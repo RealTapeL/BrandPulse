@@ -1,0 +1,121 @@
+<mxfile host="65bd71144e">
+    <diagram name="餐饮业态数据采集范围" id="fb-data-scope">
+        <mxGraphModel dx="1328" dy="665" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1800" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="餐饮业态数据采集范围（BrandPulse）" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#1A1A2E;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="20" width="1000" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="subtitle" value="领导指示：优先内部营运数据，外部招商大数据先选易获取的公开数据" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontColor=#64748B;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="70" width="1000" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="p0-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCFCE7;strokeColor=#22C55E;strokeWidth=2;arcSize=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="120" width="720" height="380" as="geometry"/>
+                </mxCell>
+                <mxCell id="p0-title" value="P0 核心数据：内部营运数据（优先开展）" style="text;html=1;strokeColor=none;fillColor=#22C55E;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=16;fontStyle=1;fontColor=#FFFFFF;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="135" width="400" height="38" as="geometry"/>
+                </mxCell>
+                <mxCell id="p0-tag" value="获取难度：低｜数据质量：高｜业务价值：高" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#166534;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="480" y="140" width="260" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="p0-1" value="&lt;b&gt;POS销售数据&lt;/b&gt;&lt;br&gt;• 销售额 / 日销售额 / 月销售额&lt;br&gt;• 客单价 / 订单数&lt;br&gt;• 坪效（销售额/面积）&lt;br&gt;• 租售比（租金/销售额）&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：判断品牌经营健康度、\n识别高风险租户" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#22C55E;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="185" width="210" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p0-2" value="&lt;b&gt;租赁合同数据&lt;/b&gt;&lt;br&gt;• 租金 / 物业费&lt;br&gt;• 租赁面积 / 楼层 / 铺位号&lt;br&gt;• 合同起止日期&lt;br&gt;• 续约/退租状态&lt;br&gt;• 免租期 / 递增条款&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：租户流失预警、\n合同到期管理" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#22C55E;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="185" width="210" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p0-3" value="&lt;b&gt;客流数据&lt;/b&gt;&lt;br&gt;• 店前客流 / 进店率&lt;br&gt;• 停留时长&lt;br&gt;• 高峰/低谷时段&lt;br&gt;• 客流转化率&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：评估品牌吸引力、\n辅助招商谈判" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#22C55E;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="530" y="185" width="210" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p0-4" value="&lt;b&gt;会员消费数据&lt;/b&gt;&lt;br&gt;• 会员消费占比&lt;br&gt;• 复购率 / 客单价&lt;br&gt;• 消费偏好标签&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：客群匹配分析、\n业态组合优化" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#22C55E;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="360" width="210" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p0-5" value="&lt;b&gt;招商联系记录&lt;/b&gt;&lt;br&gt;• 品牌联系人&lt;br&gt;• 洽谈状态&lt;br&gt;• 跟进记录&lt;br&gt;• 拓展区域&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：招商线索管理、\n商机跟进" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#22C55E;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="360" width="210" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p0-6" value="&lt;b&gt;客诉/运营评分&lt;/b&gt;&lt;br&gt;• 客诉数量及类型&lt;br&gt;• 卫生/服务评分&lt;br&gt;• 运营检查记录&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：品牌服务质量评估" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#22C55E;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="530" y="360" width="210" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#3B82F6;strokeWidth=2;arcSize=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="520" width="720" height="420" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1-title" value="P1 扩展数据：外部公开数据（支撑品牌热度/布局/分布）" style="text;html=1;strokeColor=none;fillColor=#3B82F6;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=16;fontStyle=1;fontColor=#FFFFFF;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="535" width="480" height="38" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1-tag" value="获取难度：中｜数据质量：中｜业务价值：高" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#1E40AF;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="540" width="180" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1-1" value="&lt;b&gt;大众点评数据&lt;/b&gt;&lt;br&gt;• 评分（口味/环境/服务）&lt;br&gt;• 评论数 / 人均消费&lt;br&gt;• 门店标签 / 推荐菜&lt;br&gt;• 近期评论关键词&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：品牌热度、\n消费者口碑分析" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="585" width="210" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1-2" value="&lt;b&gt;高德/百度地图&lt;/b&gt;&lt;br&gt;• 全国门店数量&lt;br&gt;• 城市分布 / 区域密度&lt;br&gt;• 门店地址 / 经纬度&lt;br&gt;• 周边商圈等级&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：品牌布局分析、\n拓店区域判断" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="585" width="210" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1-3" value="&lt;b&gt;品牌官网/公众号&lt;/b&gt;&lt;br&gt;• 品牌介绍 / 定位&lt;br&gt;• 最新拓店计划&lt;br&gt;• 加盟/合作信息&lt;br&gt;• 高管访谈 / 战略动态&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：品牌基础档案、\n招商时机判断" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="530" y="585" width="210" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1-4" value="&lt;b&gt;小红书/微博&lt;/b&gt;&lt;br&gt;• 品牌讨论量&lt;br&gt;• 热门笔记关键词&lt;br&gt;• 情感倾向（正/负）&lt;br&gt;• KOL/KOC推荐&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：品牌热度趋势、\n年轻客群偏好" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="760" width="210" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1-5" value="&lt;b&gt;竞品商场调研&lt;/b&gt;&lt;br&gt;• 对标商场餐饮品牌清单&lt;br&gt;• 各楼层业态占比&lt;br&gt;• 新引入品牌动态&lt;br&gt;• 租金水平（公开渠道）&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：竞争对标、\n差异化招商" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="760" width="210" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1-6" value="&lt;b&gt;行业报告/榜单&lt;/b&gt;&lt;br&gt;• 赢商网品牌榜单&lt;br&gt;• mallcoo 商场数据&lt;br&gt;• 餐饮连锁TOP100&lt;br&gt;• 品类趋势报告&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：行业趋势、\n品牌知名度判断" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="530" y="760" width="210" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#D97706;strokeWidth=2;arcSize=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="960" width="720" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2-title" value="P2 探索数据：外部深度数据（有条件再开展）" style="text;html=1;strokeColor=none;fillColor=#D97706;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=16;fontStyle=1;fontColor=#FFFFFF;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="975" width="420" height="38" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2-tag" value="获取难度：高｜数据质量：参差｜业务价值：中高" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#92400E;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="500" y="980" width="240" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2-1" value="&lt;b&gt;外卖平台数据&lt;/b&gt;&lt;br&gt;美团/饿了么：月销量、客单价、\n评分、热销菜品&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：补充线下销售判断、\n评估品牌真实热度" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D97706;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="1025" width="210" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2-2" value="&lt;b&gt;短视频/本地生活&lt;/b&gt;&lt;br&gt;抖音/快手：团购销量、\n探店视频热度、直播数据&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：新兴品牌热度捕捉、\n营销爆发力评估" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D97706;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="1025" width="210" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2-3" value="&lt;b&gt;新闻/招聘/投融资&lt;/b&gt;&lt;br&gt;品牌融资、关店、高管变动、\n大规模招聘（拓店信号）&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：招商时机判断、\n风险预警" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D97706;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="530" y="1025" width="210" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2-4" value="&lt;b&gt;供应链/加盟商数据&lt;/b&gt;&lt;br&gt;加盟费、开店成本、供应链信息&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：评估品牌扩张能力" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D97706;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="1160" width="210" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2-5" value="&lt;b&gt;第三方商业数据&lt;/b&gt;&lt;br&gt; Nielsen / CCFA / 艾瑞等付费报告&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：行业深度分析" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D97706;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="1160" width="210" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2-6" value="&lt;b&gt;交通/人口数据&lt;/b&gt;&lt;br&gt;商圈客流、人口结构、消费力&lt;br&gt;&lt;br&gt;&lt;b&gt;用途&lt;/b&gt;：选址匹配分析" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D97706;strokeWidth=1.5;arcSize=6;fontSize=11;align=left;verticalAlign=top;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="530" y="1160" width="210" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="right-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1;arcSize=8;" parent="1" vertex="1">
+                    <mxGeometry x="820" y="120" width="520" height="1100" as="geometry"/>
+                </mxCell>
+                <mxCell id="right-title" value="💡 落地建议与采集策略" style="text;html=1;strokeColor=none;fillColor=#1E293B;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=16;fontStyle=1;fontColor=#FFFFFF;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="135" width="480" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="strategy-1" value="&lt;b&gt;1. 先选一个细分品类跑通&lt;/b&gt;&lt;br&gt;&lt;br&gt;建议先选 &lt;b&gt;茶饮/咖啡&lt;/b&gt; 或 &lt;b&gt;火锅&lt;/b&gt;，原因：&lt;br&gt;• 品牌数量适中，容易梳理&lt;br&gt;• 公开数据丰富（大众点评/地图）&lt;br&gt;• 内部经营数据通常较完整&lt;br&gt;• 领导容易理解价值" style="text;html=1;strokeColor=none;fillColor=#F1F5F9;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=12;fontColor=#334155;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="190" width="480" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="strategy-2" value="&lt;b&gt;2. 先做&#39;内部数据&#39;再做&#39;外部数据&#39;&lt;/b&gt;&lt;br&gt;&lt;br&gt;内部数据是你的&lt;b&gt;护城河&lt;/b&gt;：&lt;br&gt;• 只有你们有，竞争对手买不到&lt;br&gt;• 质量高、可验证、跟业务直接挂钩&lt;br&gt;• 能快速证明AI价值（如租户流失预警）&lt;br&gt;&lt;br&gt;外部数据是&lt;b&gt;放大器&lt;/b&gt;：&lt;br&gt;• 补充品牌热度和布局信息&lt;br&gt;• 支撑招商决策（该不该引入某品牌）" style="text;html=1;strokeColor=none;fillColor=#F1F5F9;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=12;fontColor=#334155;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="365" width="480" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="strategy-3" value="&lt;b&gt;3. 外部数据从小而稳开始&lt;/b&gt;&lt;br&gt;&lt;br&gt;不要一上来就接所有平台：&lt;br&gt;• 第1个月：大众点评 + 高德地图&lt;br&gt;• 第2个月：加品牌官网/公众号&lt;br&gt;• 第3个月：加小红书/竞品商场&lt;br&gt;• 稳定后再考虑外卖/抖音/新闻&lt;br&gt;&lt;br&gt;每个新数据源都要先评估：&lt;br&gt;• 获取成本 vs 业务价值&lt;br&gt;• 数据稳定性（会不会频繁被封）&lt;br&gt;• 更新频率（多久采一次）" style="text;html=1;strokeColor=none;fillColor=#F1F5F9;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=12;fontColor=#334155;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="600" width="480" height="240" as="geometry"/>
+                </mxCell>
+                <mxCell id="strategy-4" value="&lt;b&gt;4. 数据采集 ≠ 有价值&lt;/b&gt;&lt;br&gt;&lt;br&gt;采集前要明确：这个数据能回答什么问题？&lt;br&gt;&lt;br&gt;例如：&lt;br&gt;• 大众点评评分 → 这个品牌口碑怎么样？&lt;br&gt;• 高德门店分布 → 这个品牌在哪些城市活跃？&lt;br&gt;• POS租售比 → 这个品牌在我们商场赚钱吗？&lt;br&gt;• 合同到期日 → 哪些租户可能近期退租？" style="text;html=1;strokeColor=none;fillColor=#F1F5F9;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=12;fontColor=#334155;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="855" width="480" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="strategy-5" value="&lt;b&gt;5. 给领导的汇报口径&lt;/b&gt;&lt;br&gt;&lt;br&gt;&#39;我先从餐饮内部营运数据入手，\n把POS、合同、客流数据整合起来，\n做租户健康度和流失预警。\n同时补充大众点评和高德的公开数据，\n做品牌热度和布局分析。\n等这个品类跑通了，再扩展数据源。&#39;" style="text;html=1;strokeColor=none;fillColor=#ECFDF5;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=12;fontColor=#065F46;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="1050" width="480" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="bottom-note" value="注：P0/P1/P2 不是绝对顺序，而是投入优先级。建议先用 1-2 周把 P0 数据梳理清楚，再用 2-4 周接入 P1 数据，P2 根据实际效果决定是否投入。" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#64748B;fontStyle=2;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="1240" width="1300" height="25" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

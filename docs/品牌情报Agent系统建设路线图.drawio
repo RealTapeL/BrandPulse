@@ -1,0 +1,244 @@
+<mxfile host="app.diagrams.net" modified="2025-01-20T00:00:00.000Z" agent="Kimi" version="21.0.0" etag="brand-intelligence-agent" type="device">
+  <diagram name="品牌情报Agent系统建设路线图" id="brand-intelligence-roadmap">
+    <mxGraphModel dx="2400" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- 标题 -->
+        <mxCell id="title" value="品牌情报Agent系统 — 分阶段建设路线图" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=28;fontStyle=1;fontColor=#1A1A2E;" vertex="1" parent="1">
+          <mxGeometry x="800" y="20" width="800" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 阶段1：品牌知识库与数据基础 ==================== -->
+        <mxCell id="phase1-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F4FD;strokeColor=#3B82F6;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="760" height="460" as="geometry" />
+        </mxCell>
+        <mxCell id="phase1-title" value="阶段1：品牌知识库与数据基础设施" style="text;html=1;strokeColor=none;fillColor=#3B82F6;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=18;fontStyle=1;fontColor=#FFFFFF;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="60" y="120" width="400" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="phase1-subtitle" value="核心目标：把零散的品牌信息变成结构化、可查询、可分析的数据资产" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#64748B;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="165" width="600" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- 1.1 品牌分类体系梳理 -->
+        <mxCell id="1-1-box" value="&lt;b&gt;1.1 品牌分类体系梳理&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="200" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="1-1-detail" value="• 建立业态分类标准（零售/餐饮/儿童/娱乐/生活服务/体验）&lt;br&gt;• 按品类细分（餐饮→火锅/茶饮/咖啡/快餐/正餐等）&lt;br&gt;• 按品牌档次分级（国际精品/轻奢/快时尚/大众/平价）&lt;br&gt;• 按品牌级别标注（首店/旗舰店/标准店/概念店）&lt;br&gt;• 定义品牌属性标签（拓店状态、区域偏好、租金承受力）" style="text;html=1;strokeColor=none;fillColor=#F1F5F9;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="255" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="1-1-output" value="交付物：品牌分类标准文档 + 品牌属性标签体系" style="text;html=1;strokeColor=none;fillColor=#DBEAFE;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fontColor=#1E40AF;" vertex="1" parent="1">
+          <mxGeometry x="60" y="372" width="340" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 1.2 品牌知识库搭建 -->
+        <mxCell id="1-2-box" value="&lt;b&gt;1.2 品牌知识库搭建&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="420" y="200" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="1-2-detail" value="• 收集品牌基础信息（品牌名、所属公司、成立年份、总部）&lt;br&gt;• 整理品牌门店分布（城市覆盖、门店数量、区域密度）&lt;br&gt;• 记录品牌联系方式（招商负责人、拓展区域、联系方式）&lt;br&gt;• 汇总品牌经营数据（客单价、目标客群、标准面积需求）&lt;br&gt;• 维护品牌动态档案（最新融资、高管变动、战略调整）" style="text;html=1;strokeColor=none;fillColor=#F1F5F9;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="420" y="255" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="1-2-output" value="交付物：品牌数据库（Excel/数据库）+ 品牌档案卡片" style="text;html=1;strokeColor=none;fillColor=#DBEAFE;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fontColor=#1E40AF;" vertex="1" parent="1">
+          <mxGeometry x="420" y="372" width="340" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 1.3 数据源盘点与接入 -->
+        <mxCell id="1-3-box" value="&lt;b&gt;1.3 数据源盘点与接入&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="410" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="1-3-detail" value="• 内部数据源：POS系统、会员系统、物业系统、合同系统&lt;br&gt;• 外部公开数据源：大众点评（评分/评论/热度）、高德地图（门店分布）&lt;br&gt;• 社交媒体数据：小红书/微博（品牌讨论量、舆情趋势）&lt;br&gt;• 行业数据：赢商网、mallcoo、品牌官网/公众号&lt;br&gt;• 新闻数据：品牌融资、并购、高管变动、战略发布" style="text;html=1;strokeColor=none;fillColor=#F1F5F9;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="465" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="1-3-output" value="交付物：数据资产目录 + 数据接口/爬虫清单" style="text;html=1;strokeColor=none;fillColor=#DBEAFE;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fontColor=#1E40AF;" vertex="1" parent="1">
+          <mxGeometry x="60" y="582" width="340" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 1.4 数据标准化与清洗 -->
+        <mxCell id="1-4-box" value="&lt;b&gt;1.4 数据标准化与清洗&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B82F6;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="420" y="410" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="1-4-detail" value="• 统一品牌命名规范（解决同一品牌多种写法问题）&lt;br&gt;• 建立业态分类映射（不同系统分类口径对齐）&lt;br&gt;• 数据质量校验（缺失值、异常值、重复数据清理）&lt;br&gt;• 数据更新机制（定期同步频率、增量更新策略）&lt;br&gt;• 数据血缘追踪（每个数据字段从哪来、怎么算的）" style="text;html=1;strokeColor=none;fillColor=#F1F5F9;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="420" y="465" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="1-4-output" value="交付物：数据标准文档 + 数据质量监控规则" style="text;html=1;strokeColor=none;fillColor=#DBEAFE;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fontColor=#1E40AF;" vertex="1" parent="1">
+          <mxGeometry x="420" y="582" width="340" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 阶段1完成标志 -->
+        <mxCell id="1-complete" value="✓ 阶段1完成标志：招商同事能查品牌、能看到数据、信息不再碎片化" style="text;html=1;strokeColor=none;fillColor=#BFDBFE;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=12;fontStyle=1;fontColor=#1E40AF;" vertex="1" parent="1">
+          <mxGeometry x="60" y="620" width="700" height="32" as="geometry" />
+        </mxCell>
+
+        <!-- 箭头到阶段2 -->
+        <mxCell id="arrow-1-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3B82F6;strokeWidth=3;endArrow=block;endFill=1;" edge="1" parent="1" source="1-complete" target="phase2-title">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 阶段2：品牌监控与预警系统 ==================== -->
+        <mxCell id="phase2-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0FDF4;strokeColor=#22C55E;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="660" width="760" height="460" as="geometry" />
+        </mxCell>
+        <mxCell id="phase2-title" value="阶段2：品牌监控与预警系统" style="text;html=1;strokeColor=none;fillColor=#22C55E;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=18;fontStyle=1;fontColor=#FFFFFF;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="60" y="680" width="400" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="phase2-subtitle" value="核心目标：从'人找数据'变成'数据找人'，有异常自动提醒" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#64748B;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="725" width="600" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- 2.1 监控指标体系设计 -->
+        <mxCell id="2-1-box" value="&lt;b&gt;2.1 监控指标体系设计&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#22C55E;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="760" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="2-1-detail" value="• 品牌热度指标：大众点评评分变化、搜索指数、社交讨论量&lt;br&gt;• 拓店动态指标：新开店数、关店数、城市覆盖变化&lt;br&gt;• 经营健康指标：租售比趋势、坪效变化、客流关联度&lt;br&gt;• 风险预警指标：负面舆情、投诉量突增、经营异常&lt;br&gt;• 竞争指标：竞品商场品牌引入、同业态品牌对比" style="text;html=1;strokeColor=none;fillColor=#F0FDF4;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="815" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="2-1-output" value="交付物：品牌监控指标体系文档 + 指标计算规则" style="text;html=1;strokeColor=none;fillColor=#DCFCE7;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fontColor=#166534;" vertex="1" parent="1">
+          <mxGeometry x="60" y="932" width="340" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 2.2 规则引擎搭建 -->
+        <mxCell id="2-2-box" value="&lt;b&gt;2.2 规则引擎搭建&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#22C55E;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="420" y="760" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="2-2-detail" value="• 阈值规则：租售比>25%触发预警、评分下降>0.5触发关注&lt;br&gt;• 趋势规则：连续3个月客流下降>15%触发分析&lt;br&gt;• 对比规则：本品牌坪效低于同业态均值20%触发优化建议&lt;br&gt;• 事件规则：监测到品牌融资/关店/高管变动自动触发&lt;br&gt;• 组合规则：多指标同时满足时触发高优先级预警" style="text;html=1;strokeColor=none;fillColor=#F0FDF4;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="420" y="815" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="2-2-output" value="交付物：规则配置面板 + 预警触发逻辑文档" style="text;html=1;strokeColor=none;fillColor=#DCFCE7;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fontColor=#166534;" vertex="1" parent="1">
+          <mxGeometry x="420" y="932" width="340" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 2.3 自动数据采集与更新 -->
+        <mxCell id="2-3-box" value="&lt;b&gt;2.3 自动数据采集与更新&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#22C55E;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="970" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="2-3-detail" value="• 爬虫自动化：定时抓取大众点评、高德、品牌官网数据&lt;br&gt;• API对接：接入地图服务、舆情监测、新闻聚合API&lt;br&gt;• 数据增量更新：只更新变化的部分，降低系统负担&lt;br&gt;• 数据校验与异常处理：抓取失败重试、数据质量校验&lt;br&gt;• 采集日志与监控：记录每次采集状态、失败告警" style="text;html=1;strokeColor=none;fillColor=#F0FDF4;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1025" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="2-3-output" value="交付物：自动化采集脚本 + 采集监控看板" style="text;html=1;strokeColor=none;fillColor=#DCFCE7;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fontColor=#166534;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1142" width="340" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 2.4 预警推送机制 -->
+        <mxCell id="2-4-box" value="&lt;b&gt;2.4 预警推送机制&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#22C55E;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="420" y="970" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="2-4-detail" value="• 多渠道推送：企业微信/钉钉/邮件/短信&lt;br&gt;• 分级推送：高优先级立即推、中优先级日报汇总、低优先级周报&lt;br&gt;• 精准到人：招商异常→推招商负责人、运营异常→推运营负责人&lt;br&gt;• 推送内容模板：包含异常描述、数据依据、建议动作&lt;br&gt;• 推送反馈追踪：推送后是否已读、是否处理、处理结果" style="text;html=1;strokeColor=none;fillColor=#F0FDF4;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1025" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="2-4-output" value="交付物：预警推送系统 + 推送模板库" style="text;html=1;strokeColor=none;fillColor=#DCFCE7;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fontColor=#166534;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1142" width="340" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 阶段2完成标志 -->
+        <mxCell id="2-complete" value="✓ 阶段2完成标志：系统能自动发现品牌异常并推送给对的人，不需要人每天盯着" style="text;html=1;strokeColor=none;fillColor=#BBF7D0;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=12;fontStyle=1;fontColor=#166534;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1180" width="700" height="32" as="geometry" />
+        </mxCell>
+
+        <!-- 箭头到阶段3 -->
+        <mxCell id="arrow-2-3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#22C55E;strokeWidth=3;endArrow=block;endFill=1;" edge="1" parent="1" source="2-complete" target="phase3-title">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 阶段3：智能分析与Agent化 ==================== -->
+        <mxCell id="phase3-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3E2;strokeColor=#F59E0B;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1220" width="760" height="500" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-title" value="阶段3：智能分析与Agent化升级" style="text;html=1;strokeColor=none;fillColor=#F59E0B;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=18;fontStyle=1;fontColor=#FFFFFF;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1240" width="400" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3-subtitle" value="核心目标：从'告诉你数据'到'告诉你结论'，再到'帮你行动'" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#64748B;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1285" width="600" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- 3.1 智能推理层（LLM分析） -->
+        <mxCell id="3-1-box" value="&lt;b&gt;3.1 智能推理层（LLM分析）&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F59E0B;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1320" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="3-1-detail" value="• 数据→结论：自动解读'喜茶新增500店→拓店活跃，招商窗口期'&lt;br&gt;• 多源信息整合：把新闻+评分+销售+竞品信息整合成一个判断&lt;br&gt;• 品牌适配分析：根据项目定位，判断某品牌是否适合引入&lt;br&gt;• 风险根因分析：不只报'租售比高'，而是分析'为什么高'&lt;br&gt;• 趋势预测：基于历史数据预测品牌未来3-6个月走势" style="text;html=1;strokeColor=none;fillColor=#FEF9C3;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1375" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="3-1-output" value="交付物：智能分析报告生成引擎" style="text;html=1;strokeColor=none;fillColor=#FEF3C7;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fontColor=#92400E;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1492" width="340" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 3.2 对话式交互界面 -->
+        <mxCell id="3-2-box" value="&lt;b&gt;3.2 对话式交互界面&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F59E0B;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1320" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="3-2-detail" value="• 自然语言查询：'最近哪些茶饮品牌在拓店？'→直接返回答案&lt;br&gt;• 多轮对话：'上海呢？'→理解上下文，继续回答&lt;br&gt;• 推荐式交互：'根据我们项目定位，推荐5个适合引入的品牌'&lt;br&gt;• 解释能力：'为什么推荐这个品牌？'→给出推理依据&lt;br&gt;• 个性化：不同角色（招商/运营/高管）看到不同视角" style="text;html=1;strokeColor=none;fillColor=#FEF9C3;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1375" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="3-2-output" value="交付物：对话式品牌情报助手（Chatbot）" style="text;html=1;strokeColor=none;fillColor=#FEF3C7;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fontColor=#92400E;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1492" width="340" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 3.3 自动化行动建议 -->
+        <mxCell id="3-3-box" value="&lt;b&gt;3.3 自动化行动建议与执行&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F59E0B;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1530" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="3-3-detail" value="• 行动推荐：识别机会后自动生成'建议联系XX品牌华东区负责人'&lt;br&gt;• 内容生成：自动起草外联邮件、会议邀约、品牌调研简报&lt;br&gt;• 任务创建：自动在CRM/钉钉创建跟进任务，分配给负责人&lt;br&gt;• 知识沉淀：每次交互和结论自动归档，形成组织知识库&lt;br&gt;• 闭环追踪：推荐行动→执行→结果反馈→模型优化" style="text;html=1;strokeColor=none;fillColor=#FEF9C3;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1585" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="3-3-output" value="交付物：自动化行动工作流引擎" style="text;html=1;strokeColor=none;fillColor=#FEF3C7;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fontColor=#92400E;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1702" width="340" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 3.4 持续学习与优化 -->
+        <mxCell id="3-4-box" value="&lt;b&gt;3.4 持续学习与优化&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F59E0B;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1530" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="3-4-detail" value="• 反馈收集：用户对推荐结果打标签（有用/没用）&lt;br&gt;• 预测准确度追踪：预警命中率、推荐成功率统计&lt;br&gt;• 模型迭代：基于反馈数据优化推理规则和LLM Prompt&lt;br&gt;• 新数据源接入：持续扩展监控范围（新平台、新指标）&lt;br&gt;• 知识库更新：品牌信息、市场动态自动更新维护" style="text;html=1;strokeColor=none;fillColor=#FEF9C3;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1585" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="3-4-output" value="交付物：系统优化迭代机制 + 效果评估报表" style="text;html=1;strokeColor=none;fillColor=#FEF3C7;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;fontStyle=1;fontColor=#92400E;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1702" width="340" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- 阶段3完成标志 -->
+        <mxCell id="3-complete" value="✓ 阶段3完成标志：系统像助手一样能对话、能推理、能建议、能行动——真正的Agent" style="text;html=1;strokeColor=none;fillColor=#FEF3C7;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=12;fontStyle=1;fontColor=#92400E;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1740" width="700" height="32" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 右侧：关键说明 ==================== -->
+        <mxCell id="note-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="850" y="100" width="520" height="1670" as="geometry" />
+        </mxCell>
+        <mxCell id="note-title" value="💡 关键说明与演进逻辑" style="text;html=1;strokeColor=none;fillColor=#1E293B;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=16;fontStyle=1;fontColor=#FFFFFF;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="870" y="120" width="480" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- 演进逻辑 -->
+        <mxCell id="note-evolution" value="&lt;b&gt;🔄 三阶段演进逻辑&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;阶段1 → 阶段2：&lt;/b&gt;&lt;br&gt;从'数据有地方存'到'数据有变化就告诉我'&lt;br&gt;关键转变：被动查询 → 主动推送&lt;br&gt;&lt;br&gt;&lt;b&gt;阶段2 → 阶段3：&lt;/b&gt;&lt;br&gt;从'告诉我数据变了'到'告诉我这意味着什么，我该怎么做'&lt;br&gt;关键转变：规则引擎 → 智能推理 + 行动建议&lt;br&gt;&lt;br&gt;每一阶段都是下一阶段的基础，&lt;br&gt;不能跳过。" style="text;html=1;strokeColor=none;fillColor=#F1F5F9;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=12;fontColor=#334155;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="870" y="175" width="480" height="220" as="geometry" />
+        </mxCell>
+
+        <!-- 技术栈建议 -->
+        <mxCell id="note-tech" value="&lt;b&gt;🛠️ 各阶段技术栈建议&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;阶段1：&lt;/b&gt;&lt;br&gt;• 数据库：MySQL/PostgreSQL + 品牌基础表&lt;br&gt;• 存储：Notion/语雀（知识库）+ Excel（过渡）&lt;br&gt;• 爬虫：Python + Scrapy/Playwright&lt;br&gt;• 展示：Streamlit/Excel透视表（快速验证）&lt;br&gt;&lt;br&gt;&lt;b&gt;阶段2：&lt;/b&gt;&lt;br&gt;• 规则引擎：Python + Airflow（调度）&lt;br&gt;• 消息队列：RabbitMQ/Redis（异步推送）&lt;br&gt;• 推送：钉钉/企微机器人API&lt;br&gt;• 监控：Prometheus + Grafana&lt;br&gt;&lt;br&gt;&lt;b&gt;阶段3：&lt;/b&gt;&lt;br&gt;• LLM：GPT-4/Claude/DeepSeek（推理）&lt;br&gt;• Agent框架：LangChain/LangGraph&lt;br&gt;• RAG：向量数据库（Milvus/Pinecone）&lt;br&gt;• 对话界面：Web聊天窗口/钉钉机器人" style="text;html=1;strokeColor=none;fillColor=#F1F5F9;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=12;fontColor=#334155;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="870" y="410" width="480" height="380" as="geometry" />
+        </mxCell>
+
+        <!-- 数据流 -->
+        <mxCell id="note-dataflow" value="&lt;b&gt;📊 数据流向示意&lt;/b&gt;&lt;br&gt;&lt;br&gt;公开数据源（大众点评/高德/新闻）&lt;br&gt;        ↓&lt;br&gt;内部数据（POS/会员/合同/物业）&lt;br&gt;        ↓&lt;br&gt;【数据清洗层】→ 标准化品牌知识库&lt;br&gt;        ↓&lt;br&gt;【监控规则引擎】→ 异常识别与预警&lt;br&gt;        ↓&lt;br&gt;【LLM推理层】→ 智能分析 + 行动建议&lt;br&gt;        ↓&lt;br&gt;【交互界面】→ 对话/面板/推送/简报" style="text;html=1;strokeColor=none;fillColor=#F1F5F9;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=12;fontColor=#334155;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="870" y="810" width="480" height="240" as="geometry" />
+        </mxCell>
+
+        <!-- 常见陷阱 -->
+        <mxCell id="note-trap" value="&lt;b&gt;⚠️ 常见陷阱&lt;/b&gt;&lt;br&gt;&lt;br&gt;• 还没建好知识库就急着做AI分析（Garbage In, Garbage Out）&lt;br&gt;• 一上来就想做全品类，建议先选一个业态（如餐饮）跑通&lt;br&gt;• 只关注'技术炫酷'，忽略了招商同事的实际使用习惯&lt;br&gt;• 数据源不稳定，导致分析结论不可靠&lt;br&gt;• 预警规则太敏感，导致'狼来了'效应，用户麻木&lt;br&gt;• LLM幻觉问题：不验证数据来源就给出结论" style="text;html=1;strokeColor=none;fillColor=#FEF2F2;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=12;fontColor=#991B1B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="870" y="1070" width="480" height="200" as="geometry" />
+        </mxCell>
+
+        <!-- 成功标志 -->
+        <mxCell id="note-success" value="&lt;b&gt;🎯 最终成功标志&lt;/b&gt;&lt;br&gt;&lt;br&gt;招商同事说：&lt;br&gt;'以前我要花2小时查品牌信息，&lt;br&gt;现在问一句，30秒就得到答案和建议。'&lt;br&gt;&lt;br&gt;运营同事说：&lt;br&gt;'系统比我更早发现租户问题，&lt;br&gt;还能告诉我该联系谁、说什么。'&lt;br&gt;&lt;br&gt;领导说：&lt;br&gt;'这个品牌情报Agent，&lt;br&gt;帮我抓住了3个招商机会，提前退了2个风险租户。'" style="text;html=1;strokeColor=none;fillColor=#ECFDF5;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=12;fontColor=#065F46;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="870" y="1290" width="480" height="220" as="geometry" />
+        </mxCell>
+
+        <!-- 底部备注 -->
+        <mxCell id="bottom-note" value="注：此路线图按逻辑先后顺序排列，不涉及具体时间节点。每个阶段内部的模块可以并行推进，但阶段之间建议顺序执行。" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#64748B;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1800" width="1330" height="25" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

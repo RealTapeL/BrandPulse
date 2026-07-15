@@ -1,0 +1,389 @@
+<mxfile host="app.diagrams.net" modified="2025-01-20T00:00:00.000Z" agent="Kimi" version="21.0.0" etag="brand-category-system" type="device">
+  <diagram name="品牌分类体系" id="brand-category-tree">
+    <mxGraphModel dx="2400" dy="2200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2800" pageHeight="2200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- 标题 -->
+        <mxCell id="title" value="购物中心品牌分类体系（BrandPulse）" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=26;fontStyle=1;fontColor=#1A1A2E;" vertex="1" parent="1">
+          <mxGeometry x="900" y="20" width="1000" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- 根节点 -->
+        <mxCell id="root" value="购物中心品牌\n分类体系" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1E293B;strokeColor=#0F172A;fontColor=#FFFFFF;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="90" width="160" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 1. 零售业态 ==================== -->
+        <mxCell id="retail" value="零售业态\nRetail" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#3B82F6;strokeColor=#1D4ED8;fontColor=#FFFFFF;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="220" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-root-retail" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3B82F6;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="root" target="retail">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 服装鞋帽 -->
+        <mxCell id="retail-1" value="服装鞋帽" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#3B82F6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-1-1" value="快时尚\n优衣库 / ZARA / H&amp;M / MUJI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="40" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-1-2" value="运动休闲\nNike / Adidas / 李宁 / 安踏" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="40" y="440" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-1-3" value="国际精品\nLV / Gucci / Hermès" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="40" y="500" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-1-4" value="轻奢\nCoach / MK / Tory Burch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="40" y="560" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-1-5" value="女装\nONLY / VERO MODA / 歌莉娅" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="40" y="620" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-1-6" value="男装\n海澜之家 / 太平鸟 / GXG" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="40" y="680" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-1-7" value="童装\n巴拉巴拉 / 安踏儿童" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="40" y="740" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-1-8" value="内衣/家居服\n曼妮芬 / 蕉内 / ubras" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="40" y="800" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- 珠宝配饰 -->
+        <mxCell id="retail-2" value="珠宝配饰" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#3B82F6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-2-1" value="黄金珠宝\n周大福 / 周生生 / 老凤祥" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="180" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-2-2" value="时尚饰品\n施华洛世奇 / 潘多拉 / APM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="180" y="440" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-2-3" value="眼镜/手表\nJINS / 宝岛 / LOHO" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="180" y="500" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- 美妆护肤 -->
+        <mxCell id="retail-3" value="美妆护肤" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#3B82F6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-3-1" value="高端护肤\nChanel / Dior / SK-II" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="320" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-3-2" value="大众护肤\n欧莱雅 / 玉兰油 / 珀莱雅" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="320" y="440" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-3-3" value="彩妆香氛\nMAC / 完美日记 / 花西子" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="320" y="500" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-3-4" value="美妆集合店\n丝芙兰 / 屈臣氏 / 妍丽" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="320" y="560" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- 数码电子 -->
+        <mxCell id="retail-4" value="数码电子" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#3B82F6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-4-1" value="手机数码\nApple / 华为 / 小米" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="460" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-4-2" value="家电生活电器\n戴森 / 索尼 / 松下" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="460" y="440" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-4-3" value="智能穿戴\n华为 / 小米 / Apple Watch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="460" y="500" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- 生活家居 -->
+        <mxCell id="retail-5" value="生活家居" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#3B82F6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="600" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-5-1" value="家具家居\n宜家 / 无印良品 / NITORI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="600" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-5-2" value="日用百货\n名创优品 / KKV / NOME" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="600" y="440" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-5-3" value="家纺用品\n罗莱 / 富安娜 / 水星" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="600" y="500" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- 超市便利店 -->
+        <mxCell id="retail-6" value="超市/便利店" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#3B82F6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="740" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-6-1" value="精品超市\nOle' / City Super / G-Super" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="740" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-6-2" value="综合超市\n永辉 / 大润发 / 沃尔玛" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="740" y="440" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retail-6-3" value="便利店\n7-11 / 全家 / 罗森" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="740" y="500" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 2. 餐饮业态 ==================== -->
+        <mxCell id="fb" value="餐饮业态\nF&amp;B" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#22C55E;strokeColor=#16A34A;fontColor=#FFFFFF;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="220" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-root-fb" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#22C55E;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="root" target="fb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fb-1" value="正餐" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCFCE7;strokeColor=#22C55E;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="960" y="320" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="fb-1-1" value="中式正餐\n海底捞 / 西贝 / 外婆家" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="960" y="380" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fb-1-2" value="西式正餐\n必胜客 / 西提 / 蓝蛙" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="960" y="440" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fb-1-3" value="日韩式\n太二 / 九锅一堂 / 姜虎东" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="960" y="500" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fb-1-4" value="火锅\n海底捞 / 小龙坎 / 呷哺呷哺" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="960" y="560" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fb-1-5" value="烧烤/地方特色\n很久以前 / 南京大牌档" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="960" y="620" width="100" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fb-2" value="快餐/轻食" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCFCE7;strokeColor=#22C55E;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1090" y="320" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="fb-2-1" value="中式快餐\n老乡鸡 / 真功夫 / 大米先生" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1090" y="380" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fb-2-2" value="西式快餐\n肯德基 / 麦当劳 / 汉堡王" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1090" y="440" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fb-2-3" value="轻食/健康餐\nWagas / Gaga / 超级碗" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1090" y="500" width="100" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fb-3" value="休闲餐饮" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCFCE7;strokeColor=#22C55E;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="320" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="fb-3-1" value="咖啡\n星巴克 / 瑞幸 / Manner" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="380" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fb-3-2" value="茶饮\n喜茶 / 奈雪 / 茶百道" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="440" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="fb-3-3" value="烘焙甜品\n面包新语 / 好利来 / 哈根达斯" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="500" width="100" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fb-4" value="美食广场" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCFCE7;strokeColor=#22C55E;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="320" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="fb-4-1" value="美食广场\n大食代 / 食通天 / 档口集合" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="380" width="100" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 3. 儿童业态 ==================== -->
+        <mxCell id="kids" value="儿童业态\nKids" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F59E0B;strokeColor=#D97706;fontColor=#FFFFFF;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1600" y="220" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-root-kids" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#F59E0B;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="root" target="kids">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="kids-1" value="儿童零售" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#F59E0B;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1530" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="kids-1-1" value="童装童鞋\n巴拉巴拉 / 安奈儿" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FCD34D;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1530" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="kids-1-2" value="玩具用品\n孩子王 / 玩具反斗城" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FCD34D;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1530" y="440" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="kids-2" value="儿童娱乐" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#F59E0B;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1670" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="kids-2-1" value="游乐园\nMeland / 卡通尼 / 乐高中心" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FCD34D;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1670" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="kids-3" value="儿童教育" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#F59E0B;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1810" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="kids-3-1" value="早教/培训\n金宝贝 / 美吉姆 / 新东方" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FCD34D;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1810" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 4. 休闲娱乐 ==================== -->
+        <mxCell id="ent" value="休闲娱乐\nEntertainment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8B5CF6;strokeColor=#7C3AED;fontColor=#FFFFFF;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="2050" y="220" width="150" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-root-ent" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#8B5CF6;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="root" target="ent">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ent-1" value="影院剧院" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE9FE;strokeColor=#8B5CF6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1970" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ent-1-1" value="影院\n万达影城 / CGV / 百老汇" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C4B5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1970" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ent-2" value="夜生活娱乐" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE9FE;strokeColor=#8B5CF6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="2110" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ent-2-1" value="KTV/酒吧/Livehouse\n纯K / 星聚会 / Helens" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C4B5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="2110" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ent-3" value="游艺健身" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE9FE;strokeColor=#8B5CF6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ent-3-1" value="电玩游艺\n大玩家 / 风云再起" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C4B5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ent-3-2" value="健身运动\n威尔仕 / 乐刻 / 超级猩猩" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C4B5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="440" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ent-3-3" value="冰雪运动\n全明星 / 世纪星" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C4B5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="2250" y="500" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ent-4" value="文创空间" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE9FE;strokeColor=#8B5CF6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="2390" y="320" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ent-4-1" value="书店/文创\n西西弗 / 言几又 / 诚品" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C4B5FD;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="2390" y="380" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 5. 生活服务 ==================== -->
+        <mxCell id="service" value="生活服务\nService" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#06B6D4;strokeColor=#0891B2;fontColor=#FFFFFF;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="780" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="svc-1" value="美业健康" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CFFAFE;strokeColor=#06B6D4;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="940" y="880" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-1-1" value="美容美发\n丝域 / TONI&amp;GUY" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#67E8F9;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="940" y="940" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-1-2" value="美甲/SPA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#67E8F9;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="940" y="1000" width="100" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="svc-2" value="医疗健康" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CFFAFE;strokeColor=#06B6D4;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="880" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-2-1" value="药店\n海王星辰 / 老百姓" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#67E8F9;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="940" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-2-2" value="诊所/口腔/体检" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#67E8F9;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="1000" width="100" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="svc-3" value="便民服务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CFFAFE;strokeColor=#06B6D4;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="880" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-3-1" value="金融服务\n银行 / 证券网点" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#67E8F9;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="940" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-3-2" value="生活服务\n洗衣 / 宠物 / 照相" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#67E8F9;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="1000" width="100" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="svc-4" value="成人教育" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CFFAFE;strokeColor=#06B6D4;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1330" y="880" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-4-1" value="培训教育\n语言 / 考证 / 兴趣" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#67E8F9;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1330" y="940" width="100" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 6. 体验业态 ==================== -->
+        <mxCell id="experience" value="体验业态\nExperience" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EC4899;strokeColor=#DB2777;fontColor=#FFFFFF;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1640" y="780" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="exp-1" value="新能源汽车" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE7F3;strokeColor=#EC4899;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1540" y="880" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="exp-1-1" value="汽车展厅\n特斯拉 / 蔚来 / 理想 / 小鹏" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F9A8D4;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1540" y="940" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="exp-2" value="沉浸式娱乐" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE7F3;strokeColor=#EC4899;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1680" y="880" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="exp-2-1" value="剧本杀 / 密室\nVR体验 / 沉浸展" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F9A8D4;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1680" y="940" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="exp-3" value="文化艺术" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE7F3;strokeColor=#EC4899;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1820" y="880" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="exp-3-1" value="艺术空间\n展览 / 快闪 / 文创市集" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#F9A8D4;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1820" y="940" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 右侧：补充维度 ==================== -->
+        <mxCell id="dim-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1100" width="720" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="dim-title" value="📌 品牌分类的补充维度（标签体系）" style="text;html=1;strokeColor=none;fillColor=#1E293B;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=15;fontStyle=1;fontColor=#FFFFFF;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1115" width="680" height="35" as="geometry" />
+        </mxCell>
+
+        <mxCell id="dim-1" value="&lt;b&gt;档次维度&lt;/b&gt;&lt;br&gt;国际精品 / 轻奢 / 快时尚 / 大众 / 平价" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1165" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="dim-2" value="&lt;b&gt;品牌级别&lt;/b&gt;&lt;br&gt;首店 / 旗舰店 / 概念店 / 标准店" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="300" y="1165" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="dim-3" value="&lt;b&gt;经营方式&lt;/b&gt;&lt;br&gt;直营 / 加盟 / 联营" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="530" y="1165" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="dim-4" value="&lt;b&gt;拓店状态&lt;/b&gt;&lt;br&gt;活跃拓店 / 谨慎拓店 / 收缩 / 区域保护" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="70" y="1240" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="dim-5" value="&lt;b&gt;区域偏好&lt;/b&gt;&lt;br&gt;一线城市 / 新一线 / 二三线 / 下沉市场" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="300" y="1240" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="dim-6" value="&lt;b&gt;客群标签&lt;/b&gt;&lt;br&gt;年轻 / 家庭 / 商务 / 亲子 / 银发" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="530" y="1240" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="dim-7" value="&lt;b&gt;主力店标签&lt;/b&gt;&lt;br&gt;主力店 / 次主力店 / 普通铺位" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="300" y="1315" width="200" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== 右侧说明：优化点 ==================== -->
+        <mxCell id="note-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF2F2;strokeColor=#FCA5A5;strokeWidth=1;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="820" y="1100" width="520" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="note-title" value="⚠️ 相比原方案的主要优化点" style="text;html=1;strokeColor=none;fillColor=#991B1B;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=15;fontStyle=1;fontColor=#FFFFFF;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="840" y="1115" width="480" height="35" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note-1" value="&lt;b&gt;1. 消除交叉重复&lt;/b&gt;&lt;br&gt;原方案中'超级猩猩'同时出现在快餐和健身，已修正到健身。\n火锅、烧烤从'正餐'和'特色美食'合并统一。" style="text;html=1;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="840" y="1160" width="480" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="note-2" value="&lt;b&gt;2. 层级统一为3-4级&lt;/b&gt;&lt;br&gt;业态(一级) → 品类(二级) → 细分(三级) → 品牌示例。\n避免有的分支过深、有的过浅。" style="text;html=1;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="840" y="1220" width="480" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="note-3" value="&lt;b&gt;3. 餐饮分类更清晰&lt;/b&gt;&lt;br&gt;正餐(含火锅/烧烤) / 快餐轻食 / 休闲餐饮 / 美食广场，\n避免'绿茶'被误放到日韩式。" style="text;html=1;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="840" y="1275" width="480" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="note-4" value="&lt;b&gt;4. 增加补充维度标签&lt;/b&gt;&lt;br&gt;档次/品牌级别/经营方式/拓店状态/客群标签/主力店标签，\n这些不是分类树，而是每个品牌的属性标签。" style="text;html=1;strokeColor=none;fillColor=#FFFFFF;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=11;fontColor=#334155;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="840" y="1330" width="480" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- 底部备注 -->
+        <mxCell id="bottom-note" value="注：分类体系建议先按项目定位做微调。高端商场与国际精品/轻奢/美妆相关度高；社区商场则更关注生活服务、快餐、儿童业态。" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#64748B;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1410" width="1300" height="25" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

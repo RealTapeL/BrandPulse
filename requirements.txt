@@ -1,0 +1,22 @@
+# Web 请求
+requests>=2.31.0
+
+# 数据库
+SQLAlchemy>=2.0.0
+psycopg2-binary>=2.9.9
+neo4j>=5.15.0
+qdrant-client>=1.7.0
+
+# 配置与环境
+python-dotenv>=1.0.0
+
+# 数据处理
+pandas>=2.1.0
+openpyxl>=3.1.2
+
+# 向量与 embedding（可选，后续 RAG 使用）
+# sentence-transformers>=2.2.2
+# openai>=1.0.0
+
+# 开发工具
+pytest>=7.4.0
