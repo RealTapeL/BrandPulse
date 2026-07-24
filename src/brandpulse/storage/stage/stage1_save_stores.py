@@ -3,9 +3,9 @@
 """
 from typing import Dict, List
 
-from brandpulse.utils.logger.modules.logger import get_logger
-from brandpulse.utils.storage.modules.neo4j_repository import Neo4jRepository
-from brandpulse.utils.storage.modules.pg_repository import BrandRepository, StoreRepository
+from brandpulse.logger.modules.logger import get_logger
+from brandpulse.storage.modules.neo4j_repository import Neo4jRepository
+from brandpulse.storage.modules.pg_repository import BrandRepository, StoreRepository
 
 logger = get_logger(__name__)
 
@@ -32,8 +32,7 @@ def run(stores_by_brand: Dict[str, List[dict]]) -> dict:
 
         # 确保 PG 中有品牌节点
         pg_brand = brand_repo.get_brand(brand_id)
-        if pg_brand:
-            neo4j_repo.create_brand_node(pg_brand)
+        if pg_brand and neo4j_repo.create_brand_node(pg_brand):
             stats["neo4j_brands"] += 1
 
         # 保存到 PostgreSQL

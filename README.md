@@ -95,6 +95,12 @@ cp .env.example .env
 # 编辑 .env，填入高德地图 API Key
 ```
 
+> **Qdrant 免 Docker 说明**：`.env` 中默认配置了 `QDRANT_PATH=brandpulse-infra/data/qdrant-local`，
+> 即本地嵌入模式——qdrant-client 直接读写本地文件，无需启动 Qdrant 服务，API 与服务器模式一致。
+> 注意同一时刻只允许一个进程访问该目录。如需改回服务器模式，将 `QDRANT_PATH` 留空即可。
+> 该模式下 docker-compose 里的 qdrant 服务可以不启动。
+
+
 ### 4. 测试数据库连接
 
 ```bash

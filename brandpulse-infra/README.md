@@ -26,12 +26,15 @@ brandpulse-infra/
 
 - 已安装 Docker
 - 已安装 Docker Compose
-- 端口 5432、7474、7687、6333、6334 未被占用
+- 端口 5432、8484、8585、7333、7334 未被占用（可在 `.env` 中修改映射端口）
 
 ## 快速启动
 
 ```bash
 cd brandpulse-infra
+
+# 0. 创建 .env，并把 HOST_IP 改为本机 IP（查看：hostname -I | awk '{print $1}'）
+cp .env.example .env
 
 # 1. 启动服务（首次启动会下载镜像并初始化数据库）
 docker-compose up -d
@@ -48,10 +51,13 @@ docker-compose logs -f
 | 服务 | 访问地址 | 默认账号 | 默认密码 |
 |------|----------|----------|----------|
 | PostgreSQL | `localhost:5432` | `brandpulse` | `brandpulse123` |
-| Neo4j Browser | `http://localhost:7474` | `neo4j` | `brandpulse123` |
-| Neo4j Bolt | `bolt://localhost:7687` | `neo4j` | `brandpulse123` |
-| Qdrant HTTP | `http://localhost:6333` | - | - |
-| Qdrant Dashboard | `http://localhost:6333/dashboard` | - | - |
+| Neo4j Browser | `http://localhost:8484` | `neo4j` | `brandpulse123` |
+| Neo4j Bolt | `bolt://localhost:8585` | `neo4j` | `brandpulse123` |
+| Qdrant HTTP | `http://localhost:7333` | - | - |
+| Qdrant Dashboard | `http://localhost:7333/dashboard` | - | - |
+
+> 端口均可在 `.env` 中修改（`POSTGRES_PORT`、`NEO4J_HTTP_PORT`、`NEO4J_BOLT_PORT`、`QDRANT_HTTP_PORT`、`QDRANT_GRPC_PORT`）。
+> 从局域网其他机器访问时，把 `localhost` 换成 `.env` 里配置的 `HOST_IP`，并确保 Python 侧 `.env` 的连接地址同步修改。
 
 ## 停止服务
 
@@ -76,7 +82,7 @@ docker exec -it brandpulse-postgres psql -U brandpulse -d brandpulse -c "SELECT 
 
 ### Neo4j
 
-打开浏览器访问 `http://localhost:7474`，输入账号密码后执行：
+打开浏览器访问 `http://localhost:8484`，输入账号密码后执行：
 
 ```cypher
 MATCH (n) RETURN n LIMIT 25
@@ -87,7 +93,7 @@ MATCH (n) RETURN n LIMIT 25
 ### Qdrant
 
 ```bash
-curl http://localhost:6333/collections
+curl http://localhost:7333/collections
 ```
 
 ## 数据初始化说明
@@ -102,6 +108,7 @@ PostgreSQL 启动时会自动执行 `init-scripts/01_create_tables.sql`，创建
 - 门店经营数据表
 - 品牌联系人表
 - 品牌关系表
+- 知识库片段表
 - 数据采集日志表
 
 并预置瑞幸、库迪、星巴克三个品牌的基础数据及竞品关系。

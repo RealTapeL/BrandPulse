@@ -3,8 +3,8 @@ Neo4j 图数据库仓储层
 """
 from typing import Dict, List
 
-from brandpulse.utils.db_clients.modules.db_clients import Neo4jClient
-from brandpulse.utils.logger.modules.logger import get_logger
+from brandpulse.db_clients.modules.db_clients import Neo4jClient
+from brandpulse.logger.modules.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -16,7 +16,9 @@ class Neo4jRepository:
         self.client = Neo4jClient()
 
     def create_brand_node(self, brand: Dict) -> bool:
-        """创建品牌节点"""
+        """创建品牌节点；Neo4j 不可用时返回 False"""
+        if not self.client.available:
+            return False
         query = """
         MERGE (b:Brand {brand_id: $brand_id})
         SET b.brand_name_cn = $brand_name_cn,
@@ -51,7 +53,9 @@ class Neo4jRepository:
             return False
 
     def create_store_node(self, store: Dict) -> bool:
-        """创建门店节点和关系"""
+        """创建门店节点和关系；Neo4j 不可用时返回 False"""
+        if not self.client.available:
+            return False
         query = """
         MERGE (s:Store {store_id: $store_id})
         SET s.store_name = $store_name,
@@ -94,7 +98,9 @@ class Neo4jRepository:
     def create_competitor_relationship(
         self, brand_id1: str, brand_id2: str, confidence: float = 0.8
     ) -> bool:
-        """创建竞品关系"""
+        """创建竞品关系；Neo4j 不可用时返回 False"""
+        if not self.client.available:
+            return False
         query = """
         MATCH (b1:Brand {brand_id: $brand_id1})
         MATCH (b2:Brand {brand_id: $brand_id2})
@@ -113,7 +119,9 @@ class Neo4jRepository:
             return False
 
     def clear_all(self) -> bool:
-        """清空所有节点和关系（慎用）"""
+        """清空所有节点和关系（慎用）；Neo4j 不可用时返回 False"""
+        if not self.client.available:
+            return False
         query = "MATCH (n) DETACH DELETE n"
         try:
             self.client.run(query)

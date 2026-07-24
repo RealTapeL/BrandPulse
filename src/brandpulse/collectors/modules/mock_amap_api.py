@@ -5,7 +5,7 @@ Mock 高德地图数据采集器
 import random
 from typing import Dict, List, Optional
 
-from brandpulse.utils.logger.modules.logger import get_logger
+from brandpulse.logger.modules.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -5,8 +5,8 @@ from typing import Dict, List, Optional
 
 from sqlalchemy import text
 
-from brandpulse.utils.db_clients.modules.db_clients import PostgresClient
-from brandpulse.utils.logger.modules.logger import get_logger
+from brandpulse.db_clients.modules.db_clients import PostgresClient
+from brandpulse.logger.modules.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -48,14 +48,14 @@ class BrandRepository:
             positioning, target_customer, avg_price_min, avg_price_max,
             standard_area_min, standard_area_max, store_count_national,
             store_count_city, expansion_status, official_website, wechat_official,
-            logo_url, data_source, is_active
+            logo_url, search_keywords, data_source, is_active
         ) VALUES (
             :brand_id, :brand_name_cn, :brand_name_en, :category_id, :tier, :brand_level,
             :business_model, :founding_year, :headquarters, :company_name, :company_id,
             :positioning, :target_customer, :avg_price_min, :avg_price_max,
             :standard_area_min, :standard_area_max, :store_count_national,
             :store_count_city, :expansion_status, :official_website, :wechat_official,
-            :logo_url, :data_source, COALESCE(:is_active, TRUE)
+            :logo_url, :search_keywords, :data_source, COALESCE(:is_active, TRUE)
         )
         ON CONFLICT (brand_id) DO UPDATE SET
             brand_name_cn = EXCLUDED.brand_name_cn,
@@ -80,6 +80,7 @@ class BrandRepository:
             official_website = EXCLUDED.official_website,
             wechat_official = EXCLUDED.wechat_official,
             logo_url = EXCLUDED.logo_url,
+            search_keywords = EXCLUDED.search_keywords,
             data_source = EXCLUDED.data_source,
             is_active = EXCLUDED.is_active,
             updated_at = CURRENT_TIMESTAMP
@@ -203,3 +204,112 @@ class StoreRepository:
                 success_count += 1
         logger.info(f"批量保存门店完成: {success_count}/{len(stores)}")
         return success_count
+
+
+class RelationshipRepository:
+    """品牌关系数据仓储"""
+
+    def __init__(self):
+        self.client = PostgresClient()
+
+    def list_relationships(
+        self,
+        relation_type: Optional[str] = None,
+    ) -> List[Dict]:
+        """查询品牌关系列表"""
+        sql = "SELECT * FROM brand_relationships WHERE 1=1"
+        params = {}
+        if relation_type:
+            sql += " AND relation_type = :relation_type"
+            params["relation_type"] = relation_type
+        sql += " ORDER BY brand_id, related_brand_id"
+
+        with self.client.engine.connect() as conn:
+            result = conn.execute(text(sql), params)
+            rows = result.mappings().all()
+            return [dict(row) for row in rows]
+
+    def upsert_relationship(self, relation: Dict) -> bool:
+        """插入或更新品牌关系"""
+        sql = """
+        INSERT INTO brand_relationships (
+            relation_id, brand_id, related_brand_id, relation_type,
+            confidence_score, description, data_source
+        ) VALUES (
+            :relation_id, :brand_id, :related_brand_id, :relation_type,
+            :confidence_score, :description, :data_source
+        )
+        ON CONFLICT (relation_id) DO UPDATE SET
+            relation_type = EXCLUDED.relation_type,
+            confidence_score = EXCLUDED.confidence_score,
+            description = EXCLUDED.description,
+            data_source = EXCLUDED.data_source,
+            created_at = CURRENT_TIMESTAMP
+        """
+        try:
+            with self.client.engine.connect() as conn:
+                conn.execute(text(sql), relation)
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"保存关系 {relation.get('relation_id')} 失败: {e}")
+            return False
+
+
+class MetricsRepository:
+    """品牌指标数据仓储"""
+
+    def __init__(self):
+        self.client = PostgresClient()
+
+    def list_metrics(
+        self,
+        brand_id: Optional[str] = None,
+        platform: Optional[str] = None,
+    ) -> List[Dict]:
+        """查询指标列表"""
+        sql = "SELECT * FROM brand_metrics WHERE 1=1"
+        params = {}
+        if brand_id:
+            sql += " AND brand_id = :brand_id"
+            params["brand_id"] = brand_id
+        if platform:
+            sql += " AND platform = :platform"
+            params["platform"] = platform
+        sql += " ORDER BY metric_date DESC, brand_id"
+
+        with self.client.engine.connect() as conn:
+            result = conn.execute(text(sql), params)
+            rows = result.mappings().all()
+            return [dict(row) for row in rows]
+
+    def upsert_metric(self, metric: Dict) -> bool:
+        """插入或更新品牌指标"""
+        sql = """
+        INSERT INTO brand_metrics (
+            metric_id, brand_id, metric_date, platform,
+            overall_score, review_count, avg_price, city_count,
+            data_source
+        ) VALUES (
+            :metric_id, :brand_id, :metric_date, :platform,
+            :overall_score, :review_count, :avg_price, :city_count,
+            :data_source
+        )
+        ON CONFLICT (metric_id) DO UPDATE SET
+            metric_date = EXCLUDED.metric_date,
+            platform = EXCLUDED.platform,
+            overall_score = EXCLUDED.overall_score,
+            review_count = EXCLUDED.review_count,
+            avg_price = EXCLUDED.avg_price,
+            city_count = EXCLUDED.city_count,
+            data_source = EXCLUDED.data_source,
+            created_at = CURRENT_TIMESTAMP
+        """
+        try:
+            with self.client.engine.connect() as conn:
+                conn.execute(text(sql), metric)
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"保存指标 {metric.get('metric_id')} 失败: {e}")
+            return False

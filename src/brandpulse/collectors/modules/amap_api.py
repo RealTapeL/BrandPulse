@@ -7,8 +7,8 @@ from typing import Dict, List, Optional
 
 import requests
 
-from brandpulse.utils.config.modules.config import Config
-from brandpulse.utils.logger.modules.logger import get_logger
+from brandpulse.config.modules.config import Config
+from brandpulse.logger.modules.logger import get_logger
 
 logger = get_logger(__name__)
 

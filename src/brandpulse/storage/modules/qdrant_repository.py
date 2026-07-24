@@ -5,8 +5,8 @@ from typing import Dict, List, Optional
 
 from qdrant_client.http import models
 
-from brandpulse.utils.db_clients.modules.db_clients import QdrantClientWrapper
-from brandpulse.utils.logger.modules.logger import get_logger
+from brandpulse.db_clients.modules.db_clients import QdrantClientWrapper
+from brandpulse.logger.modules.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -110,9 +110,9 @@ class QdrantRepository:
                     )
                 search_filter = models.Filter(must=conditions)
 
-            results = self.client.search(
+            response = self.client.query_points(
                 collection_name=self.collection_name,
-                query_vector=query_vector,
+                query=query_vector,
                 query_filter=search_filter,
                 limit=limit,
                 with_payload=True,
@@ -124,7 +124,7 @@ class QdrantRepository:
                     "score": r.score,
                     "payload": r.payload,
                 }
-                for r in results
+                for r in response.points
             ]
         except Exception as e:
             logger.error(f"向量搜索失败: {e}")

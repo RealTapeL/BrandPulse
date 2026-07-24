@@ -7,7 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # 加载项目根目录的 .env 文件
-PROJECT_ROOT = Path(__file__).resolve().parents[5]
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 ENV_FILE = PROJECT_ROOT / ".env"
 
 if ENV_FILE.exists():
@@ -24,17 +24,29 @@ class Config:
     POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "brandpulse123")
     POSTGRES_DB = os.getenv("POSTGRES_DB", "brandpulse")
 
-    # Neo4j
-    NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    # Neo4j（默认端口与 brandpulse-infra/docker-compose.yml 的映射一致）
+    NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:8585")
     NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
     NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "brandpulse123")
 
-    # Qdrant
+    # Qdrant（默认端口与 brandpulse-infra/docker-compose.yml 的映射一致）
     QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
-    QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
+    QDRANT_PORT = int(os.getenv("QDRANT_PORT", "7333"))
+    # 本地嵌入模式：设置后忽略 host/port，直接读写本地文件，无需 Qdrant 服务
+    # 相对路径基于项目根目录解析；同一时刻只允许一个进程访问该目录
+    QDRANT_PATH = os.getenv("QDRANT_PATH", "")
 
     # 高德 API
     AMAP_KEY = os.getenv("AMAP_KEY", "")
+
+    # LLM / Embedding 配置（OpenAI 兼容接口）
+    LLM_BASE_URL = os.getenv("LLM_BASE_URL", "")
+    LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+    LLM_MODEL = os.getenv("LLM_MODEL", "")
+    EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL", "")
+    EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
+    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "")
+    DEFAULT_VECTOR_SIZE = int(os.getenv("DEFAULT_VECTOR_SIZE", "1536"))
 
     # 项目路径
     DATA_DIR = PROJECT_ROOT / "data"

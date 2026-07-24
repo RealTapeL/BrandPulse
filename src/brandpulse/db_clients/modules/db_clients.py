@@ -2,6 +2,7 @@
 BrandPulse 数据库客户端
 统一封装 PostgreSQL、Neo4j、Qdrant 的连接
 """
+from pathlib import Path
 from typing import Optional
 
 from neo4j import GraphDatabase
@@ -9,8 +10,8 @@ from qdrant_client import QdrantClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-from brandpulse.utils.config.modules.config import Config
-from brandpulse.utils.logger.modules.logger import get_logger
+from brandpulse.config.modules.config import PROJECT_ROOT, Config
+from brandpulse.logger.modules.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -46,17 +47,25 @@ class PostgresClient:
 
 
 class Neo4jClient:
-    """Neo4j 图数据库客户端"""
+    """Neo4j 图数据库客户端（Neo4j 未安装时自动降级为不可用）"""
 
     _instance: Optional["Neo4jClient"] = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance.driver = GraphDatabase.driver(
-                Config.NEO4J_URI,
-                auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD),
-            )
+            cls._instance.available = False
+            cls._instance.driver = None
+            try:
+                cls._instance.driver = GraphDatabase.driver(
+                    Config.NEO4J_URI,
+                    auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD),
+                )
+                # 立即验证连接是否可用
+                cls._instance.driver.verify_connectivity()
+                cls._instance.available = True
+            except Exception as e:
+                logger.warning(f"Neo4j 未启动或连接失败，已自动跳过图操作: {e}")
         return cls._instance
 
     def close(self):
@@ -65,12 +74,16 @@ class Neo4jClient:
             self.driver.close()
 
     def run(self, query: str, parameters: dict = None):
-        """执行 Cypher 查询"""
+        """执行 Cypher 查询；Neo4j 不可用时静默返回空结果"""
+        if not self.available or not self.driver:
+            return None
         with self.driver.session() as session:
             return session.run(query, parameters or {})
 
     def test_connection(self) -> bool:
         """测试连接"""
+        if not self.available or not self.driver:
+            return False
         try:
             with self.driver.session() as session:
                 session.run("RETURN 1")
@@ -88,10 +101,19 @@ class QdrantClientWrapper:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance.client = QdrantClient(
-                host=Config.QDRANT_HOST,
-                port=Config.QDRANT_PORT,
-            )
+            if Config.QDRANT_PATH:
+                # 本地嵌入模式：无需 Qdrant 服务，数据存本地文件
+                path = Path(Config.QDRANT_PATH)
+                if not path.is_absolute():
+                    path = PROJECT_ROOT / path
+                path.mkdir(parents=True, exist_ok=True)
+                cls._instance.client = QdrantClient(path=str(path))
+                logger.info(f"Qdrant 使用本地嵌入模式: {path}")
+            else:
+                cls._instance.client = QdrantClient(
+                    host=Config.QDRANT_HOST,
+                    port=Config.QDRANT_PORT,
+                )
         return cls._instance
 
     def get_client(self) -> QdrantClient:
