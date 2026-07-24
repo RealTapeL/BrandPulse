@@ -22,7 +22,7 @@ def main():
     parser = argparse.ArgumentParser(description="BrandPulse 品牌情报Agent系统")
     parser.add_argument(
         "command",
-        choices=["test", "stage1", "dianping"],
+        choices=["test", "stage1", "dianping", "crawl"],
         help="执行的命令",
     )
     parser.add_argument(
@@ -51,7 +51,25 @@ def main():
     parser.add_argument(
         "--login-mode",
         action="store_true",
-        help="大众点评登录模式：弹出可视化浏览器窗口，登录后保存 cookies",
+        help="登录模式：弹出可视化浏览器窗口，登录后保存 cookies（配合 --site 使用）",
+    )
+    parser.add_argument(
+        "--site",
+        type=str,
+        default=None,
+        help="通用爬虫：站点 ID（在 crawler_sites.yaml 中配置）",
+    )
+    parser.add_argument(
+        "--brand-name",
+        type=str,
+        default=None,
+        help="通用爬虫：品牌中文名",
+    )
+    parser.add_argument(
+        "--brand-id",
+        type=str,
+        default=None,
+        help="通用爬虫：品牌 ID",
     )
 
     args = parser.parse_args()
@@ -113,6 +131,63 @@ def main():
                 use_mock=args.use_mock,
             )
             logger.info(f"大众点评指标采集完成: {stats}")
+
+    elif args.command == "crawl":
+        from brandpulse.collectors.modules.generic_web_crawler import (
+            GenericWebCrawler,
+            run_from_config,
+        )
+
+        if not args.site:
+            print("请指定 --site，已配置站点:")
+            crawler = GenericWebCrawler()
+            for sid, site in crawler.sites.items():
+                status = "启用" if site.enabled else "禁用"
+                print(f"  {sid:20s} [{status}] {site.name}")
+            sys.exit(1)
+
+        # 登录模式：动态调用 extractor 的 run_login_mode 函数
+        if args.login_mode:
+            crawler = GenericWebCrawler()
+            site = crawler.sites.get(args.site)
+            if not site or not site.extractor:
+                print(f"站点 {args.site} 未配置 extractor，暂不支持登录模式")
+                sys.exit(1)
+
+            module_path, func_name = site.extractor.rsplit(":", 1)
+            if func_name != "extract_search":
+                print(f"站点 {args.site} 的 extractor 不是标准 extract_search，无法自动推断登录函数")
+                sys.exit(1)
+
+            login_func_name = "run_login_mode"
+            module = __import__(module_path, fromlist=[login_func_name])
+            login_func = getattr(module, login_func_name, None)
+            if not login_func:
+                print(f"站点 {args.site} 未实现 {login_func_name}")
+                sys.exit(1)
+
+            logger.info(f"[{args.site}] 执行登录模式")
+            ok = login_func()
+            if ok:
+                logger.info("Cookies 保存成功")
+            else:
+                logger.warning("未保存到 cookies")
+                sys.exit(1)
+            return
+
+        brand_name = args.brand_name or args.brand_id
+        if not brand_name:
+            print("请指定 --brand-id 或 --brand-name")
+            sys.exit(1)
+
+        city = args.cities[0] if args.cities else None
+        result = run_from_config(
+            site_id=args.site,
+            brand_id=args.brand_id or args.brand_name,
+            brand_name=brand_name,
+            city=city,
+        )
+        logger.info(f"通用爬虫采集完成: {result}")
 
 
 if __name__ == "__main__":

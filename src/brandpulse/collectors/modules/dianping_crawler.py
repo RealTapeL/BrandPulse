@@ -67,17 +67,19 @@ def _parse_search_text(text: str) -> Optional[Dict]:
     """从搜索结果文本中解析评分、评论数、人均消费"""
     import re
 
-    # 评分：4.5 或 4.5分
-    score_match = re.search(r"(\d+\.\d+|\d+)(?:分?)", text)
+    # 评分：大众点评评分为 0-5 的 decimal，如 4.5 / 4.51 / 4.5分
+    score_match = re.search(r"([0-5]\.\d+)\s*分?", text)
     overall_score = float(score_match.group(1)) if score_match else None
 
     # 评论数：1234条评论 / 1234条评价
     review_match = re.search(r"(\d+)\s*条[评论评价]", text)
     review_count = int(review_match.group(1)) if review_match else None
 
-    # 人均：人均¥18 / 人均 18 元
+    # 人均：人均¥18 / 人均 18 元 / ¥18/人
     price_match = re.search(r"人均[\s:：]*[¥]?\s*(\d+)", text)
     avg_price = int(price_match.group(1)) if price_match else None
+
+    logger.debug(f"解析文本: {text[:120]!r} -> score={overall_score}, reviews={review_count}, price={avg_price}")
 
     return {
         "shop_text": text[:200],
@@ -92,7 +94,7 @@ class DianpingCrawler:
 
     def __init__(
         self,
-        delay: tuple = (3, 5),
+        delay: tuple = (8, 12),
         headless: bool = True,
         use_cookies: bool = True,
     ):

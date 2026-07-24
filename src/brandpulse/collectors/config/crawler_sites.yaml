@@ -1,0 +1,96 @@
+# 通用配置化爬虫：站点定义
+# 新增站点方式：
+#   1. 在 sites 下新增节点
+#   2. 配置 selectors 和 fields（简单站点）
+#   3. 复杂站点写 Python extractor，在 extractor 字段指定 "module.path:function_name"
+#
+# 字段类型说明：
+#   text      - 普通文本（XPath）
+#   attr      - HTML 属性，需指定 attr 名称
+#   css_number - CSS 字体反爬数字（需配合 css 配置）
+
+sites:
+  # ==================== 示例：CSS 字体反爬 Demo ====================
+  # 该站点用于本地测试解码器，不请求真实网站
+  demo_css_font:
+    name: "CSS 字体反爬本地演示"
+    enabled: false  # 通过 test_css_font_decoder.py 单元测试验证
+    base_url: "http://localhost:0/demo"  # 仅占位
+    method: GET
+    delay: [0, 0]
+    css:
+      enabled: true
+      font_size: 12
+      css_url_regex: 'href="([^"]+svgtextcss[^"]+)"'
+      svg_regex_template: 'background-image:\s*url\(([^)]+)\);'
+      class_tag_regex: '<b\s+class="([^"]+)"></b>'
+    selectors:
+      list: "//div[@class='shop']"
+      name: ".//span[@class='name']/text()"
+    fields:
+      - name: name
+        type: text
+        selector: ".//span[@class='name']/text()"
+        required: true
+      - name: review_count
+        type: css_number
+        selector: ".//b[@class]"
+        required: true
+
+  # ==================== 大众点评（参考实现，默认关闭） ====================
+  # 说明：大众点评 PC 端有 CSS 字体反爬 + 强风控，本地请求大概率触发滑块验证码。
+  #       这里保留配置作为技术参考，实际运行建议用 Playwright + 真浏览器。
+  dianping_search:
+    name: "大众点评搜索"
+    enabled: false
+    base_url: "https://www.dianping.com/search/keyword/{city_id}/0_{keyword}"
+    method: GET
+    headers:
+      User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      Referer: "https://www.dianping.com/"
+    delay: [5, 10]
+    encoding: utf-8
+    css:
+      enabled: true
+      font_size: 12
+      css_url_regex: 'href="([^"]+svgtextcss[^"]+)"'
+      svg_regex_template: 'background-image:\s*url\(([^)]+)\);'
+      class_tag_regex: '<b\s+class="([^"]+)"></b>'
+    selectors:
+      list: "//div[@id='shop-all-list']/ul/li"
+      name: ".//div[@class='tit']/a/@title"
+      comment_num: ".//a[@class='review-num']/b/node()"
+    fields:
+      - name: name
+        type: text
+        selector: ".//div[@class='tit']/a/@title"
+        required: true
+      - name: review_count
+        type: css_number
+        selector: ".//a[@class='review-num']/b/node()"
+        required: true
+
+  # ==================== 小红书（Playwright extractor） ====================
+  xiaohongshu_search:
+    name: "小红书搜索"
+    enabled: true
+    base_url: "https://www.xiaohongshu.com/search_result?keyword={keyword}"
+    method: GET
+    delay: [5, 8]
+    headless: true
+    extractor: "brandpulse.collectors.modules.xiaohongshu_extractor:extract_search"
+    params:
+      max_notes: 10
+      # 如需本地浏览器登录态，可把 cookies 导出到 brandpulse-infra/data/cookies/xiaohongshu_cookies.json
+
+  # ==================== 美团（待实现） ====================
+  meituan_search:
+    name: "美团搜索"
+    enabled: false
+    base_url: "https://www.meituan.com/s/{keyword}/"
+    method: GET
+    delay: [3, 6]
+    headers:
+      User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    # 美团有 cookie/签名验证，需要自定义 extractor
+    extractor: "brandpulse.collectors.modules.meituan_extractor:extract_search"
