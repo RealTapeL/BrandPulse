@@ -48,6 +48,11 @@ def main():
         default=None,
         help="指定品牌 ID 列表，如：--brand-ids LK001 KD001",
     )
+    parser.add_argument(
+        "--login-mode",
+        action="store_true",
+        help="大众点评登录模式：弹出可视化浏览器窗口，登录后保存 cookies",
+    )
 
     args = parser.parse_args()
 
@@ -92,13 +97,22 @@ def main():
     elif args.command == "dianping":
         from brandpulse.collectors.stage import stage1_collect_dianping
 
-        logger.info("执行大众点评品牌指标采集")
-        stats = stage1_collect_dianping.run(
-            cities=args.cities,
-            brand_ids=args.brand_ids,
-            use_mock=args.use_mock,
-        )
-        logger.info(f"大众点评指标采集完成: {stats}")
+        if args.login_mode:
+            logger.info("执行大众点评登录模式")
+            ok = stage1_collect_dianping.run_login_mode()
+            if ok:
+                logger.info("Cookies 保存成功，可以运行正常采集命令")
+            else:
+                logger.warning("未保存到 cookies，请重试")
+                sys.exit(1)
+        else:
+            logger.info("执行大众点评品牌指标采集")
+            stats = stage1_collect_dianping.run(
+                cities=args.cities,
+                brand_ids=args.brand_ids,
+                use_mock=args.use_mock,
+            )
+            logger.info(f"大众点评指标采集完成: {stats}")
 
 
 if __name__ == "__main__":

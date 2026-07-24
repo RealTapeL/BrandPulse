@@ -17,6 +17,13 @@ from brandpulse.storage.modules.pg_repository import BrandRepository, MetricsRep
 logger = get_logger(__name__)
 
 
+def run_login_mode() -> bool:
+    """交互式登录模式：弹出浏览器窗口，登录后保存 cookies"""
+    Config.ensure_dirs()
+    crawler = DianpingCrawler()
+    return crawler.run_login_mode()
+
+
 def run(
     cities: List[str] = None,
     brand_ids: List[str] = None,

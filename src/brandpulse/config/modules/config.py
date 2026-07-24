@@ -48,10 +48,17 @@ class Config:
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "")
     DEFAULT_VECTOR_SIZE = int(os.getenv("DEFAULT_VECTOR_SIZE", "1536"))
 
+    # 大众点评远程浏览器配置（CDP）
+    # 示例：http://192.168.0.100:9222
+    # 留空则使用 Playwright 在本地启动 Chromium
+    DIANPING_CDP_URL = os.getenv("DIANPING_CDP_URL", "")
+
     # 项目路径
     DATA_DIR = PROJECT_ROOT / "data"
     RAW_DIR = DATA_DIR / "raw"
     PROCESSED_DIR = DATA_DIR / "processed"
+    COOKIE_DIR = PROJECT_ROOT / "brandpulse-infra" / "data" / "cookies"
+    DEBUG_DIR = RAW_DIR / "dianping_debug"
 
     @classmethod
     def postgres_dsn(cls) -> str:
@@ -66,3 +73,5 @@ class Config:
         """确保数据目录存在"""
         cls.RAW_DIR.mkdir(parents=True, exist_ok=True)
         cls.PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+        cls.COOKIE_DIR.mkdir(parents=True, exist_ok=True)
+        cls.DEBUG_DIR.mkdir(parents=True, exist_ok=True)
