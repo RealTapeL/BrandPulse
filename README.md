@@ -24,7 +24,7 @@ BrandPulse/
 │
 ├── data/                           # 数据目录
 │   ├── raw/                        # 原始采集数据 / 调试输出
-│   ├── processed/                  # 清洗后数据 / metrics JSONL 缓存
+│   ├── processed/                  # 清洗后数据 / metrics JSON 缓存
 │   └── sample/                     # 示例数据
 │
 ├── scripts/                        # 一次性脚本
@@ -46,7 +46,7 @@ BrandPulse/
 │       │   │   ├── css_font_decoder.py     # CSS 字体反爬解码
 │       │   │   └── cookie_loader.py        # Cookie 导入导出
 │       │   └── stage/              # 采集编排（stage1_*）
-│       └── storage/                # 数据仓储层（PG / Neo4j / Qdrant / JSONL 文件缓存）
+│       └── storage/                # 数据仓储层（PG / Neo4j / Qdrant / JSON 文件缓存）
 │
 └── tests/                          # 测试代码
 ```
@@ -275,7 +275,7 @@ python main.py crawl --site xiaohongshu_webbridge --brand-id LK001 --brand-name 
 python main.py crawl --site xiaohongshu_search_api --brand-id LK001 --brand-name 瑞幸咖啡 --cities 北京
 ```
 
-> 所有方案采集结果都会**同时写入 PostgreSQL 和本地 JSONL 缓存**（`data/processed/metrics_*.jsonl`）。设置 `DISABLE_METRICS_DB=true` 可只用文件缓存。
+> 所有方案采集结果都会**同时写入 PostgreSQL 和本地 JSON 缓存**（`data/processed/metrics_*.json`）。设置 `DISABLE_METRICS_DB=true` 可只用文件缓存。
 
 ## 当前能力
 
@@ -288,7 +288,7 @@ python main.py crawl --site xiaohongshu_search_api --brand-id LK001 --brand-name
 - ✅ Neo4j 降级：竞品关系由 PG 表维护
 - ✅ 配置化通用爬虫引擎（crawler_sites.yaml + extractor 插件）
 - ✅ 小红书两种采集方案（WebBridge / 搜索 API）
-- ✅ metrics 双写：PostgreSQL + 本地 JSONL 文件缓存
+- ✅ metrics 双写：PostgreSQL + 本地 JSON 文件缓存
 - ✅ 测试：`pytest tests/` 通过
 
 ## 后续计划

@@ -324,7 +324,7 @@ class GenericWebCrawler:
 def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional[str] = None):
     """
     便捷入口：从配置文件运行单个站点，并将结果写入 brand_metrics（PostgreSQL）
-    和本地 JSONL 缓存文件。可通过 DISABLE_METRICS_DB=1 禁用 PostgreSQL，只用文件缓存。
+    和本地 JSON 缓存文件。可通过 DISABLE_METRICS_DB=1 禁用 PostgreSQL，只用文件缓存。
     """
     import os
 

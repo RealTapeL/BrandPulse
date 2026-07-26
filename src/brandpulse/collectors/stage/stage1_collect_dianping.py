@@ -88,6 +88,6 @@ def run(
         total_db += db_saved
         total_file += file_saved
 
-        logger.info(f"{brand_id} 点评指标保存: PG {db_saved}/{len(metrics)}, JSONL {file_saved}/{len(metrics)}")
+        logger.info(f"{brand_id} 点评指标保存: PG {db_saved}/{len(metrics)}, JSON {file_saved}/{len(metrics)}")
 
     return {"metrics": total_db, "cached": total_file, "brands": len(brands)}

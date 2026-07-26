@@ -2,12 +2,12 @@
 本地文件缓存仓储
 
 作为 PostgreSQL metrics 存储的轻量级替代/补充。
-采集结果以 JSONL 形式写入 data/processed/，无需数据库服务即可查看和后续分析。
+采集结果以标准 JSON（数组）形式写入 data/processed/，无需数据库服务即可查看和后续分析。
 
 文件命名：
-    data/processed/metrics_{metric_date}.jsonl
+    data/processed/metrics_{metric_date}.json
 
-每一行是一条 metric 记录，可直接用 pandas / jq / Python 读取。
+每个文件是一个 JSON 数组，元素为 metric 记录，可直接用 pandas / Python / 编辑器读取。
 """
 import json
 import os
@@ -22,18 +22,30 @@ logger = get_logger(__name__)
 
 
 class FileMetricsRepository:
-    """把品牌指标写入本地 JSONL 文件，实现无 DB 本地保存"""
+    """把品牌指标写入本地 JSON 文件，实现无 DB 本地保存"""
 
     def __init__(self, cache_dir: Optional[Path] = None):
         self.cache_dir = Path(cache_dir) if cache_dir else Config.METRICS_CACHE_DIR
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _file_path(self, metric_date: str) -> Path:
-        return self.cache_dir / f"metrics_{metric_date}.jsonl"
+        return self.cache_dir / f"metrics_{metric_date}.json"
+
+    def _load_file(self, path: Path) -> List[Dict]:
+        """读取单个 JSON 缓存文件，返回记录列表"""
+        if not path.exists():
+            return []
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, list) else []
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"读取缓存文件失败 {path}: {e}")
+            return []
 
     def upsert_metric(self, metric: Dict) -> bool:
         """
-        把单条 metric 写入 JSONL。
+        把单条 metric 写入 JSON 数组文件。
 
         同一 metric_id 视为同一条，会先读取当天文件去重再写回，
         保证 'upsert' 语义。因为数据量小，直接读写整个文件即可。
@@ -43,19 +55,10 @@ class FileMetricsRepository:
 
         try:
             records: Dict[str, Dict] = {}
-            if path.exists():
-                with open(path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            item = json.loads(line)
-                            mid = item.get("metric_id")
-                            if mid:
-                                records[mid] = item
-                        except json.JSONDecodeError:
-                            continue
+            for item in self._load_file(path):
+                mid = item.get("metric_id")
+                if mid:
+                    records[mid] = item
 
             records[metric["metric_id"]] = {
                 **metric,
@@ -63,8 +66,7 @@ class FileMetricsRepository:
             }
 
             with open(path, "w", encoding="utf-8") as f:
-                for item in records.values():
-                    f.write(json.dumps(item, ensure_ascii=False) + "\n")
+                json.dump(list(records.values()), f, ensure_ascii=False, indent=2)
 
             return True
         except Exception as e:
@@ -83,25 +85,15 @@ class FileMetricsRepository:
         if metric_date:
             files = [self._file_path(metric_date)]
         else:
-            files = sorted(self.cache_dir.glob("metrics_*.jsonl"))
+            files = sorted(self.cache_dir.glob("metrics_*.json"))
 
         for path in files:
-            if not path.exists():
-                continue
-            with open(path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        item = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    if brand_id and item.get("brand_id") != brand_id:
-                        continue
-                    if platform and item.get("platform") != platform:
-                        continue
-                    results.append(item)
+            for item in self._load_file(path):
+                if brand_id and item.get("brand_id") != brand_id:
+                    continue
+                if platform and item.get("platform") != platform:
+                    continue
+                results.append(item)
 
         return sorted(results, key=lambda x: x.get("cached_at", ""), reverse=True)
 

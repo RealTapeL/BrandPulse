@@ -66,7 +66,7 @@ def test_filter_by_brand_and_platform(repo):
     assert len(repo.list_metrics(brand_id="LK001", platform="dianping")) == 1
 
 
-def test_jsonl_file_created(repo):
+def test_json_file_created(repo):
     repo.upsert_metric(
         {
             "metric_id": "X",
@@ -77,9 +77,9 @@ def test_jsonl_file_created(repo):
             "data_source": "url",
         }
     )
-    path = Path(repo.cache_dir) / "metrics_2026-07-26.jsonl"
+    path = Path(repo.cache_dir) / "metrics_2026-07-26.json"
     assert path.exists()
-    lines = path.read_text(encoding="utf-8").strip().splitlines()
-    assert len(lines) == 1
-    data = json.loads(lines[0])
-    assert data["metric_id"] == "X"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(data, list)
+    assert len(data) == 1
+    assert data[0]["metric_id"] == "X"
