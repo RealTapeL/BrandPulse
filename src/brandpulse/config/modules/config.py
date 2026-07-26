@@ -68,6 +68,9 @@ class Config:
     COOKIE_DIR = PROJECT_ROOT / "brandpulse-infra" / "data" / "cookies"
     DEBUG_DIR = RAW_DIR / "dianping_debug"
 
+    # 本地文件缓存路径（用于替代/备份 PostgreSQL metrics）
+    METRICS_CACHE_DIR = Path(os.getenv("METRICS_CACHE_DIR", str(PROCESSED_DIR)))
+
     @classmethod
     def postgres_dsn(cls) -> str:
         """PostgreSQL 连接字符串"""

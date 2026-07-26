@@ -323,14 +323,26 @@ class GenericWebCrawler:
 
 def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional[str] = None):
     """
-    便捷入口：从配置文件运行单个站点，并将结果写入 brand_metrics。
+    便捷入口：从配置文件运行单个站点，并将结果写入 brand_metrics（PostgreSQL）
+    和本地 JSONL 缓存文件。可通过 DISABLE_METRICS_DB=1 禁用 PostgreSQL，只用文件缓存。
     """
+    import os
+
+    from brandpulse.storage.modules.file_repository import (
+        FileMetricsRepository,
+        is_db_disabled,
+    )
+
     crawler = GenericWebCrawler()
     records = crawler.crawl_site(site_id, brand_id=brand_id, brand_name=brand_name, city=city)
 
-    metrics_repo = MetricsRepository()
-    saved = 0
-    for record in records:
+    db_disabled = is_db_disabled()
+    metrics_repo = None if db_disabled else MetricsRepository()
+    file_repo = FileMetricsRepository()
+    db_saved = 0
+    file_saved = 0
+
+    for idx, record in enumerate(records):
         # 兼容不同平台的字段命名
         likes = record.get("likes") or record.get("like_count") or 0
         comments = record.get("comments") or record.get("comment_count") or 0
@@ -341,7 +353,7 @@ def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional
         )
 
         metric = {
-            "metric_id": f"{brand_id}_{city or 'all'}_{site_id}_{int(time.time())}_{saved}",
+            "metric_id": f"{brand_id}_{city or 'all'}_{site_id}_{int(time.time())}_{idx}",
             "brand_id": brand_id,
             "metric_date": time.strftime("%Y-%m-%d"),
             "platform": site_id,
@@ -356,8 +368,10 @@ def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional
         }
         # 仅当至少有一个有效指标时才保存
         if any([metric["review_count"], metric["social_mentions"], likes, collects, shares]):
-            if metrics_repo.upsert_metric(metric):
-                saved += 1
+            if metrics_repo and metrics_repo.upsert_metric(metric):
+                db_saved += 1
+            if file_repo.upsert_metric(metric):
+                file_saved += 1
 
-    logger.info(f"[{site_id}] 保存 {saved}/{len(records)} 条指标")
-    return {"saved": saved, "records": records}
+    logger.info(f"[{site_id}] PostgreSQL 保存 {db_saved}/{len(records)} 条，本地缓存 {file_saved}/{len(records)} 条")
+    return {"saved": db_saved, "cached": file_saved, "records": records}
