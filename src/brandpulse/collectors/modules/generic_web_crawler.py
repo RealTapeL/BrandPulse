@@ -302,6 +302,11 @@ class GenericWebCrawler:
         func = getattr(module, func_name)
         url = self._build_url(site, brand_name, city, **kwargs)
 
+        # 把外部传入的额外参数（如 place）注入 site.params，供 extractor 读取
+        extra_params = {k: v for k, v in kwargs.items() if v is not None}
+        if extra_params:
+            site.params = {**site.params, **extra_params}
+
         # Playwright/Selenium 类 extractor 通常自己管理请求，默认不预取静态 HTML
         prefetch_html = site.params.get("prefetch_html", False)
         html_text = self._fetch(url, site) if prefetch_html else ""
@@ -321,10 +326,12 @@ class GenericWebCrawler:
         time.sleep(delay)
 
 
-def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional[str] = None):
+def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional[str] = None, **kwargs):
     """
     便捷入口：从配置文件运行单个站点，并将结果写入 brand_metrics（PostgreSQL）
     和本地 JSON 缓存文件。可通过 DISABLE_METRICS_DB=1 禁用 PostgreSQL，只用文件缓存。
+
+    kwargs 中的额外参数（如 place）会透传给站点 extractor。
     """
     import os
 
@@ -334,7 +341,7 @@ def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional
     )
 
     crawler = GenericWebCrawler()
-    records = crawler.crawl_site(site_id, brand_id=brand_id, brand_name=brand_name, city=city)
+    records = crawler.crawl_site(site_id, brand_id=brand_id, brand_name=brand_name, city=city, **kwargs)
 
     db_disabled = is_db_disabled()
     metrics_repo = None if db_disabled else MetricsRepository()

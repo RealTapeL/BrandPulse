@@ -94,15 +94,19 @@ def extract_search(
         logger.error("[dianping-webbridge] 大众点评采集必须指定城市")
         return []
 
-    search_url = _search_url(brand_name, city)
-    if not search_url:
-        logger.warning(f"[dianping-webbridge] 未找到城市 {city} 的点评 ID，跳过")
-        return []
-
     params = getattr(site, "params", {}) or {}
     ws_url = params.get("ws_url", DEFAULT_WS_URL)
     wait_seconds = params.get("wait_seconds", 3)
     captcha_wait = params.get("captcha_wait_seconds", 120)
+
+    # 支持按商场/地点限定搜索，如 --place 南开大悦城
+    place = params.get("place")
+    keyword = f"{place} {brand_name}" if place else brand_name
+
+    search_url = _search_url(keyword, city)
+    if not search_url:
+        logger.warning(f"[dianping-webbridge] 未找到城市 {city} 的点评 ID，跳过")
+        return []
 
     Config.ensure_dirs()
     client = WebBridgeClient(ws_url=ws_url, timeout=params.get("timeout", 60))
@@ -142,6 +146,7 @@ def extract_search(
         "brand_id": brand_id,
         "brand_name": brand_name,
         "city": city,
+        "place": place,
         "platform": "大众点评",
         "score": data.get("overall_score"),
         "review_count": data.get("review_count"),

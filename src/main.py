@@ -71,6 +71,12 @@ def main():
         default=None,
         help="通用爬虫：品牌 ID",
     )
+    parser.add_argument(
+        "--place",
+        type=str,
+        default=None,
+        help="通用爬虫：限定地点/商场名，如 --place 南开大悦城（与品牌名组合搜索）",
+    )
 
     args = parser.parse_args()
 
@@ -186,6 +192,7 @@ def main():
             brand_id=args.brand_id or args.brand_name,
             brand_name=brand_name,
             city=city,
+            place=args.place,
         )
         logger.info(f"通用爬虫采集完成: {result}")
 

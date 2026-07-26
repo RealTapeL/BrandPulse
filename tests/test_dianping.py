@@ -14,8 +14,13 @@ class TestDianpingCrawler:
     def test_search_url_construction(self):
         url = _search_url("瑞幸咖啡", "北京")
         assert url is not None
-        assert "1" in url
+        assert "/2/0_" in url  # 北京的城市 ID 实测为 2
         assert "%E7%91%9E%E5%B9%B8%E5%92%96%E5%95%A1" in url
+
+    def test_search_url_suzhou_uses_verified_id(self):
+        url = _search_url("瑞幸咖啡", "苏州")
+        assert url is not None
+        assert "/6/0_" in url  # 苏州的城市 ID 实测为 6
 
     def test_search_url_unknown_city_returns_none(self):
         assert _search_url("瑞幸咖啡", "火星") is None
