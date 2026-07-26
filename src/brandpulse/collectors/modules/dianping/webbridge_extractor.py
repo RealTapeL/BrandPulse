@@ -28,16 +28,21 @@ from brandpulse.logger.modules.logger import get_logger
 
 logger = get_logger(__name__)
 
-# 与 dianping/crawler.py 中 Playwright 版相同的取数逻辑：
-# 取搜索结果第一个门店卡片的文本，交给 _parse_search_text 正则解析
-_EXTRACT_FIRST_SHOP_JS = """
-(() => {
-    const firstShop = document.querySelector(
-        '.shop-list li, .shop-list-item, .txt, #shop-all-list li'
-    );
-    if (!firstShop) return null;
-    return { text: firstShop.innerText || firstShop.textContent || '' };
-})()
+def _build_shop_list_js(max_shops: int) -> str:
+    """构造提取搜索页门店列表的 JS（取匹配数最多的容器，避免嵌套 .txt 重复）"""
+    return f"""
+(() => {{
+    const sels = ['#shop-all-list li', '.shop-list li', '.shop-list-item'];
+    let items = [];
+    for (const sel of sels) {{
+        const els = document.querySelectorAll(sel);
+        if (els.length > items.length) items = Array.from(els);
+    }}
+    if (!items.length) items = Array.from(document.querySelectorAll('.txt'));
+    return items.slice(0, {max_shops}).map(el => ({{
+        text: el.innerText || el.textContent || ''
+    }}));
+}})()
 """
 
 
@@ -125,40 +130,54 @@ def extract_search(
         logger.error(f"[dianping-webbridge] 验证码未在 {captcha_wait}s 内通过，本次跳过")
         return []
 
+    max_shops = params.get("max_shops", 10)
     try:
-        result = client.execute("evaluate", {"code": _EXTRACT_FIRST_SHOP_JS})
+        result = client.execute("evaluate", {"code": _build_shop_list_js(max_shops)})
     except Exception as e:
         logger.error(f"[dianping-webbridge] 提取门店文本失败: {e}")
         return []
 
     value = result.get("value") if isinstance(result, dict) else None
-    text = (value or {}).get("text") if isinstance(value, dict) else None
-    if not text:
+    items = value if isinstance(value, list) else []
+    if not items:
         logger.warning("[dianping-webbridge] 未找到搜索结果门店卡片（可能触发验证或未登录）")
         return []
 
-    data = _parse_search_text(text)
-    if not data or not (data.get("overall_score") or data.get("review_count")):
-        logger.warning(f"[dianping-webbridge] 文本解析无有效指标: {text[:80]!r}")
-        return []
+    records = []
+    seen_shops = set()
+    for item in items:
+        text = (item or {}).get("text") if isinstance(item, dict) else None
+        if not text:
+            continue
+        # 去重：按门店名（文本第一行）
+        shop_name = text.split("\n", 1)[0].strip()
+        if not shop_name or shop_name in seen_shops:
+            continue
+        seen_shops.add(shop_name)
 
-    record = {
-        "brand_id": brand_id,
-        "brand_name": brand_name,
-        "city": city,
-        "place": place,
-        "platform": "大众点评",
-        "score": data.get("overall_score"),
-        "review_count": data.get("review_count"),
-        "avg_price": data.get("avg_price"),
-        "shop_text": data.get("shop_text"),
-        "url": search_url,
-    }
-    logger.info(f"[dianping-webbridge] 解析成功: score={record['score']}, reviews={record['review_count']}, price={record['avg_price']}")
+        data = _parse_search_text(text)
+        if not data or not (data.get("overall_score") or data.get("review_count")):
+            continue
+
+        records.append({
+            "brand_id": brand_id,
+            "brand_name": brand_name,
+            "city": city,
+            "place": place,
+            "shop_name": shop_name,
+            "platform": "大众点评",
+            "score": data.get("overall_score"),
+            "review_count": data.get("review_count"),
+            "avg_price": data.get("avg_price"),
+            "shop_text": data.get("shop_text"),
+            "url": search_url,
+        })
+
+    logger.info(f"[dianping-webbridge] 解析成功 {len(records)}/{len(items)} 家门店")
 
     delay = getattr(site, "delay", [5, 8])
     time.sleep(__import__("random").uniform(*delay))
-    return [record]
+    return records
 
 
 def run_login_mode(headless: bool = False) -> bool:

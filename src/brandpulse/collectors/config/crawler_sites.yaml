@@ -80,6 +80,7 @@ sites:
     extractor: "brandpulse.collectors.modules.dianping.webbridge_extractor:extract_search"
     params:
       wait_seconds: 3
+      max_shops: 10
       ws_url: "ws://127.0.0.1:10086/ws"
       # 使用前请先启动：npx -y kimi-webbridge mcp，并在桌面浏览器登录大众点评
 

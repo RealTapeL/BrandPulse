@@ -1,5 +1,16 @@
 """
 BrandPulse 主入口
+
+
+
+# 品牌 × 城市
+python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 瑞幸咖啡 --cities 苏州
+
+# 商场 × 品类
+python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 咖啡 --cities 苏州 --place 苏州中心
+
+# 商场 × 品牌
+python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 瑞幸咖啡 --cities 苏州 --place 苏州中心
 """
 import argparse
 import sys
