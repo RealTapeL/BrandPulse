@@ -31,6 +31,12 @@ class TestDianpingCrawler:
         assert result["review_count"] == 1234
         assert result["avg_price"] == 18
 
+    def test_parse_search_text_fullwidth_yen(self):
+        text = "瑞幸咖啡(长江新能源店) 暂停营业 1025 条评价 人均 ￥15"
+        result = _parse_search_text(text)
+        assert result["review_count"] == 1025
+        assert result["avg_price"] == 15
+
     def test_mock_metrics_shape(self):
         metrics = generate_mock_metrics("LK001", "瑞幸咖啡", cities=["北京"])
         assert len(metrics) == 1

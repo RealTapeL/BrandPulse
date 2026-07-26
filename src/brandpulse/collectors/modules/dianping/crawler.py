@@ -75,8 +75,8 @@ def _parse_search_text(text: str) -> Optional[Dict]:
     review_match = re.search(r"(\d+)\s*条[评论评价]", text)
     review_count = int(review_match.group(1)) if review_match else None
 
-    # 人均：人均¥18 / 人均 18 元 / ¥18/人
-    price_match = re.search(r"人均[\s:：]*[¥]?\s*(\d+)", text)
+    # 人均：人均¥18 / 人均￥18 / 人均 18 元 / ¥18/人（¥ 有半角 U+00A5 和全角 U+FFE5 两种）
+    price_match = re.search(r"人均[\s:：]*[¥￥]?\s*(\d+)", text)
     avg_price = int(price_match.group(1)) if price_match else None
 
     logger.debug(f"解析文本: {text[:120]!r} -> score={overall_score}, reviews={review_count}, price={avg_price}")
