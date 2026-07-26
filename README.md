@@ -40,7 +40,7 @@ BrandPulse/
 │       │   ├── modules/            # 按功能分包
 │       │   │   ├── amap/           # 高德门店采集（api.py / mock.py）
 │       │   │   ├── dianping/       # 大众点评（crawler.py）
-│       │   │   ├── xiaohongshu/    # 小红书（playwright / webbridge / search_api 三种方案）
+│       │   │   ├── xiaohongshu/    # 小红书（webbridge / search_api 两种方案）
 │       │   │   ├── meituan/        # 美团（占位）
 │       │   │   ├── generic_web_crawler.py  # 配置化爬虫引擎
 │       │   │   ├── css_font_decoder.py     # CSS 字体反爬解码
@@ -248,7 +248,7 @@ python main.py dianping --cities 北京 --brand-ids LK001
 
 ## 小红书采集方案
 
-小红书风控严格，直接爬容易触发账号警告。目前提供三种方案，按推荐程度排序：
+小红书风控严格，直接爬容易触发账号警告。目前提供两种方案，按推荐程度排序：
 
 ### 方案一：Kimi WebBridge（推荐）
 
@@ -275,10 +275,6 @@ python main.py crawl --site xiaohongshu_webbridge --brand-id LK001 --brand-name 
 python main.py crawl --site xiaohongshu_search_api --brand-id LK001 --brand-name 瑞幸咖啡 --cities 北京
 ```
 
-### 方案三：Playwright + Cookie（已禁用）
-
-`xiaohongshu_search` 站点默认 `enabled: false`。该方案新开 headless Chromium + 注入 cookie，实测易被风控警告，仅保留作参考。
-
 > 所有方案采集结果都会**同时写入 PostgreSQL 和本地 JSONL 缓存**（`data/processed/metrics_*.jsonl`）。设置 `DISABLE_METRICS_DB=true` 可只用文件缓存。
 
 ## 当前能力
@@ -291,7 +287,7 @@ python main.py crawl --site xiaohongshu_search_api --brand-id LK001 --brand-name
 - ✅ PG 数据仓储层（brands / stores / brand_metrics / brand_relationships）
 - ✅ Neo4j 降级：竞品关系由 PG 表维护
 - ✅ 配置化通用爬虫引擎（crawler_sites.yaml + extractor 插件）
-- ✅ 小红书三种采集方案（WebBridge / 搜索 API / Playwright 参考实现）
+- ✅ 小红书两种采集方案（WebBridge / 搜索 API）
 - ✅ metrics 双写：PostgreSQL + 本地 JSONL 文件缓存
 - ✅ 测试：`pytest tests/` 通过
 
