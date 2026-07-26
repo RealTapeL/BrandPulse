@@ -12,6 +12,7 @@ from brandpulse.collectors.modules.dianping_crawler import (
 )
 from brandpulse.config.modules.config import Config
 from brandpulse.logger.modules.logger import get_logger
+from brandpulse.storage.modules.file_repository import FileMetricsRepository, is_db_disabled
 from brandpulse.storage.modules.pg_repository import BrandRepository, MetricsRepository
 
 logger = get_logger(__name__)
@@ -56,9 +57,12 @@ def run(
 
     logger.info(f"从 brands 表读取到 {len(brands)} 个品牌，开始大众点评采集")
 
-    metrics_repo = MetricsRepository()
+    db_disabled = is_db_disabled()
+    metrics_repo = None if db_disabled else MetricsRepository()
+    file_repo = FileMetricsRepository()
     crawler = DianpingCrawler()
-    total = 0
+    total_db = 0
+    total_file = 0
 
     for brand in brands:
         brand_id = brand["brand_id"]
@@ -74,12 +78,16 @@ def run(
                 cities=cities,
             )
 
-        saved = 0
+        db_saved = 0
+        file_saved = 0
         for metric in metrics:
-            if metrics_repo.upsert_metric(metric):
-                saved += 1
-        total += saved
+            if metrics_repo and metrics_repo.upsert_metric(metric):
+                db_saved += 1
+            if file_repo.upsert_metric(metric):
+                file_saved += 1
+        total_db += db_saved
+        total_file += file_saved
 
-        logger.info(f"{brand_id} 点评指标保存: {saved}/{len(metrics)}")
+        logger.info(f"{brand_id} 点评指标保存: PG {db_saved}/{len(metrics)}, JSONL {file_saved}/{len(metrics)}")
 
-    return {"metrics": total, "brands": len(brands)}
+    return {"metrics": total_db, "cached": total_file, "brands": len(brands)}

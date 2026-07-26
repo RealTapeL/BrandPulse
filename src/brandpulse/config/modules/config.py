@@ -69,7 +69,13 @@ class Config:
     DEBUG_DIR = RAW_DIR / "dianping_debug"
 
     # 本地文件缓存路径（用于替代/备份 PostgreSQL metrics）
-    METRICS_CACHE_DIR = Path(os.getenv("METRICS_CACHE_DIR", str(PROCESSED_DIR)))
+    # 相对路径基于项目根目录解析
+    _metrics_cache_dir_env = os.getenv("METRICS_CACHE_DIR", str(PROCESSED_DIR))
+    METRICS_CACHE_DIR = (
+        PROJECT_ROOT / _metrics_cache_dir_env
+        if not Path(_metrics_cache_dir_env).is_absolute()
+        else Path(_metrics_cache_dir_env)
+    )
 
     @classmethod
     def postgres_dsn(cls) -> str:
