@@ -10,7 +10,7 @@
 当前实现：Bocha Web Search API（国内可用，中文内容较好）
 扩展方式：在 extractor 里增加 provider 分支即可。
 
-返回字段与 xiaohongshu_extractor 保持一致，方便 generic_web_crawler 复用。
+返回字段与 playwright_extractor 保持一致，方便 generic_web_crawler 复用。
 """
 import hashlib
 import re

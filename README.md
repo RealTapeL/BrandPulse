@@ -11,9 +11,7 @@ BrandPulse/
 ├── pytest.ini                     # pytest 配置
 ├── .env                            # 环境变量（本地配置，勿提交）
 ├── .env.example                    # 环境变量示例
-├── brandpulse-infra/               # 基础设施配置
-│   ├── docker-compose.yml          # PG + Neo4j + Qdrant（可选）
-│   ├── .env                        # 基础设施环境变量
+├── brandpulse-infra/               # 基础设施与本地数据
 │   ├── init-scripts/               # PostgreSQL 初始化脚本
 │   ├── data/                       # 本地数据（Qdrant 嵌入、cookie 等，不提交）
 │   └── README.md
@@ -25,11 +23,10 @@ BrandPulse/
 │   └── 餐饮业态数据采集范围.drawio
 │
 ├── data/                           # 数据目录
-│   ├── raw/                        # 原始采集数据
-│   ├── processed/                  # 清洗后数据
+│   ├── raw/                        # 原始采集数据 / 调试输出
+│   ├── processed/                  # 清洗后数据 / metrics JSONL 缓存
 │   └── sample/                     # 示例数据
 │
-├── notebooks/                      # 分析 Notebook
 ├── scripts/                        # 一次性脚本
 ├── src/                            # 源代码
 │   ├── main.py                     # 项目入口
@@ -38,12 +35,18 @@ BrandPulse/
 │       ├── config/                 # 配置模块
 │       ├── logger/                 # 日志模块
 │       ├── db_clients/             # 数据库客户端（PG / Neo4j / Qdrant）
-│       ├── collectors/             # 数据采集（高德 / 大众点评 / Excel）
-│       ├── storage/                # 数据仓储层（PG / Neo4j / Qdrant）
-│       ├── analysis/               # 数据分析模块（待扩展）
-│       ├── agent/                  # 5-Agent 流水线（待扩展）
-│       ├── knowledge/              # Chunk / Embedding / RAG（待扩展）
-│       └── panel/                  # Streamlit 面板（待扩展）
+│       ├── collectors/             # 数据采集
+│       │   ├── config/             # crawler_sites.yaml 站点配置
+│       │   ├── modules/            # 按功能分包
+│       │   │   ├── amap/           # 高德门店采集（api.py / mock.py）
+│       │   │   ├── dianping/       # 大众点评（crawler.py）
+│       │   │   ├── xiaohongshu/    # 小红书（playwright / webbridge / search_api 三种方案）
+│       │   │   ├── meituan/        # 美团（占位）
+│       │   │   ├── generic_web_crawler.py  # 配置化爬虫引擎
+│       │   │   ├── css_font_decoder.py     # CSS 字体反爬解码
+│       │   │   └── cookie_loader.py        # Cookie 导入导出
+│       │   └── stage/              # 采集编排（stage1_*）
+│       └── storage/                # 数据仓储层（PG / Neo4j / Qdrant / JSONL 文件缓存）
 │
 └── tests/                          # 测试代码
 ```
@@ -134,7 +137,7 @@ source ../.venv/bin/activate
 python main.py dianping --cities 北京 --brand-ids LK001
 ```
 
-> 首次调试可临时关闭无头模式：修改 `collectors/modules/dianping_crawler.py` 中 `headless=True` 为 `headless=False`，
+> 首次调试可临时关闭无头模式：修改 `collectors/modules/dianping/crawler.py` 中 `headless=True` 为 `headless=False`，
 > 观察浏览器行为。采集成功后建议改回头less模式。
 
 ## 大众点评远程 Edge/Chrome 方案（CDP）
@@ -243,6 +246,41 @@ python main.py dianping --cities 北京 --brand-ids LK001
 
 > 注意：X11 转发对网络延迟敏感，首次打开浏览器可能较慢。如果窗口显示异常，建议改用 CDP 方案。
 
+## 小红书采集方案
+
+小红书风控严格，直接爬容易触发账号警告。目前提供三种方案，按推荐程度排序：
+
+### 方案一：Kimi WebBridge（推荐）
+
+驱动树莓派桌面 Chromium 中**已登录的真实浏览器**采集，不新开 headless 实例。
+
+```bash
+# 1. 树莓派桌面 Chromium 安装 Kimi WebBridge 扩展，并登录小红书小号
+# 2. 启动 WebBridge MCP 服务
+npx -y kimi-webbridge mcp
+
+# 3. 运行采集
+cd /home/lsy/BrandPulse/src
+source ../.venv/bin/activate
+python main.py crawl --site xiaohongshu_webbridge --brand-id LK001 --brand-name 瑞幸咖啡 --cities 北京
+```
+
+### 方案二：第三方搜索 API（BettaFish 思路）
+
+不访问小红书页面，调用 Bocha / Tavily 搜索 API 拿公开结果（只有标题/链接/摘要，无互动数）。
+
+```bash
+# .env 中配置 BOCHA_API_KEY 或 TAVILY_API_KEY
+# crawler_sites.yaml 中将 xiaohongshu_search_api 的 enabled 改为 true
+python main.py crawl --site xiaohongshu_search_api --brand-id LK001 --brand-name 瑞幸咖啡 --cities 北京
+```
+
+### 方案三：Playwright + Cookie（已禁用）
+
+`xiaohongshu_search` 站点默认 `enabled: false`。该方案新开 headless Chromium + 注入 cookie，实测易被风控警告，仅保留作参考。
+
+> 所有方案采集结果都会**同时写入 PostgreSQL 和本地 JSONL 缓存**（`data/processed/metrics_*.jsonl`）。设置 `DISABLE_METRICS_DB=true` 可只用文件缓存。
+
 ## 当前能力
 
 - ✅ PostgreSQL + Qdrant 本地基础设施
@@ -252,6 +290,9 @@ python main.py dianping --cities 北京 --brand-ids LK001
 - ✅ 大众点评指标采集模块（Playwright + Cookie / mock 降级）
 - ✅ PG 数据仓储层（brands / stores / brand_metrics / brand_relationships）
 - ✅ Neo4j 降级：竞品关系由 PG 表维护
+- ✅ 配置化通用爬虫引擎（crawler_sites.yaml + extractor 插件）
+- ✅ 小红书三种采集方案（WebBridge / 搜索 API / Playwright 参考实现）
+- ✅ metrics 双写：PostgreSQL + 本地 JSONL 文件缓存
 - ✅ 测试：`pytest tests/` 通过
 
 ## 后续计划

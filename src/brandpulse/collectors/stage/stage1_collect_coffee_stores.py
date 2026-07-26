@@ -3,8 +3,8 @@
 """
 from typing import List
 
-from brandpulse.collectors.modules.amap_api import AmapCollector
-from brandpulse.collectors.modules.mock_amap_api import (
+from brandpulse.collectors.modules.amap.api import AmapCollector
+from brandpulse.collectors.modules.amap.mock import (
     collect_brand_stores as mock_collect,
 )
 from brandpulse.config.modules.config import Config

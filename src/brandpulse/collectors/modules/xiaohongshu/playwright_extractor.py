@@ -15,7 +15,6 @@
 - 建议先用 --login-mode 或 cookie 方式保持登录态
 - 本实现仅采集公开搜索结果的元数据，不下载正文/评论全文
 """
-import json
 import random
 import time
 from typing import Any, Dict, List, Optional

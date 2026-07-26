@@ -6,7 +6,7 @@
 """
 from typing import List
 
-from brandpulse.collectors.modules.dianping_crawler import (
+from brandpulse.collectors.modules.dianping.crawler import (
     DianpingCrawler,
     generate_mock_metrics,
 )

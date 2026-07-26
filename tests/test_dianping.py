@@ -1,7 +1,7 @@
 """
 大众点评爬虫单元测试
 """
-from brandpulse.collectors.modules.dianping_crawler import (
+from brandpulse.collectors.modules.dianping.crawler import (
     DianpingCrawler,
     _parse_search_text,
     _search_url,

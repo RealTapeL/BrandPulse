@@ -70,15 +70,15 @@ sites:
         selector: ".//a[@class='review-num']/b/node()"
         required: true
 
-  # ==================== 小红书（Playwright extractor） ====================
+  # ==================== 小红书（Playwright extractor，已被 WebBridge 取代，保留作参考） ====================
   xiaohongshu_search:
     name: "小红书搜索"
-    enabled: true
+    enabled: false
     base_url: "https://www.xiaohongshu.com/search_result?keyword={keyword}"
     method: GET
     delay: [5, 8]
     headless: true
-    extractor: "brandpulse.collectors.modules.xiaohongshu_extractor:extract_search"
+    extractor: "brandpulse.collectors.modules.xiaohongshu.playwright_extractor:extract_search"
     params:
       max_notes: 10
       # 如需本地浏览器登录态，可把 cookies 导出到 brandpulse-infra/data/cookies/xiaohongshu_cookies.json
@@ -90,7 +90,7 @@ sites:
     base_url: "https://api.bocha.cn/v1/web-search"
     method: POST
     delay: [1, 2]
-    extractor: "brandpulse.collectors.modules.search_api_extractor:extract_search"
+    extractor: "brandpulse.collectors.modules.xiaohongshu.search_api_extractor:extract_search"
     params:
       provider: "bocha"
       max_notes: 10
@@ -104,7 +104,7 @@ sites:
     base_url: "https://www.xiaohongshu.com/search_result?keyword={keyword}"
     method: GET
     delay: [10, 20]
-    extractor: "brandpulse.collectors.modules.webbridge_extractor:extract_search"
+    extractor: "brandpulse.collectors.modules.xiaohongshu.webbridge_extractor:extract_search"
     params:
       max_notes: 10
       wait_seconds: 3
@@ -121,4 +121,4 @@ sites:
     headers:
       User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     # 美团有 cookie/签名验证，需要自定义 extractor
-    extractor: "brandpulse.collectors.modules.meituan_extractor:extract_search"
+    extractor: "brandpulse.collectors.modules.meituan.extractor:extract_search"

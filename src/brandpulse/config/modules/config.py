@@ -66,7 +66,7 @@ class Config:
     RAW_DIR = DATA_DIR / "raw"
     PROCESSED_DIR = DATA_DIR / "processed"
     COOKIE_DIR = PROJECT_ROOT / "brandpulse-infra" / "data" / "cookies"
-    DEBUG_DIR = RAW_DIR / "dianping_debug"
+    DEBUG_DIR = RAW_DIR / "debug"
 
     # 本地文件缓存路径（用于替代/备份 PostgreSQL metrics）
     # 相对路径基于项目根目录解析
