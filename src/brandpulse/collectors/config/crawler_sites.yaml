@@ -70,6 +70,19 @@ sites:
         selector: ".//a[@class='review-num']/b/node()"
         required: true
 
+  # ==================== 大众点评（Kimi WebBridge 已登录浏览器） ====================
+  dianping_webbridge:
+    name: "大众点评搜索-WebBridge"
+    enabled: true
+    base_url: "https://www.dianping.com/search/keyword/1/0_{keyword}"
+    method: GET
+    delay: [8, 12]
+    extractor: "brandpulse.collectors.modules.dianping.webbridge_extractor:extract_search"
+    params:
+      wait_seconds: 3
+      ws_url: "ws://127.0.0.1:10086/ws"
+      # 使用前请先启动：npx -y kimi-webbridge mcp，并在桌面浏览器登录大众点评
+
   # ==================== 小红书（第三方搜索 API，BettaFish 思路） ====================
   xiaohongshu_search_api:
     name: "小红书搜索-第三方API"
