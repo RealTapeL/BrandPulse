@@ -97,6 +97,20 @@ sites:
       # query_template 可选；留空则用 "{city} {brand_name}"
       # 配置 BOCHA_API_KEY 后启用：brandpulse-infra/.env
 
+  # ==================== 小红书（Kimi WebBridge 已登录浏览器） ====================
+  xiaohongshu_webbridge:
+    name: "小红书搜索-WebBridge"
+    enabled: true
+    base_url: "https://www.xiaohongshu.com/search_result?keyword={keyword}"
+    method: GET
+    delay: [10, 20]
+    extractor: "brandpulse.collectors.modules.webbridge_extractor:extract_search"
+    params:
+      max_notes: 10
+      wait_seconds: 3
+      ws_url: "ws://127.0.0.1:10086/ws"
+      # 使用前请先启动：npx -y kimi-webbridge mcp
+
   # ==================== 美团（待实现） ====================
   meituan_search:
     name: "美团搜索"
