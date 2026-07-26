@@ -83,6 +83,20 @@ sites:
       max_notes: 10
       # 如需本地浏览器登录态，可把 cookies 导出到 brandpulse-infra/data/cookies/xiaohongshu_cookies.json
 
+  # ==================== 小红书（第三方搜索 API，BettaFish 思路） ====================
+  xiaohongshu_search_api:
+    name: "小红书搜索-第三方API"
+    enabled: false
+    base_url: "https://api.bocha.cn/v1/web-search"
+    method: POST
+    delay: [1, 2]
+    extractor: "brandpulse.collectors.modules.search_api_extractor:extract_search"
+    params:
+      provider: "bocha"
+      max_notes: 10
+      # query_template 可选；留空则用 "{city} {brand_name}"
+      # 配置 BOCHA_API_KEY 后启用：brandpulse-infra/.env
+
   # ==================== 美团（待实现） ====================
   meituan_search:
     name: "美团搜索"

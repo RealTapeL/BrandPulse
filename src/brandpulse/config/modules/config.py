@@ -53,6 +53,14 @@ class Config:
     # 留空则使用 Playwright 在本地启动 Chromium
     DIANPING_CDP_URL = os.getenv("DIANPING_CDP_URL", "")
 
+    # 第三方搜索 API（BettaFish 思路：把反爬交给搜索服务商）
+    # Bocha: https://open.bocha.cn
+    BOCHA_API_KEY = os.getenv("BOCHA_API_KEY", "")
+    BOCHA_BASE_URL = os.getenv("BOCHA_BASE_URL", "https://api.bocha.cn/v1/web-search")
+    # Tavily: https://tavily.com
+    TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+    TAVILY_BASE_URL = os.getenv("TAVILY_BASE_URL", "https://api.tavily.com/search")
+
     # 项目路径
     DATA_DIR = PROJECT_ROOT / "data"
     RAW_DIR = DATA_DIR / "raw"
