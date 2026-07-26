@@ -326,25 +326,146 @@ class GenericWebCrawler:
         time.sleep(delay)
 
 
+def _save_raw_records(
+    site_id: str,
+    records: List[Dict[str, Any]],
+    brand_id: str,
+    city: Optional[str],
+    crawl_date: str,
+) -> int:
+    """
+    把爬虫原始结果写入对应的原始数据表（维度表/原始表分层架构）。
+
+    - xiaohongshu_webbridge → xhs_notes
+    - dianping_webbridge    → dp_shop_metrics（并自动登记 malls）
+
+    Returns:
+        成功写入的行数
+    """
+    from brandpulse.storage.modules.mall_heat_repository import (
+        DpShopMetricRepository,
+        MallRepository,
+        XhsNoteRepository,
+        make_mall_id,
+    )
+
+    saved = 0
+
+    if site_id == "xiaohongshu_webbridge":
+        repo = XhsNoteRepository()
+        for r in records:
+            if not r.get("note_id"):
+                continue
+            note = {
+                "note_id": r["note_id"],
+                "brand_id": brand_id,
+                "city": city,
+                "mall_name": r.get("place"),
+                "title": r.get("title"),
+                "author_name": r.get("author_name"),
+                "likes": r.get("likes"),
+                "publish_time": r.get("publish_time"),
+                "note_url": r.get("url"),
+                "keyword": r.get("keyword"),
+                "crawl_date": crawl_date,
+            }
+            if repo.upsert_note(note):
+                saved += 1
+
+    elif site_id == "dianping_webbridge":
+        repo = DpShopMetricRepository()
+        mall_repo = MallRepository()
+        for r in records:
+            if not r.get("shop_name"):
+                continue
+            place = r.get("place")
+            # shop_text 最后一段通常是商圈，如 "咖啡 | 观前街地区"
+            business_area = None
+            if r.get("shop_text") and "|" in r["shop_text"]:
+                business_area = r["shop_text"].rsplit("|", 1)[-1].strip() or None
+            shop = {
+                "shop_name": r["shop_name"],
+                "city": city,
+                "crawl_date": crawl_date,
+                "brand_id": brand_id,
+                "place": place,
+                "score": r.get("score"),
+                "review_count": r.get("review_count"),
+                "avg_price": r.get("avg_price"),
+                "business_area": business_area,
+                "shop_text": r.get("shop_text"),
+                "source_url": r.get("url"),
+            }
+            if repo.upsert_shop_metric(shop):
+                saved += 1
+            # 自动登记商场维度
+            if place:
+                mall_repo.upsert_mall({
+                    "mall_id": make_mall_id(city, place),
+                    "mall_name": place,
+                    "city": city,
+                    "district": None,
+                    "business_area": business_area,
+                    "address": None,
+                    "longitude": None,
+                    "latitude": None,
+                    "is_our_mall": False,
+                    "data_source": "dianping_webbridge",
+                })
+
+    return saved
+
+
+# 写入原始数据表后不再写旧 brand_metrics 的站点
+_RAW_TABLE_SITES = {"xiaohongshu_webbridge", "dianping_webbridge"}
+
+
 def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional[str] = None, **kwargs):
     """
-    便捷入口：从配置文件运行单个站点，并将结果写入 brand_metrics（PostgreSQL）
-    和本地 JSON 缓存文件。可通过 DISABLE_METRICS_DB=1 禁用 PostgreSQL，只用文件缓存。
+    便捷入口：从配置文件运行单个站点。
+
+    数据流向（对应 docs/品牌热度布局分布_数据表设计.drawio）：
+    1. 原始数据 → xhs_notes / dp_shop_metrics（webbridge 站点）
+    2. 每日聚合 → brand_heat_daily
+    3. 本地 JSON 缓存 → data/processed/metrics_*.json（全量备份）
+    4. 其它站点沿用旧 brand_metrics 路径
 
     kwargs 中的额外参数（如 place）会透传给站点 extractor。
     """
-    import os
-
     from brandpulse.storage.modules.file_repository import (
         FileMetricsRepository,
         is_db_disabled,
     )
+    from brandpulse.storage.modules.mall_heat_repository import BrandHeatRepository
 
     crawler = GenericWebCrawler()
     records = crawler.crawl_site(site_id, brand_id=brand_id, brand_name=brand_name, city=city, **kwargs)
 
+    today = time.strftime("%Y-%m-%d")
+    place = kwargs.get("place")
+
+    # 1. 原始数据表
+    raw_saved = _save_raw_records(site_id, records, brand_id, city, today)
+
+    # 2. 每日聚合热度（只聚合本次采集的平台；小红书非商场维度，mall_name 置空）
+    heat_saved = 0
+    if site_id in _RAW_TABLE_SITES and city:
+        heat_repo = BrandHeatRepository()
+        if site_id == "xiaohongshu_webbridge":
+            agg = heat_repo.aggregate_for_brand_city(
+                brand_id=brand_id, city=city, stat_date=today,
+                mall_name="", platform="xiaohongshu",
+            )
+        else:
+            agg = heat_repo.aggregate_for_brand_city(
+                brand_id=brand_id, city=city, stat_date=today,
+                mall_name=place or "", platform="dianping",
+            )
+        heat_saved = sum(agg.values())
+
+    # 3. brand_metrics（webbridge 站点已由原始表承载，跳过）+ JSON 缓存
     db_disabled = is_db_disabled()
-    metrics_repo = None if db_disabled else MetricsRepository()
+    metrics_repo = None if (db_disabled or site_id in _RAW_TABLE_SITES) else MetricsRepository()
     file_repo = FileMetricsRepository()
     db_saved = 0
     file_saved = 0
@@ -362,7 +483,7 @@ def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional
         metric = {
             "metric_id": f"{brand_id}_{city or 'all'}_{site_id}_{int(time.time())}_{idx}",
             "brand_id": brand_id,
-            "metric_date": time.strftime("%Y-%m-%d"),
+            "metric_date": today,
             "platform": site_id,
             "overall_score": record.get("score"),
             "review_count": comments or record.get("review_count"),
@@ -380,5 +501,14 @@ def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional
             if file_repo.upsert_metric(metric):
                 file_saved += 1
 
-    logger.info(f"[{site_id}] PostgreSQL 保存 {db_saved}/{len(records)} 条，本地缓存 {file_saved}/{len(records)} 条")
-    return {"saved": db_saved, "cached": file_saved, "records": records}
+    logger.info(
+        f"[{site_id}] 原始表 {raw_saved} 条，热度聚合 {heat_saved} 行，"
+        f"brand_metrics {db_saved} 条，JSON 缓存 {file_saved}/{len(records)} 条"
+    )
+    return {
+        "saved": db_saved,
+        "raw_saved": raw_saved,
+        "heat_saved": heat_saved,
+        "cached": file_saved,
+        "records": records,
+    }
