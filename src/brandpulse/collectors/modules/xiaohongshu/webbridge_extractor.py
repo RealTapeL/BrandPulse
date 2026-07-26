@@ -99,20 +99,34 @@ class WebBridgeClient:
 
 
 def _build_extract_js(max_notes: int) -> str:
-    """构造提取小红书搜索卡片的 JS 代码"""
+    """构造提取小红书搜索卡片的 JS 代码
+
+    按 DOM 选择器取字段，不用行号切分——部分卡片（无标题笔记、视频笔记）
+    footer 结构不同，按行取会错位。
+    """
     return f"""
 Array.from(document.querySelectorAll('section.note-item'))
   .slice(0, {max_notes})
   .map(s => {{
+    const text = (sel) => {{
+      const el = s.querySelector(sel);
+      return el ? (el.innerText || '').trim() : null;
+    }};
     const lines = (s.innerText || '').split('\\n').map(t => t.trim()).filter(Boolean);
     const link = s.querySelector('a[href*="/explore/"]');
     const noteId = s.dataset.noteId || (link ? link.href.split('/explore/')[1].split('?')[0] : null);
+
+    // 时间行：形如 07-18 / 2025-11-19 / 3小时前 / 6天前 / 昨天 / 刚刚
+    const timeRe = /^(\\d{{4}}-\\d{{1,2}}-\\d{{1,2}}|\\d{{1,2}}-\\d{{1,2}}|\\d+\\s*(分钟|小时|天|周|个月)前|昨天|刚刚)$/;
+    const publishTime = lines.find(l => timeRe.test(l)) || null;
+
+    const likeText = text('.like-wrapper .count') || text('.count');
     return {{
       note_id: noteId,
-      title: lines[0] || '',
-      author_name: lines[1] || '',
-      publish_time: lines[2] || '',
-      likes: lines[3] ? parseInt(lines[3].replace(/[^\\d]/g, '')) : null,
+      title: text('.title') || text('a[class*=title]') || '',
+      author_name: text('.author .name') || text('.name'),
+      publish_time: publishTime,
+      likes: likeText ? parseInt(likeText.replace(/[^\\d]/g, '')) : null,
       url: noteId ? 'https://www.xiaohongshu.com/explore/' + noteId : null,
     }};
   }})
