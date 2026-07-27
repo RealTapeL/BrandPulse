@@ -256,8 +256,9 @@ python main.py dianping --cities 北京 --brand-ids LK001
 
 ```bash
 # 1. 树莓派桌面 Chromium 安装 Kimi WebBridge 扩展，并登录小红书小号
-# 2. 启动 WebBridge MCP 服务
-npx -y kimi-webbridge mcp
+# 2. WebBridge MCP 服务已由 systemd 托管（开机自启）
+sudo systemctl status webbridge-mcp
+# 如需手动启动：npx -y kimi-webbridge mcp
 
 # 3. 运行采集
 cd /home/lsy/BrandPulse/src
@@ -277,19 +278,57 @@ python main.py crawl --site xiaohongshu_search_api --brand-id LK001 --brand-name
 
 > 所有方案采集结果都会**同时写入 PostgreSQL 和本地 JSON 缓存**（`data/processed/metrics_*.json`）。设置 `DISABLE_METRICS_DB=true` 可只用文件缓存。
 
+## 大众点评采集方案（WebBridge）
+
+驱动已登录大众点评的真实浏览器采集，支持**整页门店列表**和**商场级搜索**。
+
+```bash
+# 品牌 × 城市（城市 ID 已实测校准，北京=2/上海=1/苏州=6 等）
+python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 瑞幸咖啡 --cities 苏州
+
+# 商场 × 品类/品牌（--place 限定商场）
+python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 咖啡 --cities 苏州 --place 苏州中心
+```
+
+注意：点评风控较严，新开搜索页可能触发验证码。触发后 extractor 会等待 120 秒，去桌面浏览器手动点掉验证码即自动继续。
+
+## 数据模型（热度 / 布局 / 分布）
+
+对应 `docs/品牌热度布局分布_数据表设计.drawio`：
+
+- **维度表**：`malls`（商场，自动从点评采集登记）、`brands`
+- **原始表**：`stores`（高德）、`xhs_notes`（小红书笔记）、`dp_shop_metrics`（点评门店指标）
+- **聚合表**：`brand_heat_daily`（品牌×城市×商场×日期×平台 热度，AI 查询主入口）
+- **视图**：`brand_distribution`（品牌×城市×商场门店数）
+
+迁移脚本：`brandpulse-infra/init-scripts/02_create_mall_heat_tables.sql`
+
+## Superset 数据看板
+
+```text
+地址: http://192.168.0.111:8088
+账号: admin / admin123（生产环境请修改）
+```
+
+- 精简部署：pip 安装 + PostgreSQL 元数据库（无 Docker/Redis/Celery），systemd 托管（`superset.service`）
+- 看板「招商品牌情报看板」：品牌热度趋势、商场×品牌表现、门店分布地图、分布明细
+- 重建看板：`python scripts/build_superset_dashboard.py`（在 superset venv 中运行）
+
 ## 当前能力
 
 - ✅ PostgreSQL + Qdrant 本地基础设施
 - ✅ 完整品牌分类体系（6 大业态 / 24 品类 / 56 细分）
 - ✅ 咖啡品牌基础数据（瑞幸、库迪、星巴克）
 - ✅ 高德地图 API 门店采集（品牌清单从 PG 读取）
-- ✅ 大众点评指标采集模块（Playwright + Cookie / mock 降级）
-- ✅ PG 数据仓储层（brands / stores / brand_metrics / brand_relationships）
-- ✅ Neo4j 降级：竞品关系由 PG 表维护
+- ✅ 小红书采集（Kimi WebBridge 真实浏览器 / 搜索 API 两种方案）
+- ✅ 大众点评采集（WebBridge 整页门店 + 商场级 --place 搜索，城市 ID 已实测校准）
+- ✅ 热度/布局/分布数据模型（malls / xhs_notes / dp_shop_metrics / brand_heat_daily / brand_distribution）
+- ✅ Superset 招商品牌情报看板（热度趋势 / 商场矩阵 / 分布地图）
+- ✅ PG 数据仓储层 + Neo4j 降级（竞品关系由 PG 表维护）
 - ✅ 配置化通用爬虫引擎（crawler_sites.yaml + extractor 插件）
-- ✅ 小红书两种采集方案（WebBridge / 搜索 API）
 - ✅ metrics 双写：PostgreSQL + 本地 JSON 文件缓存
-- ✅ 测试：`pytest tests/` 通过
+- ✅ systemd 托管：superset / webbridge-mcp / postgresql / apache2(Adminer)
+- ✅ 测试：`pytest tests/` 通过（19 项）
 
 ## 后续计划
 
