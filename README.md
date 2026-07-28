@@ -108,9 +108,12 @@ python main.py stage1 --cities 北京 上海 广州 --use-mock
 sudo systemctl status webbridge-mcp
 # 如需手动启动：npx -y kimi-webbridge mcp
 
-# 3. 运行采集
+# 3. 运行采集（不指定 --site 会自动执行大众点评 + 小红书）
 cd /home/lsy/BrandPulse/src
 source ../.venv/bin/activate
+python main.py crawl --brand-id LK001 --brand-name 瑞幸咖啡 --cities 北京
+
+# 仅小红书
 python main.py crawl --site xiaohongshu_webbridge --brand-id LK001 --brand-name 瑞幸咖啡 --cities 北京
 ```
 
@@ -131,10 +134,10 @@ python main.py crawl --site xiaohongshu_search_api --brand-id LK001 --brand-name
 驱动已登录大众点评的真实浏览器采集，支持**整页门店列表**和**商场级搜索**。
 
 ```bash
-# 品牌 × 城市（城市 ID 已实测校准，北京=2/上海=1/苏州=6 等）
-python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 瑞幸咖啡 --cities 苏州
+# 品牌 × 城市：不指定 --site 会自动执行大众点评 + 小红书
+python main.py crawl --brand-id LK001 --brand-name 瑞幸咖啡 --cities 苏州
 
-# 商场 × 品类/品牌（--place 限定商场）
+# 仅大众点评（--place 限定商场）
 python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 咖啡 --cities 苏州 --place 苏州中心
 ```
 
