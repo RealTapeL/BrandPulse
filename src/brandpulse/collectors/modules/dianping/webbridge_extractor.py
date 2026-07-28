@@ -2,7 +2,6 @@
 大众点评 Kimi WebBridge Extractor
 
 通过 Kimi WebBridge 驱动**已登录大众点评的真实浏览器**采集搜索页指标。
-相比原 Playwright + cookie 注入方案：
 - 复用真实浏览器 Profile 和登录态，无需导出/注入 cookies
 - 不新建 headless Chromium，更接近人工浏览
 - 共享 webbridge_client，与小红书采集同一通道
@@ -12,13 +11,12 @@
 2. 已在该浏览器登录大众点评
 3. 已启动 MCP 服务：npx -y kimi-webbridge mcp
 """
+import random
+import re
 import time
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 
-from brandpulse.collectors.modules.dianping.crawler import (
-    _parse_search_text,
-    _search_url,
-)
 from brandpulse.collectors.modules.webbridge_client import (
     DEFAULT_WS_URL,
     WebBridgeClient,
@@ -27,6 +25,88 @@ from brandpulse.config.modules.config import Config
 from brandpulse.logger.modules.logger import get_logger
 
 logger = get_logger(__name__)
+
+# 城市名 -> 大众点评城市 ID（已通过页面标题实测验证，2026-07-26）
+CITY_ID_MAP = {
+    "上海": 1,
+    "北京": 2,
+    "杭州": 3,
+    "广州": 4,
+    "南京": 5,
+    "苏州": 6,
+    "深圳": 7,
+    "成都": 8,
+    "重庆": 9,
+    "天津": 10,
+    "宁波": 11,
+    "福州": 14,
+    "厦门": 15,
+    "武汉": 16,
+    "西安": 17,
+    "沈阳": 18,
+}
+
+
+def _search_url(brand_name: str, city: str) -> Optional[str]:
+    """构造大众点评搜索 URL"""
+    city_id = CITY_ID_MAP.get(city)
+    if not city_id:
+        logger.warning(f"未找到城市 {city} 的点评 ID，跳过")
+        return None
+    keyword = quote(brand_name)
+    return f"https://www.dianping.com/search/keyword/{city_id}/0_{keyword}"
+
+
+def _parse_search_text(text: str) -> Optional[Dict]:
+    """从搜索结果文本中解析评分、评论数、人均消费"""
+    # 评分：大众点评评分为 0-5 的 decimal，如 4.5 / 4.51 / 4.5分
+    score_match = re.search(r"([0-5]\.\d+)\s*分?", text)
+    overall_score = float(score_match.group(1)) if score_match else None
+
+    # 评论数：1234条评论 / 1234条评价
+    review_match = re.search(r"(\d+)\s*条[评论评价]", text)
+    review_count = int(review_match.group(1)) if review_match else None
+
+    # 人均：人均¥18 / 人均￥18 / 人均 18 元 / ¥18/人（¥ 有半角 U+00A5 和全角 U+FFE5 两种）
+    price_match = re.search(r"人均[\s:：]*[¥￥]?\s*(\d+)", text)
+    avg_price = int(price_match.group(1)) if price_match else None
+
+    logger.debug(f"解析文本: {text[:120]!r} -> score={overall_score}, reviews={review_count}, price={avg_price}")
+
+    return {
+        "shop_text": text[:200],
+        "overall_score": overall_score,
+        "review_count": review_count,
+        "avg_price": avg_price,
+    }
+
+
+def generate_mock_metrics(
+    brand_id: str,
+    brand_name: str,
+    cities: Optional[List[str]] = None,
+) -> List[Dict]:
+    """生成 Mock 点评指标数据，用于无网络或测试场景"""
+    if cities is None:
+        cities = ["北京", "上海", "广州"]
+
+    random.seed(brand_id)
+    metrics = []
+    for city in cities:
+        metric = {
+            "metric_id": f"{brand_id}_{city}_dianping_mock",
+            "brand_id": brand_id,
+            "metric_date": time.strftime("%Y-%m-%d"),
+            "platform": "大众点评-mock",
+            "overall_score": round(random.uniform(3.5, 4.8), 2),
+            "review_count": random.randint(100, 5000),
+            "avg_price": random.randint(10, 50),
+            "city_count": 1,
+            "data_source": "dianping:mock",
+        }
+        metrics.append(metric)
+    return metrics
+
 
 def _build_shop_list_js(max_shops: int) -> str:
     """构造提取搜索页门店列表的 JS（取匹配数最多的容器，避免嵌套 .txt 重复）"""
@@ -93,7 +173,7 @@ def extract_search(
     """
     通用爬虫入口：通过 WebBridge 驱动已登录浏览器抓取大众点评搜索页指标。
 
-    返回单条门店指标记录（评分/评论数/人均），字段与 dianping crawler 一致。
+    返回单条门店指标记录（评分/评论数/人均），字段与原 dianping crawler 一致。
     """
     if not city:
         logger.error("[dianping-webbridge] 大众点评采集必须指定城市")
@@ -176,7 +256,7 @@ def extract_search(
     logger.info(f"[dianping-webbridge] 解析成功 {len(records)}/{len(items)} 家门店")
 
     delay = getattr(site, "delay", [5, 8])
-    time.sleep(__import__("random").uniform(*delay))
+    time.sleep(random.uniform(*delay))
     return records
 
 

@@ -39,10 +39,10 @@ BrandPulse/
 │       │   ├── config/             # crawler_sites.yaml 站点配置
 │       │   ├── modules/            # 按功能分包
 │       │   │   ├── amap/           # 高德门店采集（api.py / mock.py）
-│       │   │   ├── dianping/       # 大众点评（crawler.py）
+│       │   │   ├── dianping/       # 大众点评（webbridge_extractor.py）
 │       │   │   ├── xiaohongshu/    # 小红书（webbridge / search_api 两种方案）
 │       │   │   ├── meituan/        # 美团（占位）
-│       │   │   ├── generic_web_crawler.py  # 配置化爬虫引擎
+│       │   │   ├── generic_web_webbridge_extractor.py  # 配置化爬虫引擎
 │       │   │   ├── css_font_decoder.py     # CSS 字体反爬解码
 │       │   │   └── cookie_loader.py        # Cookie 导入导出
 │       │   └── stage/              # 采集编排（stage1_*）
@@ -66,9 +66,6 @@ cd /home/lsy/BrandPulse
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-# 大众点评爬虫需要 Playwright 浏览器
-python -m playwright install chromium
 ```
 
 ### 3. 配置环境变量
@@ -95,156 +92,7 @@ python main.py test
 ```bash
 # 高德门店采集（mock 模式，无需 AMAP_KEY）
 python main.py stage1 --cities 北京 上海 广州 --use-mock
-
-# 大众点评指标采集（mock 模式）
-python main.py dianping --cities 北京 上海 广州 --brand-ids LK001 KD001 SB001 --use-mock
 ```
-
-## 大众点评 Cookie 登录方案
-
-大众点评页面为 JS 渲染，需使用 Playwright + 本地浏览器 cookies 才能真实抓取。
-
-### 1. 在本地电脑浏览器登录大众点评
-
-### 2. 导出 cookies
-
-安装浏览器扩展（推荐 Chrome/Edge）：
-- [Cookie-Editor](https://chrome.google.com/webstore/detail/cookie-editor/hlkenndedjnhfmakkmjigbnlnbhlejhe)
-- [EditThisCookie](https://chrome.google.com/webstore/detail/editthiscookie/fngmhnnpilhplaklbhjkcbcfmnmvgfe)
-
-导出时选择 **JSON** 格式，保存为 `dianping_cookies.json`。
-
-### 3. 传到树莓派
-
-```bash
-# 在本地电脑执行（替换为树莓派实际 IP）
-scp dianping_cookies.json lsy@192.168.0.111:/home/lsy/BrandPulse/brandpulse-infra/data/cookies/
-```
-
-### 4. 验证 cookies 已加载
-
-```bash
-cd /home/lsy/BrandPulse
-source .venv/bin/activate
-python scripts/verify_cookies.py dianping
-```
-
-### 5. 运行真实大众点评采集
-
-```bash
-cd /home/lsy/BrandPulse/src
-source ../.venv/bin/activate
-python main.py dianping --cities 北京 --brand-ids LK001
-```
-
-> 首次调试可临时关闭无头模式：修改 `collectors/modules/dianping/crawler.py` 中 `headless=True` 为 `headless=False`，
-> 观察浏览器行为。采集成功后建议改回头less模式。
-
-## 大众点评远程 Edge/Chrome 方案（CDP）
-
-如果你希望大众点评**浏览器运行在你本地电脑**，爬虫在树莓派上通过 CDP 远程控制本地浏览器，步骤如下：
-
-### 1. 在本地电脑启动 Edge 并开放调试端口
-
-**Windows**（PowerShell / CMD）：
-```powershell
-& "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --remote-debugging-port=9222
-```
-
-**macOS**：
-```bash
-/Applications/Microsoft\ Edge.app/Contents/MacOS/Microsoft\ Edge --remote-debugging-port=9222
-```
-
-**Linux**：
-```bash
-microsoft-edge --remote-debugging-port=9222
-```
-
-> 启动后，先手动登录大众点评，保持浏览器窗口开启。
-
-### 2. 查看本地电脑 IP
-
-Windows：
-```powershell
-ipconfig
-```
-
-macOS / Linux：
-```bash
-ifconfig
-```
-
-假设本地电脑 IP 为 `192.168.0.100`。
-
-### 3. 在树莓派 .env 中配置 CDP 地址
-
-```bash
-cd /home/lsy/BrandPulse
-source .venv/bin/activate
-# 编辑 .env，添加或修改：
-DIANPING_CDP_URL=http://192.168.0.100:9222
-```
-
-### 4. 运行爬虫
-
-```bash
-cd /home/lsy/BrandPulse/src
-source ../.venv/bin/activate
-python main.py dianping --cities 北京 --brand-ids LK001
-```
-
-爬虫会连接你本地电脑的 Edge，使用你已登录的 session 进行页面渲染和爬取。
-
-> 注意：
-> - 本地电脑防火墙需允许 9222 端口访问。
-> - 爬取过程中不要关闭本地 Edge 窗口。
-> - 树莓派和本地电脑必须在同一局域网。
-
-## 大众点评树莓派 X11 登录方案
-
-如果你不想在本地电脑维持一个 Edge 窗口，也可以在树莓派上启动可视化浏览器，通过 X11 转发把窗口显示到你的 MacBook 上，登录后保存 cookies。
-
-### 1. MacBook 安装 XQuartz
-
-```bash
-brew install --cask xquartz
-```
-
-安装后启动 XQuartz 应用。
-
-### 2. 通过 X11 转发 SSH 到树莓派
-
-```bash
-ssh -X lsy@192.168.0.111
-```
-
-### 3. 运行登录模式
-
-```bash
-cd /home/lsy/BrandPulse/src
-source ../.venv/bin/activate
-python main.py dianping --login-mode
-```
-
-会弹出一个 Chromium 浏览器窗口（显示在你的 MacBook 上）。
-
-### 4. 手动登录大众点评
-
-1. 在弹出的浏览器窗口中访问 https://www.dianping.com
-2. 扫码或密码登录
-3. 回到终端，按回车键保存 cookies
-
-Cookies 会保存到：
-`/home/lsy/BrandPulse/brandpulse-infra/data/cookies/dianping_cookies.json`
-
-### 5. 运行正常采集
-
-```bash
-python main.py dianping --cities 北京 --brand-ids LK001
-```
-
-> 注意：X11 转发对网络延迟敏感，首次打开浏览器可能较慢。如果窗口显示异常，建议改用 CDP 方案。
 
 ## 小红书采集方案
 
@@ -252,7 +100,7 @@ python main.py dianping --cities 北京 --brand-ids LK001
 
 ### 方案一：Kimi WebBridge（推荐）
 
-驱动树莓派桌面 Chromium 中**已登录的真实浏览器**采集，不新开 headless 实例。
+驱动树莓派桌面 Chromium 中**已登录的真实浏览器**采集，不新建浏览器实例。
 
 ```bash
 # 1. 树莓派桌面 Chromium 安装 Kimi WebBridge 扩展，并登录小红书小号

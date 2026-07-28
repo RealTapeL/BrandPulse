@@ -1,7 +1,7 @@
 """
 Cookie 加载工具
 
-支持从本地浏览器导出的 JSON cookies 文件加载，并注入 Playwright 浏览器上下文。
+支持从本地浏览器导出的 JSON cookies 文件加载。
 
 文件格式（Cookie-Editor / EditThisCookie 等插件导出）：
 [
@@ -36,7 +36,7 @@ def load_cookies(domain_filter: str = "") -> List[Dict]:
                        空字符串则返回所有。
 
     Returns:
-        Playwright 可用的 cookies 列表
+        标准化后的 cookies 列表
     """
     cookie_dir = Config.COOKIE_DIR
     if not cookie_dir.exists():
@@ -58,7 +58,7 @@ def load_cookies(domain_filter: str = "") -> List[Dict]:
                 if domain_filter and domain_filter not in str(cookie.get("domain", "")):
                     continue
 
-                # 确保 Playwright 所需字段
+                # 确保 cookies 字段完整
                 normalized = {
                     "name": str(cookie.get("name", "")),
                     "value": str(cookie.get("value", "")),

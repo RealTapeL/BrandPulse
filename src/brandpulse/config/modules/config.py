@@ -48,11 +48,6 @@ class Config:
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "")
     DEFAULT_VECTOR_SIZE = int(os.getenv("DEFAULT_VECTOR_SIZE", "1536"))
 
-    # 大众点评远程浏览器配置（CDP）
-    # 示例：http://192.168.0.100:9222
-    # 留空则使用 Playwright 在本地启动 Chromium
-    DIANPING_CDP_URL = os.getenv("DIANPING_CDP_URL", "")
-
     # 第三方搜索 API（BettaFish 思路：把反爬交给搜索服务商）
     # Bocha: https://open.bocha.cn
     BOCHA_API_KEY = os.getenv("BOCHA_API_KEY", "")

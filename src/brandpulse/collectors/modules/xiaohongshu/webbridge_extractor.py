@@ -2,9 +2,8 @@
 Kimi WebBridge Extractor
 
 通过 Kimi WebBridge 驱动**已登录小红书的真实浏览器**采集搜索结果。
-相比新开 Playwright Context，本方案：
 - 复用真实浏览器 Profile 和登录态
-- 不新建 headless Chromium
+- 不新建浏览器实例
 - 更接近人工浏览行为，降低被风控概率
 
 前提：

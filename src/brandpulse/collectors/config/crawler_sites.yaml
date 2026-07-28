@@ -39,7 +39,7 @@ sites:
 
   # ==================== 大众点评（参考实现，默认关闭） ====================
   # 说明：大众点评 PC 端有 CSS 字体反爬 + 强风控，本地请求大概率触发滑块验证码。
-  #       这里保留配置作为技术参考，实际运行建议用 Playwright + 真浏览器。
+  #       这里保留配置作为技术参考，实际运行请用 dianping_webbridge（Kimi WebBridge）。
   dianping_search:
     name: "大众点评搜索"
     enabled: false

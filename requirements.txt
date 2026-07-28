@@ -1,8 +1,6 @@
 # Web 请求与 HTML 解析
 requests>=2.31.0
 lxml>=4.9.0
-playwright>=1.40.0
-playwright-stealth>=2.0.0
 
 # 数据库
 SQLAlchemy>=2.0.0

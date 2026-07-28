@@ -33,7 +33,7 @@ def main():
     parser = argparse.ArgumentParser(description="BrandPulse 品牌情报Agent系统")
     parser.add_argument(
         "command",
-        choices=["test", "stage1", "dianping", "crawl"],
+        choices=["test", "stage1", "crawl"],
         help="执行的命令",
     )
     parser.add_argument(
@@ -58,11 +58,6 @@ def main():
         nargs="+",
         default=None,
         help="指定品牌 ID 列表，如：--brand-ids LK001 KD001",
-    )
-    parser.add_argument(
-        "--login-mode",
-        action="store_true",
-        help="登录模式：弹出可视化浏览器窗口，登录后保存 cookies（配合 --site 使用）",
     )
     parser.add_argument(
         "--site",
@@ -129,26 +124,6 @@ def main():
         rel_count = stage1_build_graph.run()
         logger.info(f"关系图构建完成: {rel_count} 条关系")
 
-    elif args.command == "dianping":
-        from brandpulse.collectors.stage import stage1_collect_dianping
-
-        if args.login_mode:
-            logger.info("执行大众点评登录模式")
-            ok = stage1_collect_dianping.run_login_mode()
-            if ok:
-                logger.info("Cookies 保存成功，可以运行正常采集命令")
-            else:
-                logger.warning("未保存到 cookies，请重试")
-                sys.exit(1)
-        else:
-            logger.info("执行大众点评品牌指标采集")
-            stats = stage1_collect_dianping.run(
-                cities=args.cities,
-                brand_ids=args.brand_ids,
-                use_mock=args.use_mock,
-            )
-            logger.info(f"大众点评指标采集完成: {stats}")
-
     elif args.command == "crawl":
         from brandpulse.collectors.modules.generic_web_crawler import (
             GenericWebCrawler,
@@ -162,35 +137,6 @@ def main():
                 status = "启用" if site.enabled else "禁用"
                 print(f"  {sid:20s} [{status}] {site.name}")
             sys.exit(1)
-
-        # 登录模式：动态调用 extractor 的 run_login_mode 函数
-        if args.login_mode:
-            crawler = GenericWebCrawler()
-            site = crawler.sites.get(args.site)
-            if not site or not site.extractor:
-                print(f"站点 {args.site} 未配置 extractor，暂不支持登录模式")
-                sys.exit(1)
-
-            module_path, func_name = site.extractor.rsplit(":", 1)
-            if func_name != "extract_search":
-                print(f"站点 {args.site} 的 extractor 不是标准 extract_search，无法自动推断登录函数")
-                sys.exit(1)
-
-            login_func_name = "run_login_mode"
-            module = __import__(module_path, fromlist=[login_func_name])
-            login_func = getattr(module, login_func_name, None)
-            if not login_func:
-                print(f"站点 {args.site} 未实现 {login_func_name}")
-                sys.exit(1)
-
-            logger.info(f"[{args.site}] 执行登录模式")
-            ok = login_func()
-            if ok:
-                logger.info("Cookies 保存成功")
-            else:
-                logger.warning("未保存到 cookies")
-                sys.exit(1)
-            return
 
         brand_name = args.brand_name or args.brand_id
         if not brand_name:

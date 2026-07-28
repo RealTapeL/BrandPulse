@@ -307,7 +307,7 @@ class GenericWebCrawler:
         if extra_params:
             site.params = {**site.params, **extra_params}
 
-        # Playwright/Selenium 类 extractor 通常自己管理请求，默认不预取静态 HTML
+        # WebBridge 等类 extractor 通常自己管理请求，默认不预取静态 HTML
         prefetch_html = site.params.get("prefetch_html", False)
         html_text = self._fetch(url, site) if prefetch_html else ""
 

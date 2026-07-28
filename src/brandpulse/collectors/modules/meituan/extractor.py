@@ -3,7 +3,7 @@
 
 美团 PC 端有签名验证、cookie 校验和字体反爬，requests 直接请求难度大。
 建议实现方案：
-1. Playwright 访问美团，复用已登录 cookie
+1. 通过 Kimi WebBridge 驱动已登录美团的真实浏览器
 2. 等待页面 JS 渲染，提取 DOM 中的门店/评分/销量
 3. 若遇字体反爬，复用 css_font_decoder.CssFontDecoder
 
