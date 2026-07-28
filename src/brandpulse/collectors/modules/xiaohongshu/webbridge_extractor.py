@@ -89,6 +89,7 @@ def extract_search(
     max_notes = params.get("max_notes", 10)
     ws_url = params.get("ws_url", DEFAULT_WS_URL)
     wait_seconds = params.get("wait_seconds", 3)
+    mall_name = params.get("place")  # 商场级搜索时传入
 
     Config.ensure_dirs()
     client = WebBridgeClient(ws_url=ws_url, timeout=params.get("timeout", 60))
@@ -132,6 +133,7 @@ def extract_search(
             "brand_id": brand_id,
             "brand_name": brand_name,
             "city": city,
+            "mall_name": mall_name,
             "keyword": keyword,
             "platform": "xiaohongshu",
             "url": item.get("url"),

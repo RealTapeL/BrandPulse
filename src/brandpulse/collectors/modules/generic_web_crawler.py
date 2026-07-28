@@ -360,7 +360,7 @@ def _save_raw_records(
                 "note_id": r["note_id"],
                 "brand_id": brand_id,
                 "city": city,
-                "mall_name": r.get("place"),
+                "mall_name": r.get("mall_name") or r.get("place"),
                 "title": r.get("title"),
                 "author_name": r.get("author_name"),
                 "likes": r.get("likes"),

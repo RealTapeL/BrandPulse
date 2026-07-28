@@ -3,16 +3,17 @@ BrandPulse 主入口
 
 
 
-# 品牌 × 城市
-python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 瑞幸咖啡 --cities 苏州
+# 品牌 × 城市（自动跑大众点评 + 小红书）
+python main.py crawl --brand-id LK001 --brand-name 瑞幸咖啡 --cities 苏州
 
-# 商场 × 品类
-python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 咖啡 --cities 苏州 --place 苏州中心
+# 商场 × 品类（自动跑大众点评 + 小红书）
+python main.py crawl --mall 苏州中心 --category 咖啡 --cities 苏州
 
-# 商场 × 品牌
+# 仅大众点评，限定商场
 python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 瑞幸咖啡 --cities 苏州 --place 苏州中心
 """
 import argparse
+import hashlib
 import sys
 from pathlib import Path
 
@@ -27,6 +28,12 @@ from brandpulse.logger.modules.logger import get_logger
 from brandpulse.storage.stage import stage1_build_graph, stage1_save_stores
 
 logger = get_logger(__name__)
+
+
+def _make_mall_search_id(mall: str, category: str, city: str) -> str:
+    """为商场+品类搜索生成稳定的 brand_id 占位符"""
+    digest = hashlib.md5(f"{city}|{mall}|{category}".encode("utf-8")).hexdigest()[:8]
+    return f"MALL_{digest}"
 
 
 def main():
@@ -83,6 +90,18 @@ def main():
         default=None,
         help="通用爬虫：限定地点/商场名，如 --place 南开大悦城（与品牌名组合搜索）",
     )
+    parser.add_argument(
+        "--mall",
+        type=str,
+        default=None,
+        help="商场级搜索：指定商场名，如 --mall 苏州中心（需配合 --category 使用）",
+    )
+    parser.add_argument(
+        "--category",
+        type=str,
+        default=None,
+        help="商场级搜索：指定品类，如 --category 咖啡（需配合 --mall 使用）",
+    )
 
     args = parser.parse_args()
 
@@ -130,12 +149,29 @@ def main():
             run_from_config,
         )
 
-        brand_name = args.brand_name or args.brand_id
-        if not brand_name:
-            print("请指定 --brand-id 或 --brand-name")
-            sys.exit(1)
-
         city = args.cities[0] if args.cities else None
+
+        # 商场 + 品类搜索模式：
+        #   --mall 苏州中心 --category 咖啡
+        # 等价于搜索关键词 "苏州中心 咖啡"，brand_id 自动生成占位
+        if args.mall and args.category:
+            mall_search_name = f"{args.mall} {args.category}"
+            brand_name = args.brand_name or mall_search_name
+            brand_id = args.brand_id or _make_mall_search_id(
+                args.mall, args.category, city or ""
+            )
+            place = args.place or args.mall
+            logger.info(f"商场级搜索: {mall_search_name}, brand_id={brand_id}")
+        elif args.mall or args.category:
+            print("--mall 和 --category 必须同时指定")
+            sys.exit(1)
+        else:
+            brand_name = args.brand_name or args.brand_id
+            if not brand_name:
+                print("请指定 --brand-id 或 --brand-name，或同时指定 --mall 和 --category")
+                sys.exit(1)
+            brand_id = args.brand_id or args.brand_name or brand_name
+            place = args.place
 
         if args.site:
             site_ids = [args.site]
@@ -153,10 +189,10 @@ def main():
             logger.info(f"[{site_id}] 开始采集")
             results[site_id] = run_from_config(
                 site_id=site_id,
-                brand_id=args.brand_id or args.brand_name,
+                brand_id=brand_id,
                 brand_name=brand_name,
                 city=city,
-                place=args.place,
+                place=place,
             )
 
         total_raw = sum(r.get("raw_saved", 0) for r in results.values())
