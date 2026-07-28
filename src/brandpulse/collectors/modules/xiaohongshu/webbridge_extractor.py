@@ -18,6 +18,7 @@ Kimi WebBridge Extractor
 - 即使使用 WebBridge，高频自动化仍可能触发平台风控，请控制采集频率
 - 建议每次只搜 1-2 个关键词，间隔 30 秒以上
 """
+import random
 import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
@@ -146,15 +147,7 @@ def extract_search(
 
     # 随机延迟，降低风控
     delay = getattr(site, "delay", [5, 10])
-    time.sleep(__import__("random").uniform(*delay))
+    time.sleep(random.uniform(*delay))
 
     return results
-
-
-def run_login_mode(headless: bool = False) -> bool:
-    """
-    WebBridge 模式不需要单独登录模式：
-    用户已在树莓派桌面 Chromium 里登录小红书小号，WebBridge 直接复用该会话。
-    """
-    logger.info("[webbridge] 使用树莓派桌面 Chromium 中已登录的会话，无需额外登录")
     return True

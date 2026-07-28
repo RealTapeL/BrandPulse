@@ -1,15 +1,14 @@
 """
-大众点评爬虫单元测试
+大众点评 WebBridge Extractor 单元测试
 """
 from brandpulse.collectors.modules.dianping.webbridge_extractor import (
     _parse_search_text,
     _search_url,
-    generate_mock_metrics,
 )
 from brandpulse.storage.modules.pg_repository import MetricsRepository
 
 
-class TestDianpingCrawler:
+class TestDianpingExtractor:
     def test_search_url_construction(self):
         url = _search_url("瑞幸咖啡", "北京")
         assert url is not None
@@ -41,16 +40,6 @@ class TestDianpingCrawler:
         assert result["review_count"] == 1025
         assert result["avg_price"] == 15
 
-    def test_mock_metrics_shape(self):
-        metrics = generate_mock_metrics("LK001", "瑞幸咖啡", cities=["北京"])
-        assert len(metrics) == 1
-        m = metrics[0]
-        assert m["brand_id"] == "LK001"
-        assert m["platform"] == "大众点评-mock"
-        assert 0 <= m["overall_score"] <= 5
-        assert m["review_count"] > 0
-        assert m["avg_price"] > 0
-
 
 class TestMetricsRepository:
     def test_upsert_and_list_metric(self):
@@ -71,23 +60,3 @@ class TestMetricsRepository:
         metrics = repo.list_metrics(brand_id="TEST_BRAND")
         assert len(metrics) >= 1
         assert metrics[0]["brand_id"] == "TEST_BRAND"
-
-
-class TestCookieLoader:
-    def test_load_cookies_filters_by_domain(self, tmp_path, monkeypatch):
-        from brandpulse.collectors.modules import cookie_loader
-        from brandpulse.config.modules.config import Config
-
-        monkeypatch.setattr(Config, "COOKIE_DIR", tmp_path)
-
-        cookie_file = tmp_path / "dianping.json"
-        cookie_file.write_text(
-            '[{"name": "sess", "value": "abc", "domain": ".dianping.com", "path": "/"}, '
-            '{"name": "other", "value": "xyz", "domain": ".example.com", "path": "/"}]',
-            encoding="utf-8",
-        )
-
-        cookies = cookie_loader.load_cookies(domain_filter="dianping")
-        assert len(cookies) == 1
-        assert cookies[0]["name"] == "sess"
-        assert cookies[0]["domain"] == ".dianping.com"

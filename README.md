@@ -42,9 +42,9 @@ BrandPulse/
 │       │   │   ├── dianping/       # 大众点评（webbridge_extractor.py）
 │       │   │   ├── xiaohongshu/    # 小红书（webbridge / search_api 两种方案）
 │       │   │   ├── meituan/        # 美团（占位）
-│       │   │   ├── generic_web_webbridge_extractor.py  # 配置化爬虫引擎
+│       │   │   ├── generic_web_crawler.py  # 配置化爬虫引擎
 │       │   │   ├── css_font_decoder.py     # CSS 字体反爬解码
-│       │   │   └── cookie_loader.py        # Cookie 导入导出
+│       │   │   └── webbridge_client.py     # Kimi WebBridge WebSocket 客户端
 │       │   └── stage/              # 采集编排（stage1_*）
 │       └── storage/                # 数据仓储层（PG / Neo4j / Qdrant / JSON 文件缓存）
 │

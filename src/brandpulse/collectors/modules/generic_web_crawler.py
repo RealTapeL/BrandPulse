@@ -38,7 +38,7 @@ DEFAULT_HEADERS = {
     ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
+    "Accept-Encoding": "gzip, deflate",
     "Connection": "keep-alive",
 }
 
@@ -61,7 +61,6 @@ class SiteConfig:
         self.fields = conf.get("fields", [])
         self.extractor = conf.get("extractor")  # 可选 Python 插件路径
         self.params = conf.get("params", {})
-        self.headless = conf.get("headless", True)
 
 
 class GenericWebCrawler:

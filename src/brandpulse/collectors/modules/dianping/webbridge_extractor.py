@@ -81,33 +81,6 @@ def _parse_search_text(text: str) -> Optional[Dict]:
     }
 
 
-def generate_mock_metrics(
-    brand_id: str,
-    brand_name: str,
-    cities: Optional[List[str]] = None,
-) -> List[Dict]:
-    """生成 Mock 点评指标数据，用于无网络或测试场景"""
-    if cities is None:
-        cities = ["北京", "上海", "广州"]
-
-    random.seed(brand_id)
-    metrics = []
-    for city in cities:
-        metric = {
-            "metric_id": f"{brand_id}_{city}_dianping_mock",
-            "brand_id": brand_id,
-            "metric_date": time.strftime("%Y-%m-%d"),
-            "platform": "大众点评-mock",
-            "overall_score": round(random.uniform(3.5, 4.8), 2),
-            "review_count": random.randint(100, 5000),
-            "avg_price": random.randint(10, 50),
-            "city_count": 1,
-            "data_source": "dianping:mock",
-        }
-        metrics.append(metric)
-    return metrics
-
-
 def _build_shop_list_js(max_shops: int) -> str:
     """构造提取搜索页门店列表的 JS（取匹配数最多的容器，避免嵌套 .txt 重复）"""
     return f"""
@@ -258,9 +231,3 @@ def extract_search(
     delay = getattr(site, "delay", [5, 8])
     time.sleep(random.uniform(*delay))
     return records
-
-
-def run_login_mode(headless: bool = False) -> bool:
-    """WebBridge 复用桌面浏览器登录态，无需单独登录模式"""
-    logger.info("[dianping-webbridge] 使用树莓派桌面 Chromium 中已登录的会话，无需额外登录")
-    return True

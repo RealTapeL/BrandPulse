@@ -58,7 +58,7 @@ def main():
     parser.add_argument(
         "--use-mock",
         action="store_true",
-        help="使用 Mock 数据（无需高德 API Key / 大众点评）",
+        help="使用 Mock 数据（无需高德 API Key）",
     )
     parser.add_argument(
         "--brand-ids",

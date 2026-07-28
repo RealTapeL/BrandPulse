@@ -113,13 +113,4 @@ sites:
       # 使用前请先启动：npx -y kimi-webbridge mcp
 
   # ==================== 美团（待实现） ====================
-  meituan_search:
-    name: "美团搜索"
-    enabled: false
-    base_url: "https://www.meituan.com/s/{keyword}/"
-    method: GET
-    delay: [3, 6]
-    headers:
-      User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    # 美团有 cookie/签名验证，需要自定义 extractor
-    extractor: "brandpulse.collectors.modules.meituan.extractor:extract_search"
+  # 占位已删除，如需支持美团请重新实现 extractor 并在此配置。

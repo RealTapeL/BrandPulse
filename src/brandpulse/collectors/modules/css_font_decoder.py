@@ -37,13 +37,16 @@ class CssFontDecoder:
         self.class_to_px: Dict[str, Tuple[float, float]] = {}
         self.svg_rows: List[Tuple[int, str]] = []  # (y_threshold, digit_string)
 
-    def load_css(self, css_url: str, px_regex: Optional[str] = None) -> None:
+    def load_css(self, css_url: str, px_regex: Optional[str] = None) -> str:
         """
         加载 CSS 文件并解析 class -> (x_offset, y_position)
 
         Args:
             css_url: CSS 文件 URL
             px_regex: 自定义正则，默认匹配 .class{background:-157.0px -103.0px}
+
+        Returns:
+            CSS 文本内容
         """
         if px_regex is None:
             px_regex = r"(\.[-a-zA-Z0-9_]+)\{background:\s*(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px"
@@ -64,6 +67,7 @@ class CssFontDecoder:
             self.class_to_px[class_name] = (float(x_off), float(y_pos))
 
         logger.info(f"CSS 解析完成: {len(self.class_to_px)} 个 class")
+        return css_text
 
     def load_svg(self, svg_url: str) -> None:
         """
@@ -160,8 +164,9 @@ class CssFontDecoder:
         if css_url.startswith("//"):
             css_url = "https:" + css_url
         elif css_url.startswith("/"):
-            # 相对路径，这里需要 base_url，暂不处理
-            pass
+            # 相对路径缺少 base_url，无法构造完整 URL，直接放弃
+            logger.info("CSS URL 为相对路径且未提供 base_url，跳过字体反爬处理")
+            return None
 
         # 2. 推断 tag，用于匹配 SVG URL
         tag = None
@@ -176,10 +181,9 @@ class CssFontDecoder:
             svg_regex = svg_regex_template
 
         decoder = cls(font_size=font_size)
-        decoder.load_css(css_url)
+        css_text = decoder.load_css(css_url)
 
         # 3. 从 CSS 内容里匹配 SVG URL
-        css_text = requests.get(css_url, timeout=decoder.timeout).text
         if svg_regex:
             svg_match = re.search(svg_regex, css_text)
             if svg_match:
