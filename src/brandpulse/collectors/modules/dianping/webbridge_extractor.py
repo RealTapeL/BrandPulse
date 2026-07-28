@@ -82,7 +82,11 @@ def _parse_search_text(text: str) -> Optional[Dict]:
 
 
 def _build_shop_list_js(max_shops: int) -> str:
-    """构造提取搜索页门店列表的 JS（取匹配数最多的容器，避免嵌套 .txt 重复）"""
+    """构造提取搜索页门店列表的 JS（取匹配数最多的容器，避免嵌套 .txt 重复）
+
+    点评搜索页的评分不是文本，而是星级 CSS class（新版 star_45 = 4.5 分，
+    老版 sml-str45 = 4.5 分），需要同时把星级元素的 className 带回来。
+    """
     return f"""
 (() => {{
     const sels = ['#shop-all-list li', '.shop-list li', '.shop-list-item'];
@@ -92,9 +96,18 @@ def _build_shop_list_js(max_shops: int) -> str:
         if (els.length > items.length) items = Array.from(els);
     }}
     if (!items.length) items = Array.from(document.querySelectorAll('.txt'));
-    return items.slice(0, {max_shops}).map(el => ({{
-        text: el.innerText || el.textContent || ''
-    }}));
+    return items.slice(0, {max_shops}).map(el => {{
+        const cands = el.querySelectorAll('[class*="rank-stars"], [class*="star_"]');
+        let starCls = '';
+        for (const s of cands) {{
+            const c = s.getAttribute('class') || '';
+            if (/(?:star_|str)\\d{{2,3}}/.test(c)) {{ starCls = c; break; }}
+        }}
+        return {{
+            text: el.innerText || el.textContent || '',
+            starClass: starCls
+        }};
+    }});
 }})()
 """
 
@@ -211,6 +224,13 @@ def extract_search(
         data = _parse_search_text(text)
         if not data or not (data.get("overall_score") or data.get("review_count")):
             continue
+
+        # 评分优先取星级 CSS class（新版 star_45 / 老版 sml-str45 = 4.5 分），
+        # 搜索页文本里没有评分数字，正则解析通常拿不到
+        star_class = (item or {}).get("starClass") or ""
+        star_match = re.search(r"(?:star_|str)(\d{2,3})", star_class)
+        if star_match:
+            data["overall_score"] = int(star_match.group(1)) / 10
 
         records.append({
             "brand_id": brand_id,

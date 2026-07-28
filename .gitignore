@@ -33,3 +33,7 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Superset 本机配置（含密钥，勿提交）
+scripts/superset_config.py
+.venv-superset/
