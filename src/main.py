@@ -153,10 +153,10 @@ def main():
 
         # 商场 + 品类搜索模式：
         #   --mall 苏州中心 --category 咖啡
-        # 等价于搜索关键词 "苏州中心 咖啡"，brand_id 自动生成占位
+        # 各平台 extractor 会自行拼接 mall / city 关键词
         if args.mall and args.category:
             mall_search_name = f"{args.mall} {args.category}"
-            brand_name = args.brand_name or mall_search_name
+            brand_name = args.brand_name or args.category
             brand_id = args.brand_id or _make_mall_search_id(
                 args.mall, args.category, city or ""
             )

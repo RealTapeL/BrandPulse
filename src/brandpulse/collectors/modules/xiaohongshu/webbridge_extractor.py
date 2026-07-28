@@ -81,15 +81,20 @@ def extract_search(
     """
     通用爬虫入口：通过 Kimi WebBridge 驱动已登录浏览器抓取小红书搜索结果
     """
-    keyword = brand_name
-    if city:
-        keyword = f"{city} {brand_name}"
-
     params = getattr(site, "params", {}) or {}
     max_notes = params.get("max_notes", 10)
     ws_url = params.get("ws_url", DEFAULT_WS_URL)
     wait_seconds = params.get("wait_seconds", 3)
     mall_name = params.get("place")  # 商场级搜索时传入
+
+    if mall_name:
+        keyword = f"{mall_name} {brand_name}"
+        if city:
+            keyword = f"{city} {keyword}"
+    elif city:
+        keyword = f"{city} {brand_name}"
+    else:
+        keyword = brand_name
 
     Config.ensure_dirs()
     client = WebBridgeClient(ws_url=ws_url, timeout=params.get("timeout", 60))
