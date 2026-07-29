@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from brandpulse.storage.modules.file_repository import FileMetricsRepository
+from brandpulse.storage.file_repository import FileMetricsRepository
 
 
 @pytest.fixture

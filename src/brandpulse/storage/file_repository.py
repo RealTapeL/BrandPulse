@@ -15,8 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from brandpulse.config.modules.config import Config
-from brandpulse.logger.modules.logger import get_logger
+from brandpulse.config.config import Config
+from brandpulse.logger.logger import get_logger
 
 logger = get_logger(__name__)
 

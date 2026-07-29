@@ -7,7 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # 加载项目根目录的 .env 文件
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 ENV_FILE = PROJECT_ROOT / ".env"
 
 if ENV_FILE.exists():
@@ -17,24 +17,12 @@ if ENV_FILE.exists():
 class Config:
     """配置类"""
 
-    # PostgreSQL
+    # PostgreSQL（全系统唯一数据库）
     POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
     POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
     POSTGRES_USER = os.getenv("POSTGRES_USER", "brandpulse")
     POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "brandpulse123")
     POSTGRES_DB = os.getenv("POSTGRES_DB", "brandpulse")
-
-    # Neo4j（默认端口与 brandpulse-infra/docker-compose.yml 的映射一致）
-    NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:8585")
-    NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-    NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "brandpulse123")
-
-    # Qdrant（默认端口与 brandpulse-infra/docker-compose.yml 的映射一致）
-    QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
-    QDRANT_PORT = int(os.getenv("QDRANT_PORT", "7333"))
-    # 本地嵌入模式：设置后忽略 host/port，直接读写本地文件，无需 Qdrant 服务
-    # 相对路径基于项目根目录解析；同一时刻只允许一个进程访问该目录
-    QDRANT_PATH = os.getenv("QDRANT_PATH", "")
 
     # 高德 API
     AMAP_KEY = os.getenv("AMAP_KEY", "")

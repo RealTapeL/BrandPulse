@@ -1,11 +1,11 @@
 """
 大众点评 WebBridge Extractor 单元测试
 """
-from brandpulse.collectors.modules.dianping.webbridge_extractor import (
+from brandpulse.collectors.extractors.dianping.webbridge_extractor import (
     _parse_search_text,
     _search_url,
 )
-from brandpulse.storage.modules.pg_repository import MetricsRepository
+from brandpulse.storage.pg_repository import MetricsRepository
 
 
 class TestDianpingExtractor:

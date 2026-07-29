@@ -21,11 +21,11 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from brandpulse.config.modules.config import Config
+from brandpulse.config.config import Config
 from brandpulse.collectors.stage import stage1_collect_coffee_stores
-from brandpulse.db_clients.modules.db_clients import test_all_connections
-from brandpulse.logger.modules.logger import get_logger
-from brandpulse.storage.stage import stage1_build_graph, stage1_save_stores
+from brandpulse.db_clients.postgres_client import test_connection
+from brandpulse.logger.logger import get_logger
+from brandpulse.storage.stage import stage1_save_stores
 
 logger = get_logger(__name__)
 
@@ -106,25 +106,15 @@ def main():
     args = parser.parse_args()
 
     if args.command == "test":
-        results = test_all_connections()
-
-        for name, status in results.items():
-            if name == "neo4j" and status != "✓ 连接正常":
-                print("neo4j: ✗ 跳过（未安装）")
-            else:
-                print(f"{name}: {status}")
-
-        if (
-            results.get("postgres") == "✓ 连接正常"
-            and results.get("qdrant") == "✓ 连接正常"
-        ):
+        if test_connection():
+            print("postgres: ✓ 连接正常")
             print("数据库连接测试通过")
         else:
-            print("数据库连接测试失败")
+            print("postgres: ✗ 连接失败")
             sys.exit(1)
 
     elif args.command == "stage1":
-        logger.info("执行阶段一：品牌知识库建设")
+        logger.info("执行阶段一：品牌门店采集（高德）")
         Config.ensure_dirs()
 
         # 1. 采集门店
@@ -135,16 +125,12 @@ def main():
             brand_ids=args.brand_ids,
         )
 
-        # 2. 保存到数据库
+        # 2. 保存到 PostgreSQL
         stats = stage1_save_stores.run(stores_by_brand)
         logger.info(f"数据保存完成: {stats}")
 
-        # 3. 构建竞品关系图
-        rel_count = stage1_build_graph.run()
-        logger.info(f"关系图构建完成: {rel_count} 条关系")
-
     elif args.command == "crawl":
-        from brandpulse.collectors.modules.generic_web_crawler import (
+        from brandpulse.collectors.crawler import (
             GenericWebCrawler,
             run_from_config,
         )

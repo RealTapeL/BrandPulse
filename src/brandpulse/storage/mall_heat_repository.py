@@ -14,8 +14,8 @@ from typing import Dict, List, Optional
 
 from sqlalchemy import text
 
-from brandpulse.db_clients.modules.db_clients import PostgresClient
-from brandpulse.logger.modules.logger import get_logger
+from brandpulse.db_clients.postgres_client import PostgresClient
+from brandpulse.logger.logger import get_logger
 
 logger = get_logger(__name__)
 

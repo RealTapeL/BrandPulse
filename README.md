@@ -27,26 +27,29 @@ BrandPulse/
 │   ├── processed/                  # 清洗后数据 / metrics JSON 缓存
 │   └── sample/                     # 示例数据
 │
-├── scripts/                        # 一次性脚本
+├── scripts/                        # 一次性脚本（Superset 看板构建/启动等）
 ├── src/                            # 源代码
-│   ├── main.py                     # 项目入口
+│   ├── main.py                     # 项目入口（test / stage1 / crawl）
 │   └── brandpulse/
 │       ├── __init__.py
-│       ├── config/                 # 配置模块
+│       ├── config/                 # 配置模块（config.py，读取 .env）
 │       ├── logger/                 # 日志模块
-│       ├── db_clients/             # 数据库客户端（PG / Neo4j / Qdrant）
+│       ├── db_clients/             # PostgreSQL 客户端（postgres_client.py，单例）
 │       ├── collectors/             # 数据采集
 │       │   ├── config/             # crawler_sites.yaml 站点配置
-│       │   ├── modules/            # 按功能分包
-│       │   │   ├── amap/           # 高德门店采集（api.py / mock.py）
+│       │   ├── crawler.py          # 配置化爬虫引擎
+│       │   ├── css_font_decoder.py # CSS 字体反爬解码
+│       │   ├── webbridge_client.py # Kimi WebBridge WebSocket 客户端
+│       │   ├── extractors/         # 平台 extractor 插件
 │       │   │   ├── dianping/       # 大众点评（webbridge_extractor.py）
-│       │   │   ├── xiaohongshu/    # 小红书（webbridge / search_api 两种方案）
-│       │   │   ├── meituan/        # 美团（占位）
-│       │   │   ├── generic_web_crawler.py  # 配置化爬虫引擎
-│       │   │   ├── css_font_decoder.py     # CSS 字体反爬解码
-│       │   │   └── webbridge_client.py     # Kimi WebBridge WebSocket 客户端
+│       │   │   └── xiaohongshu/    # 小红书（webbridge / search_api 两种方案）
+│       │   ├── amap/               # 高德门店采集（api.py / mock.py）
 │       │   └── stage/              # 采集编排（stage1_*）
-│       └── storage/                # 数据仓储层（PG / Neo4j / Qdrant / JSON 文件缓存）
+│       └── storage/                # 数据仓储层（PG 表 / JSON 文件缓存）
+│           ├── pg_repository.py        # brands / stores / brand_relationships / brand_metrics
+│           ├── mall_heat_repository.py # malls / xhs_notes / dp_shop_metrics / brand_heat_daily
+│           ├── file_repository.py      # 本地 JSON 缓存
+│           └── stage/                  # 入库编排（stage1_*）
 │
 └── tests/                          # 测试代码
 ```
@@ -55,16 +58,16 @@ BrandPulse/
 
 ### 1. 环境要求
 
-- Python 3.13
-- PostgreSQL（本机已通过 apt 安装）
-- 可选：Neo4j、Qdrant（本机因 4GB 内存，Neo4j 已跳过，竞品关系由 PG 兜底）
+- Python 3.12+（项目 venv 用 uv 或 python -m venv 创建均可）
+- PostgreSQL（本机安装，库 `brandpulse`）
+- 全系统唯一数据库是 PostgreSQL（竞品关系、知识块均由 PG 表维护，无 Neo4j/Qdrant 依赖）
 
 ### 2. 安装 Python 依赖
 
 ```bash
 cd /home/lsy/BrandPulse
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate  # fish 用户用 .venv/bin/activate.fish
 pip install -r requirements.txt
 ```
 
@@ -74,10 +77,6 @@ pip install -r requirements.txt
 cp .env.example .env
 # 编辑 .env，填入 AMAP_KEY、LLM/Embedding 配置等
 ```
-
-> **Qdrant 免 Docker 说明**：`.env` 中默认配置了 `QDRANT_PATH=brandpulse-infra/data/qdrant-local`，
-> 即本地嵌入模式——qdrant-client 直接读写本地文件，无需启动 Qdrant 服务，API 与服务器模式一致。
-> 注意同一时刻只允许一个进程访问该目录。如需改回服务器模式，将 `QDRANT_PATH` 留空即可。
 
 ### 4. 测试数据库连接
 
@@ -100,13 +99,12 @@ python main.py stage1 --cities 北京 上海 广州 --use-mock
 
 ### 方案一：Kimi WebBridge（推荐）
 
-驱动树莓派桌面 Chromium 中**已登录的真实浏览器**采集，不新建浏览器实例。
+驱动本机桌面浏览器（Edge/Chromium）中**已登录的真实浏览器**采集，不新建浏览器实例。
 
 ```bash
-# 1. 树莓派桌面 Chromium 安装 Kimi WebBridge 扩展，并登录小红书小号
-# 2. WebBridge MCP 服务已由 systemd 托管（开机自启）
-sudo systemctl status webbridge-mcp
-# 如需手动启动：npx -y kimi-webbridge mcp
+# 1. 本机桌面浏览器安装 Kimi WebBridge 扩展，并登录小红书小号
+# 2. 启动 WebBridge MCP 服务
+nohup npx -y kimi-webbridge mcp > ~/kimi-webbridge.log 2>&1 &
 
 # 3. 运行采集（不指定 --site 会自动执行大众点评 + 小红书）
 cd /home/lsy/BrandPulse/src
@@ -157,29 +155,30 @@ python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 咖
 ## Superset 数据看板
 
 ```text
-地址: http://192.168.0.111:8088
+地址: http://192.168.0.109:8088/superset/dashboard/4/
 账号: admin / admin123（生产环境请修改）
 ```
 
-- 精简部署：pip 安装 + PostgreSQL 元数据库（无 Docker/Redis/Celery），systemd 托管（`superset.service`）
-- 看板「招商品牌情报看板」：品牌热度趋势、商场×品牌表现、门店分布地图、分布明细
-- 重建看板：`python scripts/build_superset_dashboard.py`（在 superset venv 中运行）
+- 本机部署：独立 venv `.venv-superset`（Python 3.12，pip 安装，无 Docker/Redis/Celery），
+  元数据库为 PostgreSQL `superset_meta` 库（与业务库分离）
+- 配置模板：`scripts/superset_config.example.py`（复制为 `superset_config.py` 并填入自己的 SECRET_KEY）
+- 启动服务：`bash scripts/start_superset.sh`
+- 看板「招商品牌情报看板」：平台热度汇总、门店评分对比、点评门店明细、小红书笔记明细
+- 重建看板：`python scripts/build_superset_dashboard.py`（在主 venv 中运行，会自动清理旧图表并重建）
 
 ## 当前能力
 
-- ✅ PostgreSQL + Qdrant 本地基础设施
+- ✅ PostgreSQL 本地基础设施（唯一数据库，竞品关系由 PG 表维护）
 - ✅ 完整品牌分类体系（6 大业态 / 24 品类 / 56 细分）
 - ✅ 咖啡品牌基础数据（瑞幸、库迪、星巴克）
 - ✅ 高德地图 API 门店采集（品牌清单从 PG 读取）
 - ✅ 小红书采集（Kimi WebBridge 真实浏览器 / 搜索 API 两种方案）
-- ✅ 大众点评采集（WebBridge 整页门店 + 商场级 --place 搜索，城市 ID 已实测校准）
+- ✅ 大众点评采集（WebBridge 整页门店 + 商场级 --place 搜索，城市 ID 已实测校准；评分经星级 CSS class 解析）
 - ✅ 热度/布局/分布数据模型（malls / xhs_notes / dp_shop_metrics / brand_heat_daily / brand_distribution）
-- ✅ Superset 招商品牌情报看板（热度趋势 / 商场矩阵 / 分布地图）
-- ✅ PG 数据仓储层 + Neo4j 降级（竞品关系由 PG 表维护）
-- ✅ 配置化通用爬虫引擎（crawler_sites.yaml + extractor 插件）
+- ✅ Superset 招商品牌情报看板（热度汇总 / 评分对比 / 双平台明细）
+- ✅ 配置化通用爬虫引擎（crawler_sites.yaml + extractors/ 插件）
 - ✅ metrics 双写：PostgreSQL + 本地 JSON 文件缓存
-- ✅ systemd 托管：superset / webbridge-mcp / postgresql / apache2(Adminer)
-- ✅ 测试：`pytest tests/` 通过（19 项）
+- ✅ 测试：`pytest tests/` 通过（17 项）
 
 ## 后续计划
 

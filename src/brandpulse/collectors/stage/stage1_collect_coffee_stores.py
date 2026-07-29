@@ -3,13 +3,13 @@
 """
 from typing import List
 
-from brandpulse.collectors.modules.amap.api import AmapCollector
-from brandpulse.collectors.modules.amap.mock import (
+from brandpulse.collectors.amap.api import AmapCollector
+from brandpulse.collectors.amap.mock import (
     collect_brand_stores as mock_collect,
 )
-from brandpulse.config.modules.config import Config
-from brandpulse.logger.modules.logger import get_logger
-from brandpulse.storage.modules.pg_repository import BrandRepository
+from brandpulse.config.config import Config
+from brandpulse.logger.logger import get_logger
+from brandpulse.storage.pg_repository import BrandRepository
 
 logger = get_logger(__name__)
 

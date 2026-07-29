@@ -5,7 +5,7 @@ Kimi WebBridge 共享客户端
 供各平台 extractor（小红书、大众点评等）复用。
 
 前提：
-1. 树莓派桌面 Chromium/Chrome 已安装 Kimi WebBridge 扩展
+1. 本机桌面浏览器（Edge/Chromium）已安装 Kimi WebBridge 扩展
 2. 已启动 MCP 服务：npx -y kimi-webbridge mcp
 """
 import json

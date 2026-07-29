@@ -18,8 +18,8 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from brandpulse.config.modules.config import Config
-from brandpulse.logger.modules.logger import get_logger
+from brandpulse.config.config import Config
+from brandpulse.logger.logger import get_logger
 
 logger = get_logger(__name__)
 

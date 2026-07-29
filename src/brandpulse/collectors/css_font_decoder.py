@@ -23,7 +23,7 @@ from typing import Dict, List, Optional, Tuple
 import requests
 from lxml import etree
 
-from brandpulse.logger.modules.logger import get_logger
+from brandpulse.logger.logger import get_logger
 
 logger = get_logger(__name__)
 

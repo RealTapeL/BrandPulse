@@ -77,7 +77,7 @@ sites:
     base_url: "https://www.dianping.com/search/keyword/1/0_{keyword}"
     method: GET
     delay: [8, 12]
-    extractor: "brandpulse.collectors.modules.dianping.webbridge_extractor:extract_search"
+    extractor: "brandpulse.collectors.extractors.dianping.webbridge_extractor:extract_search"
     params:
       wait_seconds: 3
       max_shops: 10
@@ -91,7 +91,7 @@ sites:
     base_url: "https://api.bocha.cn/v1/web-search"
     method: POST
     delay: [1, 2]
-    extractor: "brandpulse.collectors.modules.xiaohongshu.search_api_extractor:extract_search"
+    extractor: "brandpulse.collectors.extractors.xiaohongshu.search_api_extractor:extract_search"
     params:
       provider: "bocha"
       max_notes: 10
@@ -105,7 +105,7 @@ sites:
     base_url: "https://www.xiaohongshu.com/search_result?keyword={keyword}"
     method: GET
     delay: [10, 20]
-    extractor: "brandpulse.collectors.modules.xiaohongshu.webbridge_extractor:extract_search"
+    extractor: "brandpulse.collectors.extractors.xiaohongshu.webbridge_extractor:extract_search"
     params:
       max_notes: 10
       wait_seconds: 3

@@ -7,7 +7,7 @@
 - 共享 webbridge_client，与小红书采集同一通道
 
 前提：
-1. 树莓派桌面 Chromium 已安装 Kimi WebBridge 扩展
+1. 本机桌面浏览器（Edge/Chromium）已安装 Kimi WebBridge 扩展
 2. 已在该浏览器登录大众点评
 3. 已启动 MCP 服务：npx -y kimi-webbridge mcp
 """
@@ -17,12 +17,12 @@ import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
-from brandpulse.collectors.modules.webbridge_client import (
+from brandpulse.collectors.webbridge_client import (
     DEFAULT_WS_URL,
     WebBridgeClient,
 )
-from brandpulse.config.modules.config import Config
-from brandpulse.logger.modules.logger import get_logger
+from brandpulse.config.config import Config
+from brandpulse.logger.logger import get_logger
 
 logger = get_logger(__name__)
 

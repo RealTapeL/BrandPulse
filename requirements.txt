@@ -5,8 +5,6 @@ lxml>=4.9.0
 # 数据库
 SQLAlchemy>=2.0.0
 psycopg2-binary>=2.9.9
-neo4j>=5.15.0
-qdrant-client>=1.10.0
 
 # 配置与环境
 python-dotenv>=1.0.0

@@ -1,17 +1,22 @@
 """
 通用配置化站点爬虫引擎
 
-目标：一个配置文件即可新增要爬取的商业平台。
+目标：一个配置文件（collectors/config/crawler_sites.yaml）即可新增要爬取的平台。
 
 目前支持：
 1. requests + lxml 静态页面抓取
 2. 可选 CSS 字体反爬解码（大众点评式）
 3. XPath / CSS 选择器提取字段
-4. 自动写入 brand_metrics 表
+4. Python extractor 插件（WebBridge 真实浏览器、第三方搜索 API 等复杂站点）
+
+数据流向（run_from_config）：
+1. 原始数据 → xhs_notes / dp_shop_metrics（webbridge 站点），其它站点 → brand_metrics
+2. 每日聚合 → brand_heat_daily
+3. 本地 JSON 缓存 → data/processed/metrics_*.json
 
 扩展方式：
 - 简单站点：在 crawler_sites.yaml 里配置 selectors
-- 复杂站点：在 extractors/ 下写 Python 插件，在 config 里指定 extractor
+- 复杂站点：在 collectors/extractors/ 下写 Python 插件，在 yaml 的 extractor 字段指定
 """
 import importlib
 import random
@@ -23,10 +28,10 @@ import requests
 import yaml
 from lxml import etree
 
-from brandpulse.collectors.modules.css_font_decoder import CssFontDecoder
-from brandpulse.config.modules.config import Config
-from brandpulse.logger.modules.logger import get_logger
-from brandpulse.storage.modules.pg_repository import MetricsRepository
+from brandpulse.collectors.css_font_decoder import CssFontDecoder
+from brandpulse.config.config import Config
+from brandpulse.logger.logger import get_logger
+from brandpulse.storage.pg_repository import MetricsRepository
 
 logger = get_logger(__name__)
 
@@ -68,12 +73,7 @@ class GenericWebCrawler:
 
     def __init__(self, config_path: Optional[Path] = None):
         if config_path is None:
-            config_path = (
-                Path(__file__).resolve().parents[2]
-                / "collectors"
-                / "config"
-                / "crawler_sites.yaml"
-            )
+            config_path = Path(__file__).resolve().parent / "config" / "crawler_sites.yaml"
         self.config_path = config_path
         self.sites: Dict[str, SiteConfig] = {}
         self._load_config()
@@ -341,7 +341,7 @@ def _save_raw_records(
     Returns:
         成功写入的行数
     """
-    from brandpulse.storage.modules.mall_heat_repository import (
+    from brandpulse.storage.mall_heat_repository import (
         DpShopMetricRepository,
         MallRepository,
         XhsNoteRepository,
@@ -431,11 +431,11 @@ def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional
 
     kwargs 中的额外参数（如 place）会透传给站点 extractor。
     """
-    from brandpulse.storage.modules.file_repository import (
+    from brandpulse.storage.file_repository import (
         FileMetricsRepository,
         is_db_disabled,
     )
-    from brandpulse.storage.modules.mall_heat_repository import BrandHeatRepository
+    from brandpulse.storage.mall_heat_repository import BrandHeatRepository
 
     crawler = GenericWebCrawler()
     records = crawler.crawl_site(site_id, brand_id=brand_id, brand_name=brand_name, city=city, **kwargs)

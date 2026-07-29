@@ -13,7 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
 sys.path.insert(0, str(SRC_DIR))
 
-from brandpulse.collectors.modules.css_font_decoder import CssFontDecoder
+from brandpulse.collectors.css_font_decoder import CssFontDecoder
 
 
 def build_test_assets():
@@ -103,7 +103,7 @@ def test_decode_number():
 
 
 def test_infer_tag():
-    from brandpulse.collectors.modules.css_font_decoder import _infer_tag
+    from brandpulse.collectors.css_font_decoder import _infer_tag
 
     assert _infer_tag(["vxth5", "vxt20", "vxt33"]) == "vxt"
     assert _infer_tag(["abc123", "abc456"]) == "abc"
