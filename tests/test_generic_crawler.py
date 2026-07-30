@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-SRC_DIR = PROJECT_ROOT / "src"
+SRC_DIR = PROJECT_ROOT / "src" / "backend"
 sys.path.insert(0, str(SRC_DIR))
 
 from brandpulse.collectors.crawler import GenericWebCrawler
@@ -89,6 +89,7 @@ def test_generic_crawler_with_css_font():
         crawler = GenericWebCrawler(
             config_path=Path(__file__).resolve().parent.parent
             / "src"
+            / "backend"
             / "brandpulse"
             / "collectors"
             / "config"

@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-SRC_DIR = PROJECT_ROOT / "src"
+SRC_DIR = PROJECT_ROOT / "src" / "backend"
 sys.path.insert(0, str(SRC_DIR))
 
 from brandpulse.collectors.css_font_decoder import CssFontDecoder

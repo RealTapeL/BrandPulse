@@ -7,7 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # 加载项目根目录的 .env 文件
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 ENV_FILE = PROJECT_ROOT / ".env"
 
 if ENV_FILE.exists():
