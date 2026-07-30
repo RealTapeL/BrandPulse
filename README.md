@@ -28,28 +28,37 @@ BrandPulse/
 │   └── sample/                     # 示例数据
 │
 ├── scripts/                        # 一次性脚本（Superset 看板构建/启动等）
-├── src/                            # 源代码
-│   ├── main.py                     # 项目入口（test / stage1 / crawl）
-│   └── brandpulse/
-│       ├── __init__.py
-│       ├── config/                 # 配置模块（config.py，读取 .env）
-│       ├── logger/                 # 日志模块
-│       ├── db_clients/             # PostgreSQL 客户端（postgres_client.py，单例）
-│       ├── collectors/             # 数据采集
-│       │   ├── config/             # crawler_sites.yaml 站点配置
-│       │   ├── crawler.py          # 配置化爬虫引擎
-│       │   ├── css_font_decoder.py # CSS 字体反爬解码
-│       │   ├── webbridge_client.py # Kimi WebBridge WebSocket 客户端
-│       │   ├── extractors/         # 平台 extractor 插件
-│       │   │   ├── dianping/       # 大众点评（webbridge_extractor.py）
-│       │   │   └── xiaohongshu/    # 小红书（webbridge / search_api 两种方案）
-│       │   ├── amap/               # 高德门店采集（api.py / mock.py）
-│       │   └── stage/              # 采集编排（stage1_*）
-│       └── storage/                # 数据仓储层（PG 表 / JSON 文件缓存）
-│           ├── pg_repository.py        # brands / stores / brand_relationships / brand_metrics
-│           ├── mall_heat_repository.py # malls / xhs_notes / dp_shop_metrics / brand_heat_daily
-│           ├── file_repository.py      # 本地 JSON 缓存
-│           └── stage/                  # 入库编排（stage1_*）
+├── src/                            # 源代码（前后端分离）
+│   ├── backend/                    # 后端（Python）
+│   │   ├── main.py                 # 项目入口（test / stage1 / crawl / indicators / agent）
+│   │   └── brandpulse/
+│   │       ├── __init__.py
+│   │       ├── config/                 # 配置模块（config.py，读取 .env）
+│   │       ├── logger/                 # 日志模块
+│   │       ├── db_clients/             # PostgreSQL 客户端（postgres_client.py，单例）
+│   │       ├── collectors/             # 数据采集
+│   │       │   ├── config/             # crawler_sites.yaml 站点配置
+│   │       │   ├── crawler.py          # 配置化爬虫引擎
+│   │       │   ├── css_font_decoder.py # CSS 字体反爬解码
+│   │       │   ├── webbridge_client.py # Kimi WebBridge WebSocket 客户端
+│   │       │   ├── extractors/         # 平台 extractor 插件
+│   │       │   │   ├── dianping/       # 大众点评（webbridge_extractor.py）
+│   │       │   │   └── xiaohongshu/    # 小红书（webbridge / search_api 两种方案）
+│   │       │   ├── amap/               # 高德门店采集（api.py / mock.py）
+│   │       │   └── stage/              # 采集编排（stage1_*）
+│   │       └── storage/                # 数据仓储层（PG 表 / JSON 文件缓存）
+│   │           ├── pg_repository.py        # brands / stores / brand_relationships / brand_metrics
+│   │           ├── mall_heat_repository.py # malls / xhs_notes / dp_shop_metrics / brand_heat_daily
+│   │           ├── file_repository.py      # 本地 JSON 缓存
+│   │           └── stage/                  # 入库编排（stage1_*）
+│   │       ├── indicators/             # 指标计算层（纯函数 + 编排分离）
+│   │       │   ├── reputation.py       # 贝叶斯加权口碑分
+│   │       │   ├── heat.py             # 固定基准对数热度指数（跨天可比）
+│   │       │   ├── share.py            # SOV 声量份额
+│   │       │   ├── momentum.py         # 周环比动量 + 波动率
+│   │       │   ├── repository.py       # brand_indicators_daily 读写
+│   │       │   └── pipeline.py         # 指标编排（单指标失败不拖垮整体）
+│   └── frontend/                   # 前端（Vue3 + Vite + ECharts，构建产物 dist/ 由后端静态托管）
 │
 └── tests/                          # 测试代码
 ```
@@ -81,7 +90,7 @@ cp .env.example .env
 ### 4. 测试数据库连接
 
 ```bash
-cd /home/lsy/BrandPulse/src
+cd /home/lsy/BrandPulse/src/backend
 source ../.venv/bin/activate
 python main.py test
 ```
@@ -107,7 +116,7 @@ python main.py stage1 --cities 北京 上海 广州 --use-mock
 nohup npx -y kimi-webbridge mcp > ~/kimi-webbridge.log 2>&1 &
 
 # 3. 运行采集（不指定 --site 会自动执行大众点评 + 小红书）
-cd /home/lsy/BrandPulse/src
+cd /home/lsy/BrandPulse/src/backend
 source ../.venv/bin/activate
 python main.py crawl --brand-id LK001 --brand-name 瑞幸咖啡 --cities 北京
 
@@ -152,6 +161,24 @@ python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 咖
 
 迁移脚本：`brandpulse-infra/init-scripts/02_create_mall_heat_tables.sql`
 
+## 指标计算
+
+采集完成后，在原始数据之上计算招商分析指标（确定性代码算数，不经 LLM）：
+
+```bash
+# 指标计算：口碑 / 热度 / SOV / 趋势（默认取库中最新的采集日）
+python main.py indicators [--date 2026-07-29]
+```
+
+**指标口径**（`src/backend/brandpulse/indicators/`，公式与权重均为文件头常量，可校准）：
+
+- **口碑分**：贝叶斯加权 `WR=(v/(v+m))·R+(m/(v+m))·C`，v=评价数、R=评分、C=全城均值、m=评价数中位数。解决"5 条评价的 5 星店力压 8000 条评价的 4.6 星店"问题
+- **热度指数**：固定基准对数归一 `100·ln(1+v)/ln(1+5万)`，跨天、跨商场可比；商场级按 点评评价 0.35 / 小红书点赞 0.35 / 提及 0.15 / 门店数 0.15 加权
+- **SOV 声量份额**：门店评价数 / 同商场品类总评价数
+- **趋势**：周环比动量 + 近 4 期波动率（变异系数）。高动量 + 低波动 = 正在起势且非网红泡沫
+
+结果写入 `brand_indicators_daily`（迁移脚本 `brandpulse-infra/init-scripts/03_create_indicator_tables.sql`）。
+
 ## Superset 数据看板
 
 ```text
@@ -176,9 +203,10 @@ python main.py crawl --site dianping_webbridge --brand-id LK001 --brand-name 咖
 - ✅ 大众点评采集（WebBridge 整页门店 + 商场级 --place 搜索，城市 ID 已实测校准；评分经星级 CSS class 解析）
 - ✅ 热度/布局/分布数据模型（malls / xhs_notes / dp_shop_metrics / brand_heat_daily / brand_distribution）
 - ✅ Superset 招商品牌情报看板（热度汇总 / 评分对比 / 双平台明细）
+- ✅ 指标计算层：贝叶斯口碑分 / 固定基准热度指数 / SOV / 动量与波动率（brand_indicators_daily）
 - ✅ 配置化通用爬虫引擎（crawler_sites.yaml + extractors/ 插件）
 - ✅ metrics 双写：PostgreSQL + 本地 JSON 文件缓存
-- ✅ 测试：`pytest tests/` 通过（17 项）
+- ✅ 测试：`pytest tests/` 通过（31 项）
 
 ## 后续计划
 
