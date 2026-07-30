@@ -24,6 +24,9 @@ class Config:
     POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "brandpulse123")
     POSTGRES_DB = os.getenv("POSTGRES_DB", "brandpulse")
 
+    # Redis（任务队列与缓存）
+    REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+
     # 高德 API
     AMAP_KEY = os.getenv("AMAP_KEY", "")
 

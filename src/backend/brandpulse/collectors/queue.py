@@ -4,22 +4,21 @@
 依赖：Redis + rq。开发环境请先启动 redis-server。
 TODO: 生产环境 REDIS_URL 从环境变量读取；本地若 Redis 未启动可临时切 fakeredis。
 """
-import os
 from typing import Any
 
 from redis import Redis
 
+from brandpulse.config.config import Config
 from brandpulse.logger.logger import get_logger
 
 logger = get_logger(__name__)
 
 QUEUE_NAME = "brandpulse-crawl"
-DEFAULT_REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 
 
 def _redis_conn() -> Redis:
     """从 REDIS_URL 构造 Redis 连接。"""
-    return Redis.from_url(DEFAULT_REDIS_URL, decode_responses=True)
+    return Redis.from_url(Config.REDIS_URL, decode_responses=True)
 
 
 def enqueue_crawl(task_meta: dict[str, Any]) -> str:
