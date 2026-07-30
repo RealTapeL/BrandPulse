@@ -1,0 +1,51 @@
+# BrandPulse 开发环境一键编排（可选）
+#
+# 说明：项目默认走本地安装（见 src/frontend/README.dev.md 与根 README）。
+# 本 compose 仅作为 dev infra 样例，提供 Postgres + Redis + Prometheus。
+# backend / frontend 服务需要先在本地启动，或自行扩展 Dockerfile。
+
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bp-postgres
+    environment:
+      POSTGRES_USER: brandpulse
+      POSTGRES_PASSWORD: brandpulse123
+      POSTGRES_DB: brandpulse
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./brandpulse-infra/init-scripts:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brandpulse -d brandpulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: bp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: bp-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./brandpulse-infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
