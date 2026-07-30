@@ -17,3 +17,9 @@ websocket-client>=1.9.0
 
 # 开发工具
 pytest>=7.4.0
+
+# Web 看板
+fastapi>=0.110.0
+uvicorn>=0.29.0
+
+# Agent（Pydantic AI）
