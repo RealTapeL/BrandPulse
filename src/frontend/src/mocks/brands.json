@@ -1,0 +1,212 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "name": "% Arabica 阿拉比卡咖啡(苏州中心店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-29T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 2,
+      "name": "W CAFE SH brunch&bistro(苏州中心店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-28T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 3,
+      "name": "Peet's 皮爷咖啡(苏州中心店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-27T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 4,
+      "name": "M Stand(苏州中心广场店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-26T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 5,
+      "name": "Manner Coffee(苏州中心二店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-25T10:16:04.252Z",
+      "status": "crawling"
+    },
+    {
+      "id": 6,
+      "name": "星巴克臻选(苏州中心店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-29T10:16:04.252Z",
+      "status": "error"
+    },
+    {
+      "id": 7,
+      "name": "瑞幸咖啡(苏州中心北区店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-28T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 8,
+      "name": "瑞幸咖啡(苏州中心南区B1店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-27T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 9,
+      "name": "Tims天好咖啡·贝果(东方之门店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-26T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 10,
+      "name": "LAVAZZA拉瓦萨咖啡(苏州星悦汇店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-25T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 11,
+      "name": "Emo Coffee&Bar",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-29T10:16:04.252Z",
+      "status": "crawling"
+    },
+    {
+      "id": 12,
+      "name": "COSTA COFFEE(苏州中心店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-28T10:16:04.252Z",
+      "status": "error"
+    },
+    {
+      "id": 13,
+      "name": "Seesaw Coffee(苏州中心店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-27T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 14,
+      "name": "代数学家咖啡(苏州中心店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-26T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 15,
+      "name": "NOWWA挪瓦咖啡(苏州中心店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-25T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 16,
+      "name": "库迪咖啡(苏州中心店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-29T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 17,
+      "name": "本来不该有·鲜果咖啡(苏州中心店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-28T10:16:04.252Z",
+      "status": "crawling"
+    },
+    {
+      "id": 18,
+      "name": "邮局咖啡(苏州中心店)",
+      "logo_url": "",
+      "category": "咖啡",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-27T10:16:04.252Z",
+      "status": "error"
+    },
+    {
+      "id": 19,
+      "name": "霸王茶姬(苏州中心店)",
+      "logo_url": "",
+      "category": "茶饮",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-26T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 20,
+      "name": "喜茶(苏州中心店)",
+      "logo_url": "",
+      "category": "茶饮",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-25T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 21,
+      "name": "奈雪的茶(苏州中心店)",
+      "logo_url": "",
+      "category": "茶饮",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-29T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 22,
+      "name": "茶百道(苏州中心店)",
+      "logo_url": "",
+      "category": "茶饮",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-28T10:16:04.252Z",
+      "status": "active"
+    },
+    {
+      "id": 23,
+      "name": "乐乐茶(苏州中心店)",
+      "logo_url": "",
+      "category": "茶饮",
+      "city": "苏州",
+      "last_crawl_at": "2026-07-27T10:16:04.252Z",
+      "status": "crawling"
+    }
+  ],
+  "total": 23
+}

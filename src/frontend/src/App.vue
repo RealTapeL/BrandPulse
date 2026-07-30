@@ -1,5 +1,7 @@
 <template>
-  <el-container class="layout">
+  <!-- 登录页：全屏裸布局，不带侧边栏 -->
+  <router-view v-if="isLoginPage" />
+  <el-container v-else class="layout">
     <!-- 左侧深色侧边栏 -->
     <el-aside width="216px" class="sidebar">
       <div class="brand">
@@ -53,8 +55,12 @@ import { routeLoading } from './router'
 
 const route = useRoute()
 
+const isLoginPage = computed(() => route.path === '/login')
+
 const menus = [
   { path: '/', title: '数据看板', icon: 'Odometer' },
+  { path: '/brands', title: '品牌列表', icon: 'Shop' },
+  { path: '/agent/console', title: 'Agent 控制台', icon: 'Cpu' },
   { path: '/chat', title: '对话助手', icon: 'ChatDotRound' },
   { path: '/tables', title: '数据表查看', icon: 'Grid' },
   { path: '/formulas', title: '指标公式管理', icon: 'MagicStick' },

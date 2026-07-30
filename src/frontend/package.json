@@ -6,17 +6,33 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:unit": "vitest run",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "cypress": "env -u ELECTRON_RUN_AS_NODE cypress run",
+    "cypress:open": "env -u ELECTRON_RUN_AS_NODE cypress open"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
+    "axios": "^1.19.0",
     "echarts": "^5.5.0",
     "element-plus": "^2.14.3",
+    "pinia": "^4.0.2",
     "vue": "^3.4.0",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@storybook/addon-essentials": "^8.6.14",
+    "@storybook/vue3": "^8.6.18",
+    "@storybook/vue3-vite": "^8.6.18",
     "@vitejs/plugin-vue": "^5.0.0",
-    "vite": "^5.2.0"
+    "@vue/test-utils": "^2.4.11",
+    "axios-mock-adapter": "^2.1.0",
+    "cypress": "^15.19.0",
+    "jsdom": "^24.1.3",
+    "storybook": "^8.6.18",
+    "vite": "^5.2.0",
+    "vitest": "^3.2.7"
   }
 }

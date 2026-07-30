@@ -6,10 +6,17 @@ export const routeLoading = ref(false)
 
 const routes = [
   {
+    path: '/login',
+    name: 'login',
+    component: () => import('../views/Login.vue'),
+    meta: { title: '登录', public: true },
+  },
+  {
     path: '/',
     name: 'dashboard',
     component: () => import('../views/DashboardView.vue'),
     meta: { title: '数据看板' },
+    alias: '/dashboard',
   },
   {
     path: '/chat',
@@ -29,6 +36,24 @@ const routes = [
     component: () => import('../views/FormulasView.vue'),
     meta: { title: '指标公式管理' },
   },
+  {
+    path: '/brands',
+    name: 'brands',
+    component: () => import('../views/BrandList.vue'),
+    meta: { title: '品牌列表' },
+  },
+  {
+    path: '/brands/:id',
+    name: 'brand-detail',
+    component: () => import('../views/BrandDetail.vue'),
+    meta: { title: '品牌详情' },
+  },
+  {
+    path: '/agent/console',
+    name: 'agent-console',
+    component: () => import('../views/AgentConsole.vue'),
+    meta: { title: 'Agent 控制台' },
+  },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
@@ -37,8 +62,17 @@ const router = createRouter({
   routes,
 })
 
+// 鉴权守卫：无 token 一律跳转 /login（public 路由除外），已登录访问 /login 则回首页。
+// 直接读 localStorage 而不经过 Pinia，避免守卫与 store 初始化的先后耦合。
 router.beforeEach((to, from, next) => {
   routeLoading.value = true
+  const token = localStorage.getItem('token')
+  if (!to.meta.public && !token) {
+    return next({ path: '/login', query: { redirect: to.fullPath } })
+  }
+  if (to.path === '/login' && token) {
+    return next({ path: '/' })
+  }
   next()
 })
 
