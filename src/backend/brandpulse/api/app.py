@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
+from brandpulse.api.alerts import router as alerts_router
 from brandpulse.api.crawl_jobs import router as crawl_jobs_router
 from brandpulse.api.indicators import router as indicators_router
 from brandpulse.db_clients.postgres_client import PostgresClient
@@ -28,6 +29,7 @@ logger = get_logger(__name__)
 WEB_DIST = PROJECT_ROOT / "src" / "frontend" / "dist"
 
 app = FastAPI(title="BrandPulse 招商品牌情报看板")
+app.include_router(alerts_router)
 app.include_router(crawl_jobs_router)
 app.include_router(indicators_router)
 app.add_middleware(
