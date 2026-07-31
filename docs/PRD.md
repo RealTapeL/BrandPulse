@@ -1,9 +1,9 @@
 # BrandPulse 品牌情报分析系统 — 产品需求文档（PRD）
 
-- 版本：v0.2
-- 日期：2026-07-30
+- 版本：v0.3
+- 日期：2026-07-31
 - 依据文档：`BrandPulse_系统架构.drawio`、`品牌分类体系.drawio`、`餐饮业态数据采集范围.drawio`、`品牌热度布局分布_数据表设计.drawio`
-- 现状基线：外部数据链路（采集 → 入库 → 指标 → 看板）已跑通；对话助手 CLI 可用；Web 平台四页面已上线
+- 现状基线：外部数据链路（采集 → 入库 → 指标 → 看板）已跑通；Web 平台已接入真实后端；对话与 Agent 依赖已配置的 LLM 服务
 
 ---
 
@@ -59,12 +59,12 @@
 |------|------|------|
 | 数据采集 | 商场 × 品类采集（点评 + 小红书，WebBridge 方案）；品牌 × 城市采集；高德门店采集 | 已完成 |
 | 指标计算 | 口碑（贝叶斯加权）/ 热度（对数归一）/ SOV / 趋势，确定性代码，按日写入指标表 | 已完成 |
-| Web 平台 | 数据看板、数据表查看已可用；对话助手、指标公式管理为前端原型 | 部分完成 |
-| 对话助手 | Pydantic AI 工具循环，CLI 可用（query_db / run_indicators / crawl / list_tables 四个工具） | 部分完成（待配 LLM 端点、待接 Web） |
+| Web 平台 | 登录、数据看板、品牌列表/详情/采集、数据表查看、公式管理、Agent 控制台、对话页面均调用真实 FastAPI | 已完成（对话需 LLM 配置） |
+| 对话助手 | Pydantic AI 工具循环；CLI 和 Web 接口均可用（query_db / run_indicators / crawl / list_tables 四个工具） | 已完成（运行需 LLM 端点） |
 | 品牌知识库 | brands / stores / malls / category_dict 实体表，高德 stage1 采集 | 基础完成 |
 | 数据清洗与标准化 | 品牌别名归一、门店去重、质量校验、采集血缘 | 未开始 |
 | Excel 导入 / 手工录入 | 内部营运数据接入口 | 未开始 |
-| 监控与预警 | 规则引擎、定时采集、企微/钉钉推送 | 未开始 |
+| 监控与预警 | 告警规则、手动检查接口与历史记录已实现；定时采集、企微/钉钉推送待接入 | 部分完成 |
 | 机器学习预测 | 热度/趋势预测 | 未开始（独立分支） |
 
 ---
@@ -83,7 +83,7 @@
 指标层 indicators（口碑 / 热度 / SOV / 趋势，确定性代码）
         │  写入 brand_indicators_daily
         ▼
-FastAPI（/api/dashboard 等接口）
+FastAPI（认证 / 看板 / 品牌 / 采集任务 / 数据表 / 公式 / Agent / 对话接口）
         │
         ▼
 Vue3 + Element Plus Web 平台（看板 / 对话 / 数据表 / 公式）
@@ -107,13 +107,13 @@ Vue3 + Element Plus Web 平台（看板 / 对话 / 数据表 / 公式）
 
 | 领域 | 选型 | 说明 |
 |------|------|------|
-| 语言 | Python 3.13 | `.venv` |
+| 语言 | Python 3.14 | `.venv` |
 | 数据库 | PostgreSQL + SQLAlchemy | 唯一数据库 |
 | 采集 | Kimi WebBridge + 配置化 crawler 引擎 | extractor 插件式扩展 |
 | 后端 | FastAPI | 看板接口 + 前端静态托管 |
 | 前端 | Vue3 + Element Plus + ECharts + vue-router | hash 路由 |
 | Agent | Pydantic AI | 工具循环薄层，模型无关 |
-| 测试 | pytest | 47 项 |
+| 测试 | pytest + Vitest | 后端 55 项、前端 9 项 |
 
 ### 3.4 分支模型
 
@@ -140,9 +140,9 @@ Vue3 + Element Plus Web 平台（看板 / 对话 / 数据表 / 公式）
 | 里程碑 | 内容 | 状态 |
 |--------|------|------|
 | 外部数据链路 | 商场 × 品类采集（点评 + 小红书）→ 入库 → 指标 → 看板 | 已完成 |
-| Web 平台四页面 | 看板 / 对话 / 数据表 / 公式管理前端 | 已完成 |
-| 对话助手 CLI | Pydantic AI agent + 四个工具 | 已完成 |
-| M1 平台后端补全 | `/api/chat`、`/api/tables`、`/api/formulas` 接入，前端开关切换 | 下一步 |
+| Web 平台 | 看板 / 品牌 / 对话 / 数据表 / 公式 / Agent 控制台，均已接入真实后端 | 已完成 |
+| 对话助手 | Pydantic AI agent + 四个工具，支持 CLI 与 Web 后台任务 | 已完成（需 LLM 配置） |
+| M1 平台后端补全 | `/api/chat`、`/api/tables`、`/api/formulas`、品牌与 Agent 接口接入 | 已完成 |
 | M2 清洗与标准化 | 别名归一、门店去重、质量校验、血缘 | 未开始 |
 | M3 监控预警（阶段二） | 规则引擎、定时采集、分级推送 | 未开始 |
 | M4 机器学习预测 | 热度/趋势预测模型 | 未开始（独立分支） |
@@ -152,6 +152,6 @@ Vue3 + Element Plus Web 平台（看板 / 对话 / 数据表 / 公式）
 
 ## 6. 待确认问题
 
-1. LLM 用哪家（Kimi / DeepSeek / 硅基流动 / OpenAI）？API Key 何时到位——决定 M1 完成时间
+1. LLM 用哪家（Kimi / DeepSeek / 硅基流动 / OpenAI）？API Key 与调用预算何时到位——决定对话功能可用范围
 2. 内部经营数据能拿到什么形式的导出（Excel？字段有哪些）？
 3. 自定义公式是否需要真正参与指标计算（涉及服务端表达式求值与安全沙箱），还是仅作展示管理？

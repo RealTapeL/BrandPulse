@@ -62,6 +62,7 @@
         <div class="block-title">输出</div>
         <pre class="block-body output">{{ store.task.output }}</pre>
       </div>
+      <el-alert v-if="store.task.error" type="error" :title="store.task.error" :closable="false" />
     </el-card>
 
     <!-- 错误态：retry -->

@@ -6,6 +6,7 @@ main.run_mall_crawl（Kimi WebBridge 驱动大众点评 + 小红书）。
 TODO: 后端 /api/v1/data/raw 就绪后，把原始 JSON 通过 POST 上传而非仅更新 job 摘要。
 """
 import sys
+import json
 from pathlib import Path
 
 # main.py 不在 brandpulse 包内，把 src/backend 加入 path
@@ -30,36 +31,49 @@ def run_crawl_job(task_meta: dict) -> dict:
     Returns:
         { raw, heat, cached, sites } 采集摘要
     """
+    job_id = task_meta.get("job_id")
     brand_id = task_meta["brand_id"]
     mall = task_meta["mall"]
     category = task_meta["category"]
     city = (task_meta.get("cities") or ["苏州"])[0]
 
-    logger.info(f"[worker] start crawl job: brand_id={brand_id}, mall={mall}, category={category}, city={city}")
-    stats = main.run_mall_crawl(mall=mall, category=category, city=city)
+    logger.info(f"[worker] start crawl job: id={job_id}, brand_id={brand_id}, mall={mall}, category={category}, city={city}")
+    if job_id:
+        _update_job(job_id, status="running")
+    try:
+        stats = main.run_mall_crawl(mall=mall, category=category, city=city)
+    except Exception as exc:
+        if job_id:
+            _update_job(job_id, status="failed", result={"error": str(exc)})
+        raise
 
-    _update_job(brand_id, stats)
+    if job_id:
+        _update_job(job_id, status="completed", result=stats)
     return stats
 
 
-def _update_job(brand_id: str, stats: dict) -> None:
-    """把采集结果摘要写回 crawl_jobs（按 brand_id 找最新一条 running 记录）。"""
+def _update_job(job_id: str, status: str, result: dict | None = None) -> None:
+    """按唯一 job_id 更新任务状态，避免并发任务互相覆盖。"""
     sql = """
         UPDATE crawl_jobs
-        SET status = 'completed',
-            result = :result,
-            finished_at = CURRENT_TIMESTAMP
-        WHERE brand_id = :brand_id
-          AND status = 'running'
+        SET status = :status,
+            result = COALESCE(:result, result),
+            finished_at = CASE
+                WHEN :status IN ('completed', 'failed') THEN CURRENT_TIMESTAMP
+                ELSE finished_at
+            END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE job_id = :job_id
         RETURNING job_id
     """
     try:
         client = PostgresClient()
         result = client.execute(sql, {
-            "brand_id": brand_id,
-            "result": str(stats),
+            "job_id": job_id,
+            "status": status,
+            "result": json.dumps(result, ensure_ascii=False) if result is not None else None,
         })
         rows = result.fetchall() if result else []
-        logger.info(f"[worker] updated {len(rows)} crawl_jobs for {brand_id}: {stats}")
+        logger.info(f"[worker] updated {len(rows)} crawl_jobs for {job_id}: {status}")
     except Exception as e:
         logger.error(f"[worker] failed to update crawl_jobs: {e}")

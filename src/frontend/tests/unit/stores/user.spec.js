@@ -23,7 +23,7 @@ describe('stores/user', () => {
   })
 
   it('登录成功：保存 token 与 user 到 state 和 localStorage', async () => {
-    mock.onPost('/auth/login').reply(200, {
+    mock.onPost('/v1/auth/login').reply(200, {
       token: 'mock-jwt-token-for-demo',
       user: { id: 1, username: 'admin', role: 'admin' },
     })
@@ -40,21 +40,21 @@ describe('stores/user', () => {
   })
 
   it('登录成功后请求自动携带 Authorization', async () => {
-    mock.onPost('/auth/login').reply(200, {
+    mock.onPost('/v1/auth/login').reply(200, {
       token: 't-123',
       user: { id: 1, username: 'admin', role: 'admin' },
     })
-    mock.onGet('/brands').reply(200, { items: [], total: 0 })
+    mock.onGet('/v1/brands').reply(200, { items: [], total: 0 })
 
     const store = useUserStore()
     await store.login('admin', '123456')
-    await api.get('/brands')
+    await api.get('/v1/brands')
 
     expect(mock.history.get[0].headers.Authorization).toBe('Bearer t-123')
   })
 
   it('登录失败：抛出错误且不写入 token', async () => {
-    mock.onPost('/auth/login').reply(400, { message: '用户名和密码不能为空' })
+    mock.onPost('/v1/auth/login').reply(400, { message: '用户名和密码不能为空' })
 
     const store = useUserStore()
     await expect(store.login('', '')).rejects.toThrow()
@@ -63,7 +63,7 @@ describe('stores/user', () => {
   })
 
   it('logout：清空 state 与 localStorage', async () => {
-    mock.onPost('/auth/login').reply(200, {
+    mock.onPost('/v1/auth/login').reply(200, {
       token: 't-123',
       user: { id: 1, username: 'admin', role: 'admin' },
     })

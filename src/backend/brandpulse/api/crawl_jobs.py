@@ -10,7 +10,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from brandpulse.collectors.queue import enqueue_crawl
+from brandpulse.collectors.jobs import CrawlJobEnqueueError, create_crawl_job as create_job
 from brandpulse.db_clients.postgres_client import PostgresClient
 
 router = APIRouter(prefix="/api/v1/crawl_jobs", tags=["crawl_jobs"])
@@ -37,50 +37,17 @@ class CrawlJobResponse(BaseModel):
 @router.post("", response_model=dict)
 def create_crawl_job(payload: CrawlJobCreate):
     """创建并 enqueue 抓取任务。"""
-    # 1) 写库
-    insert_sql = """
-        INSERT INTO crawl_jobs (job_id, brand_id, mall, category, cities, status, created_at)
-        VALUES (gen_random_uuid()::text, :brand_id, :mall, :category, :cities, 'pending', CURRENT_TIMESTAMP)
-        RETURNING job_id, created_at
-    """
-    client = PostgresClient()
     try:
-        result = client.execute(insert_sql, {
-            "brand_id": payload.brand_id,
-            "mall": payload.mall,
-            "category": payload.category,
-            "cities": payload.cities,
-        })
-        row = result.fetchone()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"创建任务失败: {e}") from e
-
-    job_id = row[0]
-    created_at = row[1]
-
-    # 2) 入队 RQ
-    try:
-        rq_job_id = enqueue_crawl({
-            "job_id": job_id,
-            "brand_id": payload.brand_id,
-            "mall": payload.mall,
-            "category": payload.category,
-            "cities": payload.cities,
-        })
-    except Exception as e:
-        # 回滚任务状态为 failed
-        client.execute(
-            "UPDATE crawl_jobs SET status='failed', result=:msg WHERE job_id=:id",
-            {"id": job_id, "msg": f"入队失败: {e}"},
+        return create_job(
+            brand_id=payload.brand_id,
+            mall=payload.mall,
+            category=payload.category,
+            cities=payload.cities or ["苏州"],
         )
-        raise HTTPException(status_code=503, detail=f"任务入队失败，请检查 Redis: {e}") from e
-
-    # 3) 标记为 running（worker 会再次更新为 completed）
-    client.execute(
-        "UPDATE crawl_jobs SET status='running' WHERE job_id=:id",
-        {"id": job_id},
-    )
-    return {"job_id": job_id, "rq_job_id": rq_job_id, "status": "running", "created_at": str(created_at)}
+    except CrawlJobEnqueueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"创建任务失败: {exc}") from exc
 
 
 @router.get("/{job_id}", response_model=CrawlJobResponse)

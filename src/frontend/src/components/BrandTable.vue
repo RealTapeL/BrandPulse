@@ -29,7 +29,7 @@
       </el-table-column>
       <template #empty>
         <el-empty description="暂无品牌数据">
-          <el-button type="primary" aria-label="添加品牌" @click="$emit('add')">添加品牌</el-button>
+          <el-text type="info">请先在品牌主数据中维护品牌</el-text>
         </el-empty>
       </template>
     </el-table>
@@ -56,7 +56,7 @@
         </el-card>
       </template>
       <el-empty v-else description="暂无品牌数据">
-        <el-button type="primary" aria-label="添加品牌" @click="$emit('add')">添加品牌</el-button>
+        <el-text type="info">请先在品牌主数据中维护品牌</el-text>
       </el-empty>
     </div>
 
@@ -89,7 +89,7 @@ defineProps({
   loading: { type: Boolean, default: false },
 })
 
-defineEmits(['page-change', 'row-click', 'add'])
+defineEmits(['page-change', 'row-click'])
 
 const isCompact = ref(false)
 const mq = window.matchMedia('(max-width: 1023px)')

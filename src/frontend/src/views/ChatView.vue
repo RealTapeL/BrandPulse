@@ -156,11 +156,10 @@ async function send() {
   try {
     const resp = await sendChat(question, history)
     messages.value.push({ role: 'assistant', content: resp.answer || '（服务未返回内容）', time: Date.now() })
-  } catch {
-    // 404 / 500 / 超时等：降级为系统提示，不打断会话
+  } catch (e) {
     messages.value.push({
       role: 'system',
-      content: '对话服务尚未接入后端，当前为前端原型',
+      content: `对话服务暂不可用：${e.response?.data?.detail || e.message || '未知错误'}`,
       time: Date.now(),
     })
   } finally {

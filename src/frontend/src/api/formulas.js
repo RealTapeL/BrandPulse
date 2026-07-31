@@ -10,69 +10,27 @@
  * Formula: { id, name, description, expression, params: [{key, value}],
  *            enabled: boolean, remark, created_at, updated_at }
  *
- * 当前实现：localStorage 持久化（带版本号 key）。
- * 后端接口上线后，把 USE_BACKEND_FORMULA_API 置为 true 即可（一行切换）。
+ * 由 FastAPI + PostgreSQL 持久化；自定义公式当前只作管理展示，不直接参与指标计算。
  */
-import { request } from './http'
-
-const USE_BACKEND_FORMULA_API = false
-const STORAGE_KEY = 'brandpulse.custom-formulas.v1'
-
-function loadAll() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    const list = raw ? JSON.parse(raw) : []
-    return Array.isArray(list) ? list : []
-  } catch {
-    return []
-  }
-}
-
-function saveAll(list) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
-}
-
-function genId() {
-  return `f_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
-}
+import api from './index'
 
 export async function listFormulas() {
-  if (USE_BACKEND_FORMULA_API) {
-    const resp = await request('/api/formulas')
-    return resp.formulas || []
-  }
-  return loadAll()
+  const { data } = await api.get('/v1/formulas')
+  return data.formulas || []
 }
 
 export async function createFormula(formula) {
-  if (USE_BACKEND_FORMULA_API) {
-    return request('/api/formulas', { method: 'POST', body: formula })
-  }
-  const list = loadAll()
-  const now = new Date().toISOString()
-  const item = { ...formula, id: genId(), created_at: now, updated_at: now }
-  list.push(item)
-  saveAll(list)
-  return item
+  const { data } = await api.post('/v1/formulas', formula)
+  return data
 }
 
 export async function updateFormula(id, patch) {
-  if (USE_BACKEND_FORMULA_API) {
-    return request(`/api/formulas/${id}`, { method: 'PUT', body: patch })
-  }
-  const list = loadAll()
-  const idx = list.findIndex((f) => f.id === id)
-  if (idx === -1) throw new Error('公式不存在')
-  list[idx] = { ...list[idx], ...patch, id, updated_at: new Date().toISOString() }
-  saveAll(list)
-  return list[idx]
+  const { data } = await api.put(`/v1/formulas/${id}`, patch)
+  return data
 }
 
 export async function deleteFormula(id) {
-  if (USE_BACKEND_FORMULA_API) {
-    return request(`/api/formulas/${id}`, { method: 'DELETE' })
-  }
-  saveAll(loadAll().filter((f) => f.id !== id))
+  await api.delete(`/v1/formulas/${id}`)
 }
 
 /**

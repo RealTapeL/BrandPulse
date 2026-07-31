@@ -21,8 +21,8 @@ describe('stores/agent', () => {
   })
 
   it('execute：拿到 task_id 后轮询到 success，记录历史', async () => {
-    mock.onPost('/agent/execute').reply(200, { task_id: 'task-1' })
-    mock.onGet('/agent/tasks/task-1').reply(200, {
+    mock.onPost('/v1/agent/execute').reply(200, { task_id: 'task-1' })
+    mock.onGet('/v1/agent/tasks/task-1').reply(200, {
       id: 'task-1',
       status: 'success',
       input: '统计口碑排名',
@@ -40,7 +40,7 @@ describe('stores/agent', () => {
   })
 
   it('execute 发起失败：error 落盘且 running 复位', async () => {
-    mock.onPost('/agent/execute').reply(500, { message: 'server error' })
+    mock.onPost('/v1/agent/execute').reply(500, { message: 'server error' })
 
     const store = useAgentStore()
     await store.execute('x')

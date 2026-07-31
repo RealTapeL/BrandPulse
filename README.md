@@ -18,7 +18,7 @@ BrandPulse/
 │   ├── coffee_brand_database_schema.sql  # 咖啡品牌库表结构参考
 │   └── data/                       # 本地数据（不提交）
 ├── docs/                           # PRD 与 drawio 架构图
-├── migrations/                     # 新增表迁移（crawl_jobs / indicators / alerts）
+├── migrations/                     # 应用表迁移（任务、指标、告警、Web 平台）
 ├── data/                           # raw / processed / normalized / invalid / labelled
 ├── scripts/                        # 服务启动脚本
 ├── src/
@@ -36,7 +36,7 @@ BrandPulse/
 │   │       │   └── pipelines.py    #   解析/标准化/校验 pipeline
 │   │       ├── storage/            # 仓储层：PG 表 + JSON 文件缓存双写
 │   │       ├── indicators/         # 指标层：口碑 / 热度 / SOV / 趋势 + aggregate job
-│   │       ├── api/                # FastAPI：看板 + crawl_jobs + indicators + alerts
+│   │       ├── api/                # FastAPI：认证、看板、品牌、任务、数据表、公式等
 │   │       ├── agent/              # Pydantic AI 工具循环 + Tool registry
 │   │       └── alerts/             # 告警规则与调度器
 │   ├── frontend/                   # 前端（Vue3 + Element Plus + ECharts + Pinia）
@@ -60,9 +60,9 @@ python -m venv .venv
 
 cp env.dev.example .env   # 编辑填入 LLM_*（对话助手）、REDIS_URL 等
 
-# 初始化数据库，按顺序执行脚本
+# 初始化数据库，按顺序执行脚本（会提示输入 sudo 密码）
 for f in brandpulse-infra/init-scripts/*.sql migrations/*.sql; do
-  echo 'yang2004.' | sudo -S -u postgres psql -d brandpulse -f "$f"
+  sudo -u postgres psql -d brandpulse -f "$f"
 done
 
 # 前端（本机 npm 位于 ~/.local/node/bin）
@@ -98,10 +98,19 @@ cd src/frontend && npm run dev
 
 | 接口 | 说明 |
 |------|------|
-| `GET  /api/dashboard` | 看板聚合数据 |
+| `POST /api/v1/auth/login` | 本地会话登录（`AUTH_MODE` 可选 `local` / `password`） |
+| `GET  /api/v1/dashboard` | 看板聚合数据（`/api/dashboard` 保留为兼容别名） |
+| `GET  /api/v1/brands` | 品牌目录筛选与分页 |
+| `GET  /api/v1/brands/filters` | 品类、城市筛选项 |
+| `GET  /api/v1/brands/{id}` | 品牌详情、采集记录与真实指标时序 |
+| `POST /api/v1/brands/{id}/crawl` | 从品牌详情发起采集 |
 | `POST /api/v1/crawl_jobs` | 创建采集任务并 enqueue（body: brand_id, mall, category, cities?） |
 | `GET  /api/v1/crawl_jobs/{id}` | 查询任务状态 |
 | `GET  /api/v1/indicators` | 指标时序（query: brand_id, indicator, start, end） |
+| `GET  /api/v1/tables/{name}` | 白名单数据表的服务端筛选、排序、分页 |
+| `GET|POST|PUT|DELETE /api/v1/formulas` | 自定义指标公式管理 |
+| `POST /api/v1/agent/execute` | 创建后台 Agent 任务；`GET /api/v1/agent/tasks/{id}` 轮询状态 |
+| `POST /api/v1/chat` | 对话式数据问答（需配置 LLM） |
 | `POST /api/v1/alerts/check-now` | 立即执行告警检查 |
 | `POST /ml/sentiment` | 情感分类推理 |
 | `POST /ml/ner` | 命名实体识别推理 |
@@ -125,10 +134,10 @@ cd src/frontend && npm run dev
 
 访问 `http://<本机IP>:8000/`，包含：
 
-- **登录页**：localStorage token，受路由守卫保护
+- **登录页**：真实 `/api/v1/auth/login` 接口；单团队本地部署默认接受非空凭据，也可用环境变量切换为固定账号密码
 - **数据看板**：KPI 卡片、指标趋势图、双平台明细表
 - **品牌列表 / 详情**：搜索、分页、热度趋势、最近采集、发起采集
-- **Agent 控制台**：输入指令 → POST `/api/v1/agent/execute` → 轮询任务 → 展示日志与输出
+- **Agent 控制台**：输入指令 → 后台任务持久化 → 轮询状态 → 展示日志与输出
 - **数据表查看**：点评门店 / 小红书笔记 / 指标日表的分页、排序、筛选
 - **指标公式管理**：内置指标口径展示与自定义公式
 
@@ -175,7 +184,7 @@ npm run cypress     # e2e 1 项
 
 ## 当前开发分支
 
-- `develop`：集成主线（前端原型 1–3 阶段已合并）
+- `develop`：集成主线
 - `feat/collectors-20260730`：本次 backend 工程能力分支（A/B/C/D/F/G/E/H）
 
 ## 分支约定
@@ -185,9 +194,6 @@ npm run cypress     # e2e 1 项
 
 ## 后续计划
 
-- Agent Console 后端接口 `/api/v1/agent/execute` 接入前端（前端已按契约实现轮询展示）
-- `/api/formulas` 自定义公式服务端表达式沙箱
-- 前端与真实后端对接（关闭 VITE_USE_MOCK）
 - 品牌别名归一、门店去重、采集血缘
 - ML 模型训练调优与模型管理
 

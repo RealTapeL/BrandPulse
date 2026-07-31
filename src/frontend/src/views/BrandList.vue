@@ -55,7 +55,6 @@
       :loading="store.loading"
       @page-change="load"
       @row-click="goDetail"
-      @add="onAdd"
     />
   </div>
 </template>
@@ -63,22 +62,23 @@
 <script setup>
 /**
  * 品牌列表页 /brands：搜索（q/品类/城市）+ 分页表格。
- * TODO: 「添加品牌」入口待后端提供品牌管理接口后接入。
+ * 筛选项由后端主数据下发，避免前端把业务品类和城市写死。
  */
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import BrandTable from '../components/BrandTable.vue'
 import { useBrandsStore } from '../stores/brands'
 
 const router = useRouter()
 const store = useBrandsStore()
 
-// TODO: 品类/城市选项后续由后端字典接口下发
-const categories = ['咖啡', '茶饮']
-const cities = ['苏州']
+const categories = computed(() => store.filters.categories)
+const cities = computed(() => store.filters.cities)
 
-onMounted(() => load())
+onMounted(() => {
+  store.fetchFilters().catch(() => {})
+  load()
+})
 
 function load(page = 1) {
   store.fetchList({ page })
@@ -92,9 +92,6 @@ function goDetail(row) {
   router.push(`/brands/${row.id}`)
 }
 
-function onAdd() {
-  ElMessage.info('品牌管理功能待后端接口就绪后开放')
-}
 </script>
 
 <style scoped>

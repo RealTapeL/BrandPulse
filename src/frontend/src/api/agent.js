@@ -6,9 +6,9 @@
 import api from './index'
 
 export function executeAgent(prompt, context = {}) {
-  return api.post('/agent/execute', { prompt, context }).then((r) => r.data)
+  return api.post('/v1/agent/execute', { prompt, context }).then((r) => r.data)
 }
 
 export function getTask(id) {
-  return api.get(`/agent/tasks/${id}`).then((r) => r.data)
+  return api.get(`/v1/agent/tasks/${id}`).then((r) => r.data)
 }

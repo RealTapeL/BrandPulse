@@ -1,108 +1,37 @@
-<mxfile host="app.diagrams.net" modified="2026-07-30T00:00:00.000Z" agent="Kimi" version="21.0.0" etag="brandpulse-agent-harness" type="device">
-  <diagram name="BrandPulse 自建 Agent Harness 系统架构" id="brandpulse-agent-harness-arch">
-    <mxGraphModel dx="2400" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1600" math="0" shadow="0">
+<mxfile host="app.diagrams.net" modified="2026-07-31T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="brandpulse-current-architecture" name="当前实现架构">
+    <mxGraphModel dx="1420" dy="850" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
       <root>
-        <mxCell id="0" />
-        <mxCell id="1" parent="0" />
-
-        <mxCell id="title" value="BrandPulse 自建 Agent Harness 系统架构" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=28;fontStyle=1;fontColor=#1A1A2E;" vertex="1" parent="1">
-          <mxGeometry x="600" y="20" width="1200" height="50" as="geometry" />
-        </mxCell>
-
-        <mxCell id="input" value="用户提问 / 对话界面（Vue3 前端）&lt;br&gt;“苏州中心咖啡店这个月口碑怎么样？”" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=2;arcSize=6;fontSize=13;" vertex="1" parent="1">
-          <mxGeometry x="800" y="100" width="800" height="60" as="geometry" />
-        </mxCell>
-
-        <mxCell id="harness-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=3;arcSize=6;" vertex="1" parent="1">
-          <mxGeometry x="450" y="210" width="1500" height="400" as="geometry" />
-        </mxCell>
-        <mxCell id="harness-title" value="&lt;b&gt;Agent Harness（自建脚手架）—— LLM 只负责调度与表达，不做计算&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=15;fontStyle=1;fontColor=#EA580C;" vertex="1" parent="1">
-          <mxGeometry x="800" y="220" width="800" height="30" as="geometry" />
-        </mxCell>
-        <mxCell id="llm" value="&lt;b&gt;LLM 决策核心&lt;/b&gt;&lt;br&gt;模型 API（Kimi / 其他）&lt;br&gt;理解意图、选择工具、组织语言" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EA580C;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="590" y="260" width="400" height="90" as="geometry" />
-        </mxCell>
-        <mxCell id="loop" value="&lt;b&gt;ReAct 循环（harness 的心脏）&lt;/b&gt;&lt;br&gt;思考 → 调用工具 → 观察结果 → 再思考&lt;br&gt;直到任务完成或达到步数上限" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EA580C;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="1410" y="260" width="400" height="90" as="geometry" />
-        </mxCell>
-        <mxCell id="registry" value="&lt;b&gt;工具注册表 Tool Registry&lt;/b&gt;&lt;br&gt;每个工具：名称 / 参数 schema / 文档说明&lt;br&gt;LLM 按说明决定何时调用" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EA580C;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="590" y="380" width="400" height="90" as="geometry" />
-        </mxCell>
-        <mxCell id="memory" value="&lt;b&gt;上下文与记忆管理&lt;/b&gt;&lt;br&gt;对话压缩 / 会话记忆 / 历史摘要&lt;br&gt;长任务不“失忆”" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EA580C;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="1410" y="380" width="400" height="90" as="geometry" />
-        </mxCell>
-        <mxCell id="permission" value="&lt;b&gt;权限层&lt;/b&gt;&lt;br&gt;只读工具直接执行；&lt;br&gt;写入/采集等动作可要求人工确认" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EA580C;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="590" y="500" width="400" height="80" as="geometry" />
-        </mxCell>
-        <mxCell id="audit" value="&lt;b&gt;审计日志&lt;/b&gt;&lt;br&gt;记录每步决策与工具调用（可回放）&lt;br&gt;支撑结果可追溯、可审计" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EA580C;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="1410" y="500" width="400" height="80" as="geometry" />
-        </mxCell>
-        <mxCell id="harness-inner-link" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#EA580C;strokeWidth=1;dashed=1;endArrow=none;startArrow=none;" edge="1" parent="1" source="llm" target="loop">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-
-        <mxCell id="tools-title" value="&lt;b&gt;工具层 = 现有代码封装（原 5 个 Agent 降级为工具组，由 Harness 统一调度）&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=15;fontStyle=1;fontColor=#1A1A2E;" vertex="1" parent="1">
-          <mxGeometry x="700" y="640" width="1000" height="30" as="geometry" />
-        </mxCell>
-
-        <mxCell id="tool-crawl" value="&lt;b&gt;采集工具 crawl&lt;/b&gt;&lt;br&gt;crawl(mall, category)&lt;br&gt;WebBridge 驱动真实浏览器&lt;br&gt;大众点评 / 小红书" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#2563EB;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="200" y="690" width="260" height="110" as="geometry" />
-        </mxCell>
-        <mxCell id="tool-search" value="&lt;b&gt;网页搜索工具&lt;/b&gt;&lt;br&gt;web_search(query)&lt;br&gt;实时查新：融资 / 拓店&lt;br&gt;关店 / 高管动态" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#2563EB;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="540" y="690" width="260" height="110" as="geometry" />
-        </mxCell>
-        <mxCell id="tool-sql" value="&lt;b&gt;数据查询工具&lt;/b&gt;&lt;br&gt;query_db(sql) 只读&lt;br&gt;NL → SQL&lt;br&gt;查事实、不编造" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCFCE7;strokeColor=#059669;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="880" y="690" width="260" height="110" as="geometry" />
-        </mxCell>
-        <mxCell id="tool-indicators" value="&lt;b&gt;指标计算工具&lt;/b&gt;&lt;br&gt;run_indicators(date)&lt;br&gt;口碑 / 热度 / SOV&lt;br&gt;确定性代码，可复现可审计" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#D97706;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="1220" y="690" width="260" height="110" as="geometry" />
-        </mxCell>
-        <mxCell id="tool-report" value="&lt;b&gt;报告与图表工具&lt;/b&gt;&lt;br&gt;render_chart / gen_report&lt;br&gt;ECharts 看板 / 招商简报&lt;br&gt;按模板渲染多格式" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#9333EA;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="1560" y="690" width="260" height="110" as="geometry" />
-        </mxCell>
-
-        <mxCell id="data-layer" value="&lt;b&gt;数据层&lt;/b&gt;&lt;br&gt;PostgreSQL：dp_shop_metrics / xhs_notes / brand_indicators_daily&lt;br&gt;JSON 缓存（原始响应，可重放）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0E7FF;strokeColor=#4F46E5;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="200" y="880" width="740" height="90" as="geometry" />
-        </mxCell>
-
-        <mxCell id="output" value="&lt;b&gt;输出&lt;/b&gt;&lt;br&gt;招商简报 / 品牌档案 / 风险预警报告&lt;br&gt;（附带数据来源引用，可追溯）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#10B981;strokeWidth=2;arcSize=6;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="1140" y="880" width="680" height="90" as="geometry" />
-        </mxCell>
-
-        <mxCell id="input-to-llm" value="提问" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#64748B;strokeWidth=2;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="input" target="harness-bg">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="harness-to-crawl" value="调用 / 返回结果" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2563EB;strokeWidth=2;endArrow=block;endFill=1;startArrow=block;startFill=1;fontSize=11;" edge="1" parent="1" source="tool-crawl" target="harness-bg">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="harness-to-search" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2563EB;strokeWidth=2;endArrow=block;endFill=1;startArrow=block;startFill=1;" edge="1" parent="1" source="tool-search" target="harness-bg">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="harness-to-sql" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#059669;strokeWidth=2;endArrow=block;endFill=1;startArrow=block;startFill=1;" edge="1" parent="1" source="tool-sql" target="harness-bg">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="harness-to-indicators" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#D97706;strokeWidth=2;endArrow=block;endFill=1;startArrow=block;startFill=1;" edge="1" parent="1" source="tool-indicators" target="harness-bg">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="harness-to-report" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9333EA;strokeWidth=2;endArrow=block;endFill=1;startArrow=block;startFill=1;" edge="1" parent="1" source="tool-report" target="harness-bg">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="crawl-to-data" value="写入" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#4F46E5;strokeWidth=2;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="tool-crawl" target="data-layer">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="sql-to-data" value="只读查询" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#4F46E5;strokeWidth=2;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="tool-sql" target="data-layer">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="indicators-to-data" value="读原始表 / 写指标表" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#4F46E5;strokeWidth=2;endArrow=block;endFill=1;startArrow=block;startFill=1;fontSize=11;" edge="1" parent="1" source="tool-indicators" target="data-layer">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="report-to-output" value="渲染" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#10B981;strokeWidth=2;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="tool-report" target="output">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-
-        <mxCell id="note" value="&lt;b&gt;说明&lt;/b&gt;&lt;br&gt;• 与原“5-Agent 流水线”的区别：不再有 5 个各自为政的 Agent，而是 1 个 Harness（LLM + ReAct 循环）统一调度 5 个工具组&lt;br&gt;• 确定性原则：采集、SQL 查询、指标计算全部走代码，LLM 只做“调哪个工具、怎么组织结论”，指标可复现可审计&lt;br&gt;• 工具即现有代码：crawl = main.py 采集流程，run_indicators = src/backend/brandpulse/indicators/，query_db = PostgreSQL 只读连接&lt;br&gt;• 权限层保证只读操作自由执行，写库 / 发起采集等动作可配置人工确认&lt;br&gt;• 阶段规划：先封装 4 个只读工具（查询/指标/搜索/图表）跑通对话，再接入采集与报告生成" style="text;html=1;strokeColor=none;fillColor=#F8FAFC;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=12;fontColor=#334155;spacing=8;" vertex="1" parent="1">
-          <mxGeometry x="200" y="1010" width="1620" height="130" as="geometry" />
-        </mxCell>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="BrandPulse 当前实现架构（2026-07-31）" style="text;html=1;align=center;verticalAlign=middle;fontSize=20;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="340" y="20" width="520" height="30" as="geometry"/></mxCell>
+        <mxCell id="source-title" value="外部公开数据源" style="swimlane;html=1;rounded=1;startSize=28;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="95" width="220" height="255" as="geometry"/></mxCell>
+        <mxCell id="dp" value="大众点评&#xa;评分 / 评价数 / 人均" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="source-title"><mxGeometry x="20" y="45" width="180" height="50" as="geometry"/></mxCell>
+        <mxCell id="xhs" value="小红书&#xa;笔记 / 点赞 / 发布时间" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="source-title"><mxGeometry x="20" y="110" width="180" height="50" as="geometry"/></mxCell>
+        <mxCell id="amap" value="高德地图 API&#xa;品牌门店 POI / 坐标" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="source-title"><mxGeometry x="20" y="175" width="180" height="50" as="geometry"/></mxCell>
+        <mxCell id="webbridge" value="Kimi WebBridge&#xa;已登录浏览器会话&#xa;WebSocket 127.0.0.1:10086" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="300" y="125" width="195" height="80" as="geometry"/></mxCell>
+        <mxCell id="collector" value="collectors 采集层&#xa;配置化站点 + extractor 插件&#xa;解析、校验、原始结果缓存" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="540" y="115" width="225" height="100" as="geometry"/></mxCell>
+        <mxCell id="queue" value="Redis + RQ&#xa;brandpulse-crawl 队列" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="540" y="250" width="145" height="60" as="geometry"/></mxCell>
+        <mxCell id="worker" value="RQ Worker&#xa;执行商场 × 品类采集&#xa;更新 crawl_jobs 状态" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="715" y="245" width="165" height="70" as="geometry"/></mxCell>
+        <mxCell id="storage" value="PostgreSQL（主数据与业务数据）&#xa;brands / category_dict / stores / malls&#xa;dp_shop_metrics / xhs_notes / brand_heat_daily&#xa;brand_indicators_daily / crawl_jobs / agent_tasks / custom_formulas / alerts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="925" y="105" width="310" height="125" as="geometry"/></mxCell>
+        <mxCell id="cache" value="JSON 原始结果缓存&#xa;data/processed/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="975" y="255" width="190" height="55" as="geometry"/></mxCell>
+        <mxCell id="indicator" value="indicators 指标层（可重复计算）&#xa;口碑：贝叶斯加权评分&#xa;热度：固定基准对数归一&#xa;SOV：同商场评价声量份额&#xa;趋势：环比动量 + 波动率" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="885" y="365" width="300" height="115" as="geometry"/></mxCell>
+        <mxCell id="api" value="FastAPI 服务（:8000）&#xa;认证 / 看板 / 品牌 / 采集任务 / 指标&#xa;数据表白名单查询 / 公式 CRUD / 告警 / Agent / 对话&#xa;静态托管前端构建产物" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="495" y="515" width="330" height="105" as="geometry"/></mxCell>
+        <mxCell id="agent" value="Pydantic AI Agent（可选 LLM）&#xa;只读 SQL / 表结构 / 触发指标 / 触发采集&#xa;Web 任务通过 BackgroundTasks 写入 agent_tasks&#xa;未配置 LLM 时，对话与 Agent 返回明确错误" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="855" y="535" width="300" height="95" as="geometry"/></mxCell>
+        <mxCell id="frontend" value="Vue 3 Web 平台&#xa;登录、看板、品牌、数据表、公式、Agent 控制台、对话助手&#xa;统一调用 /api/v1；前端不使用运行时 Mock" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="95" y="525" width="330" height="95" as="geometry"/></mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="dp" target="webbridge"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="xhs" target="webbridge"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="浏览器采集" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="webbridge" target="collector"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="amap" target="collector"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="原始表" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="collector" target="storage"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="缓存" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="collector" target="cache"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="任务入队" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="api" target="queue"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="queue" target="worker"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="worker" target="collector"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" value="读原始数据 / 写指标" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="storage" target="indicator"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="indicator" target="api"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e12" value="HTTP /api/v1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="frontend" target="api"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e13" value="工具调用" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="api" target="agent"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e14" value="只读查询 / 触发任务" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="agent" target="storage"><mxGeometry relative="1" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

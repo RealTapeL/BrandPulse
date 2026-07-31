@@ -20,14 +20,14 @@ class IndicatorResponse(BaseModel):
 
 @router.get("", response_model=IndicatorResponse)
 def get_indicators(
-    brand_id: str = Query(default="MALL:苏州中心:苏州", description="品牌/商场 ID"),
+    brand_id: str = Query(..., min_length=1, description="品牌或商场×品类数据集 ID"),
     indicator: str = Query(default="heat", description="指标名：reputation/heat/sov"),
     start: Optional[str] = Query(default=None, description="开始日期 YYYY-MM-DD"),
     end: Optional[str] = Query(default=None, description="结束日期 YYYY-MM-DD"),
 ):
     """
     查询指标时序。
-    TODO: 接入品牌基础表 brands 后，brand_id 应映射到真实 brand_id。
+    brand_id 由调用方明确传入，避免以某个固定商场作为默认数据范围。
     """
     client = PostgresClient()
     sql = """

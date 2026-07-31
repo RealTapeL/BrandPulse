@@ -3,7 +3,7 @@
  * 错误信息统一由 axios 拦截器弹窗，store 里记录 error 供页面展示 retry 区域。
  */
 import { defineStore } from 'pinia'
-import { getBrands, getBrand, startCrawl } from '../api/brands'
+import { getBrands, getBrand, getBrandFilters, startCrawl } from '../api/brands'
 
 export const useBrandsStore = defineStore('brands', {
   state: () => ({
@@ -12,6 +12,7 @@ export const useBrandsStore = defineStore('brands', {
     page: 1,
     perPage: 10,
     query: { q: '', category: '', city: '' },
+    filters: { categories: [], cities: [] },
     loading: false,
     error: null,
     detail: null,
@@ -40,6 +41,9 @@ export const useBrandsStore = defineStore('brands', {
       } finally {
         this.loading = false
       }
+    },
+    async fetchFilters() {
+      this.filters = await getBrandFilters()
     },
     async fetchDetail(id) {
       this.detailLoading = true

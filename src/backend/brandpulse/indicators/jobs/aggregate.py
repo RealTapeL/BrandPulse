@@ -2,7 +2,7 @@
 指标聚合 job：从 brand_indicators_daily（门店/笔记级指标）按 mall+date 聚合，
 写入 indicators 表，为 GET /api/v1/indicators 提供时序数据。
 
-目前按商场维度聚合（brand_id='MALL'），后续接入品牌基础表后可按真实 brand_id 聚合。
+按采集数据集（brand_id）和商场维度聚合，保留采集链路的真实归属。
 """
 from typing import Dict, List
 
@@ -50,18 +50,18 @@ def aggregate(date: str | None = None) -> Dict[str, int]:
         with client.engine.connect() as conn:
             rows = conn.execute(
                 text("""
-                    SELECT mall_name, city,
+                    SELECT brand_id, mall_name, city,
                            AVG(weighted_score) AS reputation,
                            AVG(heat_index) AS heat,
                            AVG(sov) AS sov
                     FROM brand_indicators_daily
                     WHERE stat_date = :d
-                    GROUP BY mall_name, city
+                    GROUP BY brand_id, mall_name, city
                 """),
                 {"d": d},
             ).mappings().all()
 
-        # 写入 indicators（brand_id 暂用 'MALL' + mall_name）
+        # 写入 indicators（brand_id 与原始采集/指标行保持一致）
         inserted = 0
         upsert_sql = """
             INSERT INTO indicators (brand_id, indicator, date, value)
@@ -71,7 +71,10 @@ def aggregate(date: str | None = None) -> Dict[str, int]:
                 updated_at = CURRENT_TIMESTAMP
         """
         for r in rows:
-            brand_id = f"MALL:{r['mall_name']}:{r['city']}"
+            brand_id = r["brand_id"]
+            if not brand_id:
+                logger.warning("[aggregate] %s/%s 缺少 brand_id，跳过", r["mall_name"], r["city"])
+                continue
             for indicator, field in METRICS.items():
                 value = r[indicator]
                 if value is None:

@@ -27,6 +27,11 @@ class Config:
     # Redis（任务队列与缓存）
     REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 
+    # Web 平台登录。默认 local 模式仅用于单团队本地部署，严格模式由环境变量提供凭据。
+    AUTH_MODE = os.getenv("AUTH_MODE", "local").lower()
+    AUTH_USERNAME = os.getenv("AUTH_USERNAME", "")
+    AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "")
+
     # 高德 API
     AMAP_KEY = os.getenv("AMAP_KEY", "")
 

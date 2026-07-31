@@ -1,6 +1,7 @@
 # Web 请求与 HTML 解析
 requests>=2.31.0
 lxml>=4.9.0
+beautifulsoup4>=4.12.0
 
 # 数据库
 SQLAlchemy>=2.0.0

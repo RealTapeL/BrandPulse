@@ -54,8 +54,8 @@ def test_indicators_api_default_params(monkeypatch):
     monkeypatch.setattr(indicators, "PostgresClient", FakePostgresClient)
 
     c = TestClient(app)
-    resp = c.get("/api/v1/indicators")
+    resp = c.get("/api/v1/indicators?brand_id=MALL_906d5b65&indicator=heat")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["meta"]["brand_id"] == "MALL:苏州中心:苏州"
+    assert data["meta"]["brand_id"] == "MALL_906d5b65"
     assert data["meta"]["indicator"] == "heat"

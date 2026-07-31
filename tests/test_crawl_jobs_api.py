@@ -15,10 +15,8 @@ def client(monkeypatch):
         created.append(meta)
         return "rq-job-123"
 
-    monkeypatch.setattr("brandpulse.collectors.queue.enqueue_crawl", fake_enqueue)
-
-    # 不要真正运行 worker，避免触发 WebBridge
-    monkeypatch.setattr("brandpulse.api.crawl_jobs.enqueue_crawl", fake_enqueue)
+    # 不要真正运行 worker，避免触发 WebBridge。
+    monkeypatch.setattr("brandpulse.collectors.jobs.enqueue_crawl", fake_enqueue)
 
     # 数据库依赖 PostgresClient；实际 POST 会写库，这里直接测 HTTP 接口形态
     return TestClient(app), created
@@ -35,7 +33,7 @@ def test_create_crawl_job(client):
     assert resp.status_code == 200
     data = resp.json()
     assert "job_id" in data
-    assert data["status"] == "running"
+    assert data["status"] == "pending"
     assert data["rq_job_id"] == "rq-job-123"
     assert len(created) == 1
     assert created[0]["mall"] == "苏州中心"
