@@ -36,7 +36,7 @@
           登 录
         </el-button>
       </el-form>
-      <div class="login-tip">演示环境：任意用户名 / 密码均可登录（mock）</div>
+      <div class="login-tip">本地单团队模式使用任意非空凭据；严格模式由服务端配置账号。</div>
     </el-card>
   </div>
 </template>

@@ -4,10 +4,12 @@
 cd "$(dirname "$0")/.."
 PROJECT_ROOT="$(pwd)"
 LOG_DIR="$PROJECT_ROOT/logs"
+HOST_IP="$(ip -4 -o addr show scope global 2>/dev/null | awk 'NR == 1 { split($4, parts, "/"); print parts[1] }')"
+WEB_URL="http://${HOST_IP:-127.0.0.1}:8000/"
 mkdir -p "$LOG_DIR"
 
 if pgrep -f "uvicorn brandpulse.api.app:app" > /dev/null; then
-    echo "看板已在运行: http://192.168.0.109:8000/"
+    echo "看板已在运行: $WEB_URL"
     echo "最近日志:"
     tail -5 "$LOG_DIR/web.log"
     exit 0
@@ -24,7 +26,7 @@ for i in $(seq 1 15); do
     [ "$code" = "200" ] && break
 done
 echo "看板接口状态码: $code"
-echo "看板地址: http://192.168.0.109:8000/"
+echo "看板地址: $WEB_URL"
 echo "日志文件: $LOG_DIR/web.log"
 echo "最近日志:"
 tail -5 "$LOG_DIR/web.log"

@@ -10,38 +10,46 @@ BrandPulse/
 ├── requirements.txt                # Python 依赖
 ├── pytest.ini                      # pytest 配置
 ├── .env / .env.example             # 环境变量（.env 不提交）
+├── env.dev.example                 # 本地开发环境变量模板
+├── docker-compose.dev.yml          # 开发依赖编排（Postgres / Redis / Prometheus，可选）
 ├── brandpulse-infra/
-│   ├── init-scripts/               # PostgreSQL 建表脚本（01 实体表 / 02 热度表 / 03 指标表）
+│   ├── init-scripts/               # PostgreSQL 建表脚本（01–05）
+│   ├── prometheus.yml              # Prometheus scrape 样例
 │   ├── coffee_brand_database_schema.sql  # 咖啡品牌库表结构参考
 │   └── data/                       # 本地数据（不提交）
 ├── docs/                           # PRD 与 drawio 架构图
-├── data/                           # raw（原始留存）/ processed（JSON 缓存）/ sample（模板）
-├── scripts/                        # 服务启动脚本（start_web.sh / start_webbridge.sh 等）
+├── migrations/                     # 应用表迁移（任务、指标、告警、Web 平台）
+├── data/                           # raw / processed / normalized / invalid / labelled
+├── scripts/                        # 服务启动脚本
 ├── src/
 │   ├── backend/                    # 后端（Python）
-│   │   ├── main.py                 # CLI 入口（test / stage1 / crawl / indicators / agent）
+│   │   ├── main.py                 # CLI 入口
 │   │   └── brandpulse/
 │   │       ├── config/             # 读取 .env
 │   │       ├── logger/             # 日志
 │   │       ├── db_clients/         # PostgreSQL 客户端（单例）
-│   │       ├── collectors/         # 采集层：crawler 引擎 + 平台 extractor + WebBridge 客户端
+│   │       ├── collectors/         # 采集层：crawler + extractor + WebBridge + RQ queue
 │   │       │   ├── config/         #   crawler_sites.yaml 站点配置
 │   │       │   ├── extractors/     #   大众点评 / 小红书 extractor 插件
 │   │       │   ├── amap/           #   高德门店采集
-│   │       │   └── stage/          #   采集编排（stage1_*）
+│   │       │   ├── schemas.py      #   pydantic 采集 schema
+│   │       │   └── pipelines.py    #   解析/标准化/校验 pipeline
 │   │       ├── storage/            # 仓储层：PG 表 + JSON 文件缓存双写
-│   │       ├── indicators/         # 指标层：口碑 / 热度 / SOV / 趋势（纯函数 + 编排分离）
-│   │       ├── api/                # FastAPI：看板数据接口 + 前端静态托管
-│   │       └── agent/              # 对话助手（Pydantic AI 工具循环）
-│   └── frontend/                   # 前端（Vue3 + Element Plus + ECharts）
-└── tests/                          # pytest（47 项）
+│   │       ├── indicators/         # 指标层：口碑 / 热度 / SOV / 趋势 + aggregate job
+│   │       ├── api/                # FastAPI：认证、看板、品牌、任务、数据表、公式等
+│   │       ├── agent/              # Pydantic AI 工具循环 + Tool registry
+│   │       └── alerts/             # 告警规则与调度器
+│   ├── frontend/                   # 前端（Vue3 + Element Plus + ECharts + Pinia）
+│   └── ml/                         # 情感分类 & NER 训练/推理（transformers）
+├── models/                         # 训练后模型保存目录
+└── tests/                          # pytest（52+ 项）
 ```
 
 ## 快速开始
 
 ### 环境要求
 
-- Python 3.12+，Node.js 20+，PostgreSQL（本机库 `brandpulse`）
+- Python 3.12+，Node.js 20+，PostgreSQL（本机库 `brandpulse`），Redis（任务队列）
 - 数据采集依赖 Kimi WebBridge 浏览器扩展（Edge / Chrome），需在本机桌面浏览器登录大众点评、小红书账号
 
 ### 安装
@@ -50,22 +58,28 @@ BrandPulse/
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
-cp .env.example .env   # 编辑填入 LLM_*（对话助手）、高德 key 等
+cp env.dev.example .env   # 编辑填入 LLM_*（对话助手）、REDIS_URL 等
 
-# 初始化数据库，按顺序执行三个脚本
-psql -U postgres -d brandpulse -f brandpulse-infra/init-scripts/01_create_tables.sql
-psql -U postgres -d brandpulse -f brandpulse-infra/init-scripts/02_create_mall_heat_tables.sql
-psql -U postgres -d brandpulse -f brandpulse-infra/init-scripts/03_create_indicator_tables.sql
+# 初始化数据库，按顺序执行脚本（会提示输入 sudo 密码）
+for f in brandpulse-infra/init-scripts/*.sql migrations/*.sql; do
+  sudo -u postgres psql -d brandpulse -f "$f"
+done
 
-# 前端构建（产物 dist/ 由后端静态托管）
+# 前端（本机 npm 位于 ~/.local/node/bin）
+fish_add_path ~/.local/node/bin
 cd src/frontend && npm install && npm run build && cd ../..
 ```
 
 ### 启动服务
 
 ```bash
-bash scripts/start_webbridge.sh   # 采集通道：WebBridge MCP（ws://127.0.0.1:10086）
-bash scripts/start_web.sh         # Web 平台：FastAPI + 前端静态托管（8000 端口）
+redis-server --daemonize yes --port 6379        # Redis 任务队列
+bash scripts/start_rq_worker.sh                  # RQ worker：消费 brandpulse-crawl 队列
+bash scripts/start_webbridge.sh                  # 采集通道：WebBridge MCP（ws://127.0.0.1:10086）
+bash scripts/start_web.sh                        # Web 平台：FastAPI + 前端静态托管（8000 端口）
+
+# 开发模式（热重载，前端独立 5173）
+cd src/frontend && npm run dev
 ```
 
 ## 数据采集
@@ -80,11 +94,26 @@ bash scripts/start_web.sh         # Web 平台：FastAPI + 前端静态托管（
 - 采集驱动的是桌面浏览器中已登录的真实会话；触发验证码时在浏览器里手动通过即可自动继续
 - 结果双写 PostgreSQL 与 `data/processed/` 下的 JSON 缓存
 
-品牌 × 城市模式（保留）：
+## 后端 API 接口
 
-```bash
-.venv/bin/python src/backend/main.py crawl --brand-id LK001 --brand-name 瑞幸咖啡 --cities 苏州
-```
+| 接口 | 说明 |
+|------|------|
+| `POST /api/v1/auth/login` | 本地会话登录（`AUTH_MODE` 可选 `local` / `password`） |
+| `GET  /api/v1/dashboard` | 看板聚合数据（`/api/dashboard` 保留为兼容别名） |
+| `GET  /api/v1/brands` | 品牌目录筛选与分页 |
+| `GET  /api/v1/brands/filters` | 品类、城市筛选项 |
+| `GET  /api/v1/brands/{id}` | 品牌详情、采集记录与真实指标时序 |
+| `POST /api/v1/brands/{id}/crawl` | 从品牌详情发起采集 |
+| `POST /api/v1/crawl_jobs` | 创建采集任务并 enqueue（body: brand_id, mall, category, cities?） |
+| `GET  /api/v1/crawl_jobs/{id}` | 查询任务状态 |
+| `GET  /api/v1/indicators` | 指标时序（query: brand_id, indicator, start, end） |
+| `GET  /api/v1/tables/{name}` | 白名单数据表的服务端筛选、排序、分页 |
+| `GET|POST|PUT|DELETE /api/v1/formulas` | 自定义指标公式管理 |
+| `POST /api/v1/agent/execute` | 创建后台 Agent 任务；`GET /api/v1/agent/tasks/{id}` 轮询状态 |
+| `POST /api/v1/chat` | 对话式数据问答（需配置 LLM） |
+| `POST /api/v1/alerts/check-now` | 立即执行告警检查 |
+| `POST /ml/sentiment` | 情感分类推理 |
+| `POST /ml/ner` | 命名实体识别推理 |
 
 ## 指标计算
 
@@ -103,14 +132,16 @@ bash scripts/start_web.sh         # Web 平台：FastAPI + 前端静态托管（
 
 ## Web 平台
 
-访问 `http://<本机IP>:8000/`，包含四个页面：
+访问 `http://<本机IP>:8000/`，包含：
 
-- **数据看板**：KPI 卡片、四象限气泡图（口碑×热度×SOV）、各指标对比图、双平台明细表
-- **对话助手**：对话式数据问答（前端已完成，后端接口 `/api/chat` 待接入）
+- **登录页**：真实 `/api/v1/auth/login` 接口；单团队本地部署默认接受非空凭据，也可用环境变量切换为固定账号密码
+- **数据看板**：KPI 卡片、指标趋势图、双平台明细表
+- **品牌列表 / 详情**：搜索、分页、热度趋势、最近采集、发起采集
+- **Agent 控制台**：输入指令 → 后台任务持久化 → 轮询状态 → 展示日志与输出
 - **数据表查看**：点评门店 / 小红书笔记 / 指标日表的分页、排序、筛选
-- **指标公式管理**：内置指标口径展示；自定义公式的增删改与启停（服务端 `/api/formulas` 待接入）
+- **指标公式管理**：内置指标口径展示与自定义公式
 
-技术栈：FastAPI（`src/backend/brandpulse/api/`，接口 `GET /api/dashboard`）+ Vue3 / Element Plus / ECharts（hash 路由，前端内已预留后端接口契约与降级逻辑）。
+技术栈：FastAPI + Vue3 / Element Plus / ECharts + Pinia + axios（hash 路由）。
 
 ## 对话助手
 
@@ -119,7 +150,9 @@ bash scripts/start_web.sh         # Web 平台：FastAPI + 前端静态托管（
 | 工具 | 说明 |
 |------|------|
 | `list_tables` | 返回业务表结构，供模型写 SQL 前参考 |
-| `query_db` | 只读 SQL（仅 SELECT/WITH，拦截多语句与写操作，限 100 行） |
+| `query_db` / `run_sql` | 只读 SQL（仅 SELECT/WITH，拦截多语句与写操作，限 100 行） |
+| `query_brand` | 按 brand_id 查询品牌基础信息 |
+| `start_crawl` | 把采集任务入队 RQ，返回 job_id |
 | `run_indicators` | 调用指标管道，刷新当日指标 |
 | `crawl` | 驱动浏览器采集指定商场 × 品类数据（约 40 秒） |
 
@@ -140,8 +173,19 @@ bash scripts/start_web.sh         # Web 平台：FastAPI + 前端静态托管（
 ## 测试
 
 ```bash
-.venv/bin/python -m pytest tests/ -q   # 47 项
+# 后端 + ML 测试
+PYTHONPATH=src/backend:src .venv/bin/python -m pytest tests/ -q   # 52 项
+
+# 前端测试（在 src/frontend 目录）
+cd src/frontend
+npm run test:unit   # 9 项
+npm run cypress     # e2e 1 项
 ```
+
+## 当前开发分支
+
+- `develop`：集成主线
+- `feat/collectors-20260730`：本次 backend 工程能力分支（A/B/C/D/F/G/E/H）
 
 ## 分支约定
 
@@ -150,10 +194,8 @@ bash scripts/start_web.sh         # Web 平台：FastAPI + 前端静态托管（
 
 ## 后续计划
 
-- 对话助手与自定义公式的后端接口（`/api/chat`、`/api/formulas`）接入 Web 平台
-- 数据清洗与标准化（品牌别名归一、门店去重、采集血缘）
-- 品牌监控与预警（规则引擎 + 定时采集 + 企业微信/钉钉推送）
-- 机器学习预测（独立分支）
+- 品牌别名归一、门店去重、采集血缘
+- ML 模型训练调优与模型管理
 
 ## 注意事项
 

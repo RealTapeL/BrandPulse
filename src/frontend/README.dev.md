@@ -1,6 +1,6 @@
 # BrandPulse 前端开发说明
 
-管理台原型（演示级）。技术栈：Vue 3 + Vite + Element Plus + ECharts + Pinia + axios，JavaScript（非 TS）。
+管理台。技术栈：Vue 3 + Vite + Element Plus + ECharts + Pinia + axios，JavaScript（非 TS）。所有页面调用真实 FastAPI，不使用运行时 Mock 数据。
 
 ## 环境要求
 
@@ -10,7 +10,7 @@
 
 ```bash
 npm install          # 安装依赖
-npm run dev          # 开发服务器（默认挂 mock，见下）
+npm run dev          # 开发服务器（/api 代理至本机 FastAPI）
 npm run build        # 构建到 dist/（生产由 FastAPI 静态托管）
 npm run test:unit    # Vitest 单元测试（tests/unit/**/*.spec.js）
 npm run storybook    # Storybook 组件演示（http://localhost:6006）
@@ -20,31 +20,19 @@ npm run cypress:open # Cypress 交互界面
 
 注意：本机 shell 里有 `ELECTRON_RUN_AS_NODE=1`（vscode-server 注入），会让 Cypress 的 Electron 以 Node 模式启动失败，cypress 脚本已内置 `env -u` 处理；手动执行 `npx cypress` 时也要加 `env -u ELECTRON_RUN_AS_NODE`。
 
-## 环境变量
+## 后端依赖
 
-| 变量 | 默认 | 说明 |
-| --- | --- | --- |
-| `VITE_USE_MOCK` | dev 下默认开启 | `false` 时关闭 mock，走真实后端（vite proxy `/api` → `127.0.0.1:8000`） |
+开发与生产均调用真实 FastAPI。启动前请保证 PostgreSQL、Redis、RQ Worker 与后端服务可用。
+Vite 会把 `/api` 代理到 `127.0.0.1:8000`；FastAPI 静态托管构建产物时则同源访问。
 
-在 `.env.development` 中设置，例如后端就绪后：
-
-```
-VITE_USE_MOCK=false
-```
-
-## Mock 策略
-
-- `src/mocks/index.js` 用 axios-mock-adapter 拦截 axios 实例（`src/api/index.js`，baseURL `/api/v1`），数据来自 `src/mocks/*.json`。
-- 仅在 `import.meta.env.DEV && VITE_USE_MOCK !== 'false'` 时由 `src/main.js` 挂载，生产构建不含 mock。
-- 未覆盖的接口返回 404 `{ message: 'mock 未覆盖该接口' }`，便于发现待补契约。
-- 演示登录：任意非空用户名/密码均可登录，返回 `mock-jwt-token-for-demo`。
+默认 `AUTH_MODE=local`，单团队本地部署可使用任意非空凭据登录；设置
+`AUTH_MODE=password` 后，必须同时在 `.env` 配置 `AUTH_USERNAME` 与 `AUTH_PASSWORD`。
 
 ## 目录约定
 
 ```
 src/api/        axios 封装与接口函数（index.js 为 configuredAxios）
 src/stores/     Pinia stores（user / brands / agent）
-src/mocks/      mock 数据与 axios-mock-adapter 挂载
 src/views/      页面（Login / Dashboard / BrandList / BrandDetail / AgentConsole ...）
 tests/unit/     Vitest 单元测试
 ```
@@ -53,21 +41,19 @@ tests/unit/     Vitest 单元测试
 
 - `POST /auth/login` → `{ token, user: { id, username, role } }`
 - `GET /brands?q=&category=&city=&page=&per_page=` → `{ items: Brand[], total }`
+- `GET /brands/filters` → `{ categories, cities }`
 - `GET /brands/{id}` → `{ brand, stats: { indicators: [{date,value}] }, recent_crawls: [] }`
 - `POST /brands/{id}/crawl` → `{ job_id }`
 - `GET /indicators?brand_id=&start=&end=&indicator=` → `{ series: [{date,value}], meta }`
 - `POST /agent/execute` → `{ task_id }`
 - `GET /agent/tasks/{id}` → `{ id, status, input, output, logs }`
+- `GET /dashboard`、`GET /tables/{table_name}`、`POST /chat`
+- `GET|POST|PUT|DELETE /formulas`
 
 鉴权：axios 自动注入 `Authorization: Bearer <localStorage.token>`；401 统一清除 token 并跳转 `/login`。
 
-## 两套 HTTP 封装说明（过渡期）
-
-- 旧四页面（看板/对话/数据表/公式）用 `src/api/http.js`（fetch，对接现有 FastAPI `/api/*`），保持不变。
-- 新管理台页面统一走 `src/api/index.js`（axios，`/api/v1/*` 契约）。后端就绪后逐步迁移旧页面。
+所有页面统一使用 `src/api/index.js` 中的 axios 实例；它自动注入浏览器会话 token 并处理服务端错误。
 
 ## 实施路线
 
-- 阶段 1（已完成）：axios 封装 + user store + Login + 路由守卫 + mock 登录 + vitest
-- 阶段 2（已完成）：BrandList / BrandDetail / BrandTable + 分页 + Storybook
-- 阶段 3（已完成）：Agent Console + agent store + Cypress e2e（登录→列表→搜索→详情）
+- 品牌、Agent、聊天、数据表与公式管理均已接入真实后端。

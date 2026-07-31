@@ -6,5 +6,5 @@
 import api from './index'
 
 export function login(username, password) {
-  return api.post('/auth/login', { username, password }).then((r) => r.data)
+  return api.post('/v1/auth/login', { username, password }).then((r) => r.data)
 }

@@ -19,17 +19,4 @@ app.use(createPinia())
 app.use(ElementPlus, { locale: zhCn })
 app.use(router)
 
-async function bootstrap() {
-  // 开发环境默认挂 mock（axios-mock-adapter 拦截 /api/v1/*）；
-  // 后端就绪后在 .env.development 设 VITE_USE_MOCK=false 即可走真实接口。
-  if (import.meta.env.DEV && import.meta.env.VITE_USE_MOCK !== 'false') {
-    const [{ setupMock }, { default: api }] = await Promise.all([
-      import('./mocks'),
-      import('./api'),
-    ])
-    setupMock(api)
-  }
-  app.mount('#app')
-}
-
-bootstrap()
+app.mount('#app')

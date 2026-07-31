@@ -19,7 +19,7 @@ describe('api/brands', () => {
   })
 
   it('getBrands：透传 q/category/city/page/per_page 查询参数', async () => {
-    mock.onGet('/brands').reply((config) => {
+    mock.onGet('/v1/brands').reply((config) => {
       expect(config.params).toEqual({ q: '瑞幸', category: '咖啡', city: '苏州', page: 1, per_page: 10 })
       return [200, { items: [], total: 0 }]
     })
@@ -29,14 +29,14 @@ describe('api/brands', () => {
   })
 
   it('getBrand：按 id 请求详情', async () => {
-    mock.onGet('/brands/7').reply(200, { brand: { id: 7 }, stats: { indicators: [] }, recent_crawls: [] })
+    mock.onGet('/v1/brands/7').reply(200, { brand: { id: 7 }, stats: { indicators: [] }, recent_crawls: [] })
 
     const data = await getBrand(7)
     expect(data.brand.id).toBe(7)
   })
 
   it('startCrawl：POST 采集参数并返回 job_id', async () => {
-    mock.onPost('/brands/7/crawl').reply((config) => {
+    mock.onPost('/v1/brands/7/crawl').reply((config) => {
       expect(JSON.parse(config.data)).toEqual({ mall: '苏州中心', category: '咖啡', cities: ['苏州'] })
       return [200, { job_id: 'job-1' }]
     })
