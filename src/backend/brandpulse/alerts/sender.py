@@ -1,24 +1,45 @@
-"""
-告警通知发送：dev 模式下仅记录日志并返回模拟结果，不真正发邮件/ webhook。
-TODO: 生产环境接入 SMTP / 企业微信 / 钉钉 webhook。
-"""
+"""告警通知发送：只报告真实发送结果，不伪造 mock 成功。"""
+from email.message import EmailMessage
+import smtplib
 from typing import Any, Dict, List
 
+import requests
+
+from brandpulse.config.config import Config
 from brandpulse.logger.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 def send_email(to: str, subject: str, body: str) -> Dict[str, Any]:
-    """模拟发送邮件（dev 仅记录）。"""
-    logger.info(f"[alert][email] to={to} subject={subject}")
-    return {"type": "email", "to": to, "status": "mock_sent"}
+    """通过配置的 SMTP 服务器发送邮件。"""
+    if not Config.SMTP_HOST or not Config.SMTP_FROM:
+        raise RuntimeError("SMTP 未配置，请设置 SMTP_HOST 和 SMTP_FROM")
+
+    message = EmailMessage()
+    message["From"] = Config.SMTP_FROM
+    message["To"] = to
+    message["Subject"] = subject
+    message.set_content(body)
+
+    with smtplib.SMTP(Config.SMTP_HOST, Config.SMTP_PORT, timeout=Config.ALERT_WEBHOOK_TIMEOUT) as smtp:
+        if Config.SMTP_USE_TLS:
+            smtp.starttls()
+        if Config.SMTP_USERNAME:
+            smtp.login(Config.SMTP_USERNAME, Config.SMTP_PASSWORD)
+        smtp.send_message(message)
+    logger.info(f"[alert][email] sent to={to} subject={subject}")
+    return {"type": "email", "to": to, "status": "sent"}
 
 
 def send_webhook(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """模拟发送 webhook（dev 仅记录）。"""
-    logger.info(f"[alert][webhook] url={url} payload={payload}")
-    return {"type": "webhook", "url": url, "status": "mock_sent"}
+    """向用户配置的 webhook 发起真实 HTTP POST。"""
+    if not url.startswith(("http://", "https://")):
+        raise ValueError("webhook 地址必须是 http:// 或 https://")
+    response = requests.post(url, json=payload, timeout=Config.ALERT_WEBHOOK_TIMEOUT)
+    response.raise_for_status()
+    logger.info(f"[alert][webhook] sent url={url} status_code={response.status_code}")
+    return {"type": "webhook", "url": url, "status": "sent", "status_code": response.status_code}
 
 
 def send(destinations: List[Dict[str, Any]], message: str) -> List[Dict[str, Any]]:

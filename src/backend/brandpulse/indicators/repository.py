@@ -33,14 +33,15 @@ class IndicatorRepository:
             :stat_date, :city, :mall_name, :entity_type, :entity_name, :brand_id,
             :weighted_score, :heat_index, :wow_momentum, :volatility, :sov, :detail
         )
-        ON CONFLICT (stat_date, city, mall_name, entity_type, entity_name) DO UPDATE SET
+        ON CONFLICT (stat_date, city, mall_name, entity_type, entity_name, brand_id) DO UPDATE SET
             brand_id = COALESCE(EXCLUDED.brand_id, brand_indicators_daily.brand_id),
             weighted_score = COALESCE(EXCLUDED.weighted_score, brand_indicators_daily.weighted_score),
             heat_index = COALESCE(EXCLUDED.heat_index, brand_indicators_daily.heat_index),
             wow_momentum = COALESCE(EXCLUDED.wow_momentum, brand_indicators_daily.wow_momentum),
             volatility = COALESCE(EXCLUDED.volatility, brand_indicators_daily.volatility),
             sov = COALESCE(EXCLUDED.sov, brand_indicators_daily.sov),
-            detail = COALESCE(EXCLUDED.detail, brand_indicators_daily.detail),
+            detail = COALESCE(brand_indicators_daily.detail, '{}'::jsonb)
+                     || COALESCE(EXCLUDED.detail, '{}'::jsonb),
             updated_at = CURRENT_TIMESTAMP
         """
         saved = 0
@@ -52,7 +53,15 @@ class IndicatorRepository:
         )
         for row in rows:
             row = {k: row.get(k) for k in all_keys}
+            if not row["brand_id"]:
+                logger.warning("跳过缺少 brand_id 的指标行 %s/%s，禁止无归属写入", row["entity_name"], row["stat_date"])
+                continue
             detail = row.get("detail")
+            # 各指标步骤分开 upsert，同一实体的 detail 必须按 metric 合并，
+            # 不能让最后一个步骤覆盖前面已落库的审计信息。
+            if isinstance(detail, dict) and detail.get("metric"):
+                metric = detail["metric"]
+                detail = {metric: {k: v for k, v in detail.items() if k != "metric"}}
             row["detail"] = json.dumps(detail, ensure_ascii=False) if detail is not None else None
             try:
                 self.client.execute(sql, row)

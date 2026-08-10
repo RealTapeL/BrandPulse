@@ -12,3 +12,9 @@ def test_local_login_returns_session_token():
     data = response.json()
     assert data["token"]
     assert data["user"] == {"id": "operator", "username": "operator", "role": "operator"}
+
+
+def test_business_api_rejects_anonymous_request():
+    client = TestClient(app)
+    response = client.get("/api/v1/brands")
+    assert response.status_code == 401

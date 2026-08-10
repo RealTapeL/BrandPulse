@@ -1,5 +1,5 @@
 <template>
-  <div class="brand-detail-page" v-loading="store.detailLoading">
+  <div class="page brand-detail-page" v-loading="store.detailLoading">
     <template v-if="brand">
       <!-- 头部：品牌信息 + 操作 -->
       <div class="detail-header">
@@ -21,14 +21,27 @@
 
       <!-- 指标趋势图 -->
       <el-card class="section" shadow="never">
-        <template #header>热度指数趋势（近 30 天）</template>
+        <template #header>
+          <div class="chart-head">
+            <span>{{ indicatorLabel }}趋势（近 30 个数据期）</span>
+            <el-select v-model="indicator" size="small" class="indicator-select" @change="loadIndicator">
+              <el-option label="热度指数" value="heat" />
+              <el-option label="口碑分" value="reputation" />
+              <el-option label="SOV 声量份额" value="sov" />
+              <el-option label="周环比动量" value="momentum" />
+              <el-option label="波动率" value="volatility" />
+            </el-select>
+          </div>
+        </template>
         <EChart :option="chartOption" height="320px" />
+        <el-empty v-if="!indicatorLoading && !indicatorSeries.length" description="该品牌尚无已确认归属的真实指标数据" :image-size="72" />
       </el-card>
 
       <!-- 最近采集记录 -->
       <el-card class="section" shadow="never">
         <template #header>最近采集</template>
-        <el-table :data="crawls" aria-label="最近采集记录">
+        <div class="table-scroll">
+          <el-table :data="crawls" aria-label="最近采集记录">
           <el-table-column prop="job_id" label="任务 ID" width="140" />
           <el-table-column prop="mall" label="商场" min-width="120" />
           <el-table-column prop="category" label="品类" width="90" />
@@ -42,11 +55,12 @@
             <template #default="{ row }">{{ formatTime(row.started_at) }}</template>
           </el-table-column>
           <template #empty><el-empty description="暂无采集记录" /></template>
-        </el-table>
+          </el-table>
+        </div>
       </el-card>
 
       <!-- 发起采集对话框 -->
-      <el-dialog v-model="crawlDialog" title="发起采集" width="420px">
+      <el-dialog v-model="crawlDialog" title="发起采集" width="min(420px, calc(100vw - 32px))">
         <el-form label-position="top">
           <el-form-item label="商场">
             <el-input v-model="crawlForm.mall" aria-label="商场名" placeholder="如：苏州中心" />
@@ -78,43 +92,66 @@
 
 <script setup>
 /**
- * 品牌详情页 /brands/:id：品牌信息 + 指标趋势（ECharts）+ 最近采集记录 + 发起采集。
- * TODO: 指标种类切换（口碑/热度/SOV）待后端 /api/v1/indicators 就绪后接入。
+ * 品牌详情页 /brands/:id：品牌信息、可切换指标趋势、最近采集记录和发起采集。
  */
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import EChart from '../components/EChart.vue'
 import { useBrandsStore } from '../stores/brands'
+import { getBrandIndicatorSeries } from '../api/brands'
 
 const route = useRoute()
 const router = useRouter()
 const store = useBrandsStore()
 
-const brandId = route.params.id
+const brandId = computed(() => String(route.params.id || ''))
 const brand = computed(() => store.detail?.brand)
 const crawls = computed(() => store.detail?.recent_crawls || [])
+const indicator = ref('heat')
+const indicatorSeries = ref([])
+const indicatorLoading = ref(false)
+let indicatorRequestId = 0
+const indicatorLabels = { heat: '热度指数', reputation: '口碑分', sov: 'SOV 声量份额', momentum: '周环比动量', volatility: '波动率' }
+const indicatorLabel = computed(() => indicatorLabels[indicator.value] || indicator.value)
 
 const crawlDialog = ref(false)
 const crawling = ref(false)
 const crawlForm = reactive({ mall: '苏州中心', category: '咖啡', citiesText: '苏州' })
 
 load()
+watch(() => route.params.id, (next, previous) => {
+  if (next && next !== previous) load(String(next))
+})
 
-function load() {
-  store.fetchDetail(brandId)
+function load(id = brandId.value) {
+  if (!id) return
+  store.fetchDetail(id)
+  loadIndicator(id)
+}
+
+async function loadIndicator(id = brandId.value) {
+  if (!id) return
+  const requestId = ++indicatorRequestId
+  indicatorLoading.value = true
+  try {
+    const result = await getBrandIndicatorSeries(id, indicator.value)
+    if (requestId === indicatorRequestId && id === brandId.value) indicatorSeries.value = result.series || []
+  } finally {
+    if (requestId === indicatorRequestId) indicatorLoading.value = false
+  }
 }
 
 const chartOption = computed(() => {
-  const series = store.detail?.stats?.indicators || []
+  const series = indicatorSeries.value
   return {
     grid: { left: 40, right: 20, top: 30, bottom: 30 },
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', data: series.map((p) => p.date) },
-    yAxis: { type: 'value', name: '热度指数' },
+    yAxis: { type: 'value', name: indicatorLabel.value },
     series: [
       {
-        name: '热度指数',
+        name: indicatorLabel.value,
         type: 'line',
         smooth: true,
         data: series.map((p) => p.value),
@@ -131,18 +168,38 @@ async function submitCrawl() {
       .split(/[,，]/)
       .map((s) => s.trim())
       .filter(Boolean)
-    const { job_id } = await store.crawl(brandId, {
+    const { job_id } = await store.crawl(brandId.value, {
       mall: crawlForm.mall,
       category: crawlForm.category,
       cities: cities.length ? cities : undefined,
     })
-    ElMessage.success(`采集任务已发起：${job_id}`)
+    ElMessage.info(`采集任务已入队：${job_id}`)
     crawlDialog.value = false
+    await pollCrawlJob(job_id)
   } catch {
     // 错误提示由 axios 拦截器统一弹出
   } finally {
     crawling.value = false
   }
+}
+
+async function pollCrawlJob(jobId) {
+  const maxPolls = 90
+  for (let index = 0; index < maxPolls; index += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    const job = await store.fetchCrawlJob(jobId)
+    if (job.status === 'completed') {
+      await load()
+      ElMessage.success(`采集完成：入库 ${job.result ? '结果已写回' : '暂无结果摘要'}`)
+      return
+    }
+    if (job.status === 'failed') {
+      await load()
+      ElMessage.error('采集任务失败，请查看最近采集记录')
+      return
+    }
+  }
+  ElMessage.warning('采集仍在后台执行，可稍后刷新页面查看结果')
 }
 
 function crawlStatusType(s) {
@@ -157,13 +214,15 @@ function formatTime(iso) {
 
 <style scoped>
 .brand-detail-page {
-  padding: 20px;
+  min-width: 0;
 }
 .detail-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 .header-brand {
   display: flex;
@@ -181,5 +240,26 @@ function formatTime(iso) {
 }
 .section {
   margin-bottom: 16px;
+}
+.chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.indicator-select {
+  width: 150px;
+}
+
+@media (max-width: 767px) {
+  .detail-header :deep(.el-page-header) {
+    width: 100%;
+  }
+
+  .detail-header > .el-button,
+  .indicator-select {
+    width: 100%;
+  }
 }
 </style>

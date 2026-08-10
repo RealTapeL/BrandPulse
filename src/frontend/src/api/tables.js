@@ -45,6 +45,25 @@ export const TABLES = [
       { prop: 'sov', label: 'SOV 声量份额', sortable: true, width: 140 },
     ],
   },
+  {
+    name: 'store_operations',
+    label: '门店经营数据',
+    desc: 'Excel 导入的真实销售、成本与合同经营记录',
+    columns: [
+      { prop: 'record_date', label: '日期', sortable: true, width: 120 },
+      { prop: 'brand_id', label: '品牌 ID', sortable: true, width: 120 },
+      { prop: 'store_id', label: '门店 ID', sortable: true, width: 170 },
+      { prop: 'sales_amount', label: '销售额', sortable: true, width: 120 },
+      { prop: 'order_count', label: '订单数', sortable: true, width: 100 },
+      { prop: 'customer_price', label: '客单价', sortable: true, width: 100 },
+      { prop: 'customer_flow', label: '客流量', sortable: true, width: 100 },
+      { prop: 'rent', label: '租金', sortable: true, width: 100 },
+      { prop: 'rent_to_sales_ratio', label: '租售比(%)', sortable: true, width: 120 },
+      { prop: 'sales_per_sqm', label: '坪效', sortable: true, width: 100 },
+      { prop: 'contract_end', label: '合同到期', sortable: true, width: 120 },
+      { prop: 'data_source', label: '数据来源', sortable: false, minWidth: 180 },
+    ],
+  },
 ]
 
 export function getTableConfig(name) {

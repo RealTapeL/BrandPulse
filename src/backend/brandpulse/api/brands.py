@@ -13,6 +13,14 @@ from brandpulse.api.dashboard import to_jsonable
 
 router = APIRouter(prefix="/api/v1/brands", tags=["brands"])
 
+_INDICATOR_COLUMNS = {
+    "reputation": ("weighted_score", "口碑分"),
+    "heat": ("heat_index", "热度指数"),
+    "sov": ("sov", "SOV 声量份额"),
+    "momentum": ("wow_momentum", "周环比动量"),
+    "volatility": ("volatility", "波动率"),
+}
+
 
 class BrandCrawlRequest(BaseModel):
     mall: str = Field(..., min_length=1, max_length=128)
@@ -125,6 +133,38 @@ def brand_filters():
             ORDER BY city
         """)).scalars().all()
     return {"categories": categories, "cities": cities}
+
+
+@router.get("/{brand_id}/indicator-series")
+def get_brand_indicator_series(
+    brand_id: str,
+    indicator: str = Query(default="heat", pattern="^(reputation|heat|sov|momentum|volatility)$"),
+    limit: int = Query(default=30, ge=1, le=180),
+):
+    """返回品牌维度的真实指标序列；无归属数据时返回空序列，不补造数据。"""
+    column, label = _INDICATOR_COLUMNS[indicator]
+    client = PostgresClient()
+    with client.engine.connect() as conn:
+        exists = conn.execute(
+            text("SELECT 1 FROM brands WHERE brand_id = :brand_id"), {"brand_id": brand_id}
+        ).first()
+        if not exists:
+            raise HTTPException(status_code=404, detail="品牌不存在")
+        rows = conn.execute(
+            text(
+                f"""
+                SELECT stat_date AS date, AVG({column}) AS value
+                FROM brand_indicators_daily
+                WHERE brand_id = :brand_id AND {column} IS NOT NULL
+                GROUP BY stat_date
+                ORDER BY stat_date DESC
+                LIMIT :limit
+                """
+            ),
+            {"brand_id": brand_id, "limit": limit},
+        ).mappings().all()
+    series = list(reversed(to_jsonable([dict(row) for row in rows])))
+    return {"brand_id": brand_id, "indicator": indicator, "label": label, "series": series}
 
 
 @router.get("/{brand_id}")

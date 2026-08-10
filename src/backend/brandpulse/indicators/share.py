@@ -33,7 +33,7 @@ def compute_sov(stat_date: Optional[str] = None) -> List[Dict]:
         return []
 
     sql = """
-    SELECT shop_name, city, COALESCE(place, '') AS mall_name, review_count
+    SELECT shop_name, city, COALESCE(place, '') AS mall_name, brand_id, review_count
     FROM dp_shop_metrics
     WHERE crawl_date = :stat_date
     """
@@ -58,6 +58,7 @@ def compute_sov(stat_date: Optional[str] = None) -> List[Dict]:
             "mall_name": r["mall_name"],
             "entity_type": "shop",
             "entity_name": r["shop_name"],
+            "brand_id": r["brand_id"],
             "sov": round(v / total, 4),
             "detail": {"metric": "sov", "shop_reviews": v, "mall_total_reviews": total},
         })

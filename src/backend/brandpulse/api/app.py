@@ -13,40 +13,68 @@ from pathlib import Path
 # 工作目录是项目根，src/backend/ 不在 sys.path，参照 src/backend/main.py 的做法
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(PROJECT_ROOT / "src" / "backend"))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from brandpulse.api.agent import router as agent_router
 from brandpulse.api.alerts import router as alerts_router
 from brandpulse.api.auth import router as auth_router
+from brandpulse.api.auth import require_auth
 from brandpulse.api.brands import router as brands_router
 from brandpulse.api.chat import router as chat_router
 from brandpulse.api.crawl_jobs import router as crawl_jobs_router
+from brandpulse.api.data_governance import router as data_governance_router
 from brandpulse.api.dashboard import router as dashboard_router
 from brandpulse.api.formulas import router as formulas_router
 from brandpulse.api.indicators import router as indicators_router
+from brandpulse.api.ml_forecasting import router as ml_forecasting_router
+from brandpulse.api.monitoring import router as monitoring_router
+from brandpulse.api.operations import router as operations_router
+from brandpulse.api.reports import router as reports_router
 from brandpulse.api.tables import router as tables_router
 from brandpulse.logger.logger import get_logger
+from brandpulse.alerts.scheduler import shutdown_scheduler, start_scheduler
+from brandpulse.config.config import Config
 
 logger = get_logger(__name__)
 
 WEB_DIST = PROJECT_ROOT / "src" / "frontend" / "dist"
 
-app = FastAPI(title="BrandPulse 招商品牌情报看板")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    if Config.ALERT_SCHEDULER_ENABLED:
+        start_scheduler(Config.ALERT_INTERVAL_MINUTES)
+    try:
+        yield
+    finally:
+        if Config.ALERT_SCHEDULER_ENABLED:
+            shutdown_scheduler()
+
+
+app = FastAPI(title="BrandPulse 招商品牌情报看板", lifespan=lifespan)
 app.include_router(auth_router)
-app.include_router(brands_router)
-app.include_router(agent_router)
-app.include_router(chat_router)
-app.include_router(tables_router)
-app.include_router(formulas_router)
-app.include_router(alerts_router)
-app.include_router(crawl_jobs_router)
-app.include_router(indicators_router)
-app.include_router(dashboard_router)
+protected = {"dependencies": [Depends(require_auth)]}
+app.include_router(brands_router, **protected)
+app.include_router(agent_router, **protected)
+app.include_router(chat_router, **protected)
+app.include_router(tables_router, **protected)
+app.include_router(formulas_router, **protected)
+app.include_router(alerts_router, **protected)
+app.include_router(crawl_jobs_router, **protected)
+app.include_router(data_governance_router, **protected)
+app.include_router(indicators_router, **protected)
+app.include_router(ml_forecasting_router, **protected)
+app.include_router(monitoring_router, **protected)
+app.include_router(reports_router, **protected)
+app.include_router(dashboard_router, **protected)
+app.include_router(operations_router, **protected)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=Config.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -12,3 +12,7 @@ export function executeAgent(prompt, context = {}) {
 export function getTask(id) {
   return api.get(`/v1/agent/tasks/${id}`).then((r) => r.data)
 }
+
+export function listTasks(params = {}) {
+  return api.get('/v1/agent/tasks', { params }).then((r) => r.data)
+}

@@ -4,9 +4,6 @@
 from typing import List
 
 from brandpulse.collectors.amap.api import AmapCollector
-from brandpulse.collectors.amap.mock import (
-    collect_brand_stores as mock_collect,
-)
 from brandpulse.config.config import Config
 from brandpulse.logger.logger import get_logger
 from brandpulse.storage.pg_repository import BrandRepository
@@ -26,7 +23,7 @@ def run(
     Args:
         cities: 目标城市列表
         max_pages: 每个城市最大采集页数（仅真实 API）
-        use_mock: 是否使用 Mock 数据
+        use_mock: 已废弃。生产链路不接受 Mock 数据。
         brand_ids: 指定品牌 ID 列表；None 则读取所有 is_active 品牌
 
     Returns:
@@ -49,35 +46,26 @@ def run(
 
     logger.info(f"从 brands 表读取到 {len(brands)} 个品牌: {[b['brand_id'] for b in brands]}")
 
-    # 判断是否使用 Mock：显式指定 或 未配置 AMAP_KEY
-    if not use_mock and not Config.AMAP_KEY:
-        logger.warning("未配置 AMAP_KEY，自动切换到 Mock 数据模式")
-        use_mock = True
+    if use_mock:
+        raise RuntimeError("已禁用 Mock 门店数据；请配置 AMAP_KEY 后采集真实高德数据")
+    if not Config.AMAP_KEY:
+        raise RuntimeError("未配置 AMAP_KEY，无法采集真实门店数据；请在 .env 中配置高德 API Key")
 
     result = {}
 
-    if use_mock:
-        for brand in brands:
-            stores = mock_collect(
-                brand_id=brand["brand_id"],
-                brand_name=brand["brand_name_cn"],
-                cities=cities,
-            )
-            result[brand["brand_id"]] = stores
-    else:
-        collector = AmapCollector()
-        for brand in brands:
-            brand_id = brand["brand_id"]
-            keywords = brand.get("search_keywords") or brand["brand_name_cn"]
+    collector = AmapCollector()
+    for brand in brands:
+        brand_id = brand["brand_id"]
+        keywords = brand.get("search_keywords") or brand["brand_name_cn"]
 
-            logger.info(f"开始采集 {brand_id} - {keywords}")
-            stores = collector.collect_brand_stores(
-                brand_id=brand_id,
-                keywords=keywords,
-                cities=cities,
-                max_pages=max_pages,
-            )
-            result[brand_id] = stores
-            logger.info(f"{brand_id} 共采集 {len(stores)} 家门店")
+        logger.info(f"开始采集 {brand_id} - {keywords}")
+        stores = collector.collect_brand_stores(
+            brand_id=brand_id,
+            keywords=keywords,
+            cities=cities,
+            max_pages=max_pages,
+        )
+        result[brand_id] = stores
+        logger.info(f"{brand_id} 共采集 {len(stores)} 家门店")
 
     return result

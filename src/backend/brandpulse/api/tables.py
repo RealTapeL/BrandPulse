@@ -34,6 +34,11 @@ TABLE_SPECS: Dict[str, TableSpec] = {
         searchable_fields=("entity_name", "city", "mall_name"),
         default_order="stat_date DESC, heat_index DESC NULLS LAST",
     ),
+    "store_operations": TableSpec(
+        fields=("op_id", "brand_id", "store_id", "record_date", "sales_amount", "order_count", "customer_price", "customer_flow", "rent", "store_area", "rent_to_sales_ratio", "sales_per_sqm", "contract_end", "data_source"),
+        searchable_fields=("brand_id", "store_id", "data_source"),
+        default_order="record_date DESC, store_id ASC",
+    ),
 }
 
 

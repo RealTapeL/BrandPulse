@@ -6,8 +6,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from brandpulse.api.app import app
+from tests.conftest import AUTH_HEADERS
 
-client = TestClient(app)
+client = TestClient(app, headers=AUTH_HEADERS)
 
 
 @pytest.fixture

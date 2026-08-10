@@ -45,8 +45,8 @@ tests/unit/     Vitest 单元测试
 - `GET /brands/{id}` → `{ brand, stats: { indicators: [{date,value}] }, recent_crawls: [] }`
 - `POST /brands/{id}/crawl` → `{ job_id }`
 - `GET /indicators?brand_id=&start=&end=&indicator=` → `{ series: [{date,value}], meta }`
-- `POST /agent/execute` → `{ task_id }`
-- `GET /agent/tasks/{id}` → `{ id, status, input, output, logs }`
+- `POST /agent/execute` → `{ task_id, rq_job_id, status }`
+- `GET /agent/tasks` / `GET /agent/tasks/{id}` → 持久化任务历史与 `{ id, status, input, output, logs }`
 - `GET /dashboard`、`GET /tables/{table_name}`、`POST /chat`
 - `GET|POST|PUT|DELETE /formulas`
 

@@ -18,6 +18,7 @@ const props = defineProps({
 
 const el = ref(null)
 let chart = null
+let resizeObserver = null
 
 const onResize = () => chart && chart.resize()
 
@@ -25,6 +26,10 @@ onMounted(() => {
   chart = echarts.init(el.value)
   chart.setOption(props.option)
   window.addEventListener('resize', onResize)
+  if (window.ResizeObserver) {
+    resizeObserver = new ResizeObserver(onResize)
+    resizeObserver.observe(el.value)
+  }
 })
 
 watch(
@@ -37,6 +42,8 @@ watch(
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
+  resizeObserver?.disconnect()
+  resizeObserver = null
   if (chart) {
     chart.dispose()
     chart = null

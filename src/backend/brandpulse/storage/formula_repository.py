@@ -1,4 +1,4 @@
-"""自定义公式的 PostgreSQL 仓储。公式仅供管理展示，当前不参与指标计算。"""
+"""自定义公式配置和真实计算结果的 PostgreSQL 仓储。"""
 import json
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
@@ -23,6 +23,50 @@ class FormulaRepository:
         with self.client.engine.connect() as conn:
             rows = conn.execute(text("SELECT * FROM custom_formulas ORDER BY created_at DESC, formula_id DESC")).mappings().all()
         return [self._row_to_dict(row) for row in rows]
+
+    def get(self, formula_id: str) -> Optional[Dict[str, Any]]:
+        with self.client.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM custom_formulas WHERE formula_id = :formula_id"),
+                {"formula_id": formula_id},
+            ).mappings().first()
+        return self._row_to_dict(row) if row else None
+
+    def list_enabled(self) -> List[Dict[str, Any]]:
+        with self.client.engine.connect() as conn:
+            rows = conn.execute(
+                text("SELECT * FROM custom_formulas WHERE enabled = TRUE ORDER BY formula_id")
+            ).mappings().all()
+        return [self._row_to_dict(row) for row in rows]
+
+    def upsert_values(self, rows: List[Dict[str, Any]]) -> int:
+        if not rows:
+            return 0
+        sql = text("""
+            INSERT INTO custom_formula_values (formula_id, brand_id, stat_date, value, detail)
+            VALUES (:formula_id, :brand_id, :stat_date, :value, CAST(:detail AS jsonb))
+            ON CONFLICT (formula_id, brand_id, stat_date) DO UPDATE SET
+                value = EXCLUDED.value,
+                detail = EXCLUDED.detail,
+                updated_at = CURRENT_TIMESTAMP
+        """)
+        with self.client.engine.begin() as conn:
+            conn.execute(sql, [
+                {**row, "detail": json.dumps(row.get("detail") or {}, ensure_ascii=False)}
+                for row in rows
+            ])
+        return len(rows)
+
+    def list_values(self, formula_id: str, brand_id: Optional[str] = None, limit: int = 30) -> List[Dict[str, Any]]:
+        sql = "SELECT * FROM custom_formula_values WHERE formula_id = :formula_id"
+        params: Dict[str, Any] = {"formula_id": formula_id, "limit": limit}
+        if brand_id:
+            sql += " AND brand_id = :brand_id"
+            params["brand_id"] = brand_id
+        sql += " ORDER BY stat_date DESC, brand_id LIMIT :limit"
+        with self.client.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).mappings().all()
+        return [dict(row) for row in rows]
 
     def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         formula_id = str(uuid4())

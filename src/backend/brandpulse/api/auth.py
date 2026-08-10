@@ -3,15 +3,68 @@
 项目当前不提供用户管理和细粒度权限；local 模式仅建立前端会话，password 模式由
 环境变量提供单个运营账号，避免把凭据写入代码库。
 """
+import base64
+import hashlib
+import hmac
+import json
 import secrets
+import time
 from hmac import compare_digest
+from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from brandpulse.config.config import Config
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+
+_TOKEN_SECRET = Config.AUTH_SECRET.encode("utf-8") if Config.AUTH_SECRET else secrets.token_bytes(32)
+
+
+def _b64(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
+
+
+def _unb64(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
+def create_access_token(username: str, role: str = "operator") -> str:
+    """创建带过期时间和签名的无状态会话令牌。"""
+    header = _b64(json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode())
+    payload = _b64(json.dumps({
+        "sub": username,
+        "role": role,
+        "iat": int(time.time()),
+        "exp": int(time.time()) + Config.AUTH_TOKEN_TTL_SECONDS,
+    }, separators=(",", ":")).encode())
+    unsigned = f"{header}.{payload}".encode("ascii")
+    signature = _b64(hmac.new(_TOKEN_SECRET, unsigned, hashlib.sha256).digest())
+    return f"{header}.{payload}.{signature}"
+
+
+def decode_access_token(token: str) -> Dict[str, Any]:
+    """验证令牌签名和过期时间，失败时统一抛出 401。"""
+    try:
+        header, payload, signature = token.split(".")
+        unsigned = f"{header}.{payload}".encode("ascii")
+        expected = _b64(hmac.new(_TOKEN_SECRET, unsigned, hashlib.sha256).digest())
+        if not hmac.compare_digest(signature, expected):
+            raise ValueError("invalid signature")
+        data = json.loads(_unb64(payload))
+        if not data.get("sub") or int(data.get("exp", 0)) <= int(time.time()):
+            raise ValueError("expired token")
+        return data
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(status_code=401, detail="登录已失效，请重新登录") from exc
+
+
+def require_auth(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+    """所有业务 API 共用的 Bearer 认证依赖。"""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="需要 Bearer 登录令牌")
+    return decode_access_token(authorization[7:].strip())
 
 
 class LoginRequest(BaseModel):
@@ -46,6 +99,6 @@ def login(payload: LoginRequest) -> LoginResponse:
     if not _credentials_are_valid(payload.username, payload.password):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     return LoginResponse(
-        token=secrets.token_urlsafe(32),
+        token=create_access_token(payload.username),
         user=LoginUser(id=payload.username, username=payload.username, role="operator"),
     )

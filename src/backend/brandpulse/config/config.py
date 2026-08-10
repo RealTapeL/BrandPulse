@@ -31,6 +31,31 @@ class Config:
     AUTH_MODE = os.getenv("AUTH_MODE", "local").lower()
     AUTH_USERNAME = os.getenv("AUTH_USERNAME", "")
     AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "")
+    AUTH_SECRET = os.getenv("AUTH_SECRET", "")
+    AUTH_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_TOKEN_TTL_SECONDS", "28800"))
+
+    # 逗号分隔的浏览器来源；allow_credentials=True 时不能使用通配符。
+    CORS_ORIGINS = [
+        origin.strip()
+        for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+        if origin.strip()
+    ]
+
+    # 告警调度与通知
+    ALERT_SCHEDULER_ENABLED = os.getenv("ALERT_SCHEDULER_ENABLED", "true").lower() in {"1", "true", "yes"}
+    ALERT_INTERVAL_MINUTES = int(os.getenv("ALERT_INTERVAL_MINUTES", "5"))
+    SMTP_HOST = os.getenv("SMTP_HOST", "")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USERNAME)
+    SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes"}
+    ALERT_WEBHOOK_TIMEOUT = float(os.getenv("ALERT_WEBHOOK_TIMEOUT", "10"))
+
+    # 自动采集与报告计划。计划本身默认禁用；调度器只领取用户显式启用的计划。
+    MONITORING_SCHEDULER_ENABLED = os.getenv("MONITORING_SCHEDULER_ENABLED", "true").lower() in {"1", "true", "yes"}
+    MONITORING_SCHEDULER_INTERVAL_SECONDS = int(os.getenv("MONITORING_SCHEDULER_INTERVAL_SECONDS", "60"))
+    REPORT_MAX_DATA_AGE_HOURS = int(os.getenv("REPORT_MAX_DATA_AGE_HOURS", "72"))
 
     # 高德 API
     AMAP_KEY = os.getenv("AMAP_KEY", "")

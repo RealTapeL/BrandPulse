@@ -117,7 +117,7 @@ class DpShopMetricRepository:
             :shop_name, :city, :crawl_date, :brand_id, :place,
             :score, :review_count, :avg_price, :business_area, :shop_text, :source_url
         )
-        ON CONFLICT (shop_name, city, crawl_date) DO UPDATE SET
+        ON CONFLICT (shop_name, city, crawl_date, brand_id, place) DO UPDATE SET
             brand_id = EXCLUDED.brand_id,
             place = EXCLUDED.place,
             score = EXCLUDED.score,
@@ -177,6 +177,7 @@ class BrandHeatRepository:
             COALESCE(MAX(likes), 0)
         FROM xhs_notes
         WHERE brand_id = :brand_id AND city = :city AND crawl_date = :stat_date
+          AND (:mall_name = '' OR COALESCE(mall_name, '') = :mall_name)
         ON CONFLICT (stat_date, brand_id, city, mall_name, platform) DO UPDATE SET
             mentions = EXCLUDED.mentions,
             total_likes = EXCLUDED.total_likes,
@@ -197,6 +198,7 @@ class BrandHeatRepository:
             ROUND(AVG(avg_price)::numeric, 2)
         FROM dp_shop_metrics
         WHERE brand_id = :brand_id AND city = :city AND crawl_date = :stat_date
+          AND (:mall_name = '' OR COALESCE(place, '') = :mall_name)
         ON CONFLICT (stat_date, brand_id, city, mall_name, platform) DO UPDATE SET
             dp_review_count = EXCLUDED.dp_review_count,
             dp_shop_count = EXCLUDED.dp_shop_count,

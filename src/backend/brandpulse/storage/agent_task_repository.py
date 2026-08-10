@@ -20,7 +20,7 @@ class AgentTaskRepository:
         item["input"] = item.pop("prompt")
         item["logs"] = item.get("logs") or []
         item["context"] = item.get("context") or {}
-        for key in ("created_at", "updated_at", "finished_at"):
+        for key in ("created_at", "updated_at", "started_at", "finished_at"):
             if item.get(key) is not None:
                 item[key] = str(item[key])
         return item
@@ -55,8 +55,60 @@ class AgentTaskRepository:
     def finish_failure(self, task_id: str, error: str) -> None:
         self._update(task_id, status="failed", error=error, finished=True)
 
-    def mark_running(self, task_id: str) -> None:
-        self._update(task_id, status="running")
+    def mark_running(self, task_id: str) -> bool:
+        with self.client.engine.connect() as conn:
+            result = conn.execute(text("""
+                UPDATE agent_tasks
+                SET status = 'running',
+                    started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
+                    attempt_count = attempt_count + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE task_id = :task_id AND status IN ('pending', 'running')
+            """), {"task_id": task_id})
+            conn.commit()
+        return bool(result.rowcount)
+
+    def set_rq_job(self, task_id: str, rq_job_id: str) -> None:
+        with self.client.engine.connect() as conn:
+            conn.execute(text("""
+                UPDATE agent_tasks
+                SET rq_job_id = :rq_job_id, updated_at = CURRENT_TIMESTAMP
+                WHERE task_id = :task_id
+            """), {"task_id": task_id, "rq_job_id": rq_job_id})
+            conn.commit()
+
+    def recover_stale_pending(self, stale_minutes: int = 10) -> int:
+        """回收创建后长期没有 RQ job ID 的孤儿任务。"""
+        with self.client.engine.connect() as conn:
+            result = conn.execute(text("""
+                UPDATE agent_tasks
+                SET status = 'failed',
+                    error = '任务创建后未成功进入队列，已自动终止，请重新提交',
+                    updated_at = CURRENT_TIMESTAMP,
+                    finished_at = CURRENT_TIMESTAMP
+                WHERE status = 'pending'
+                  AND rq_job_id IS NULL
+                  AND created_at < CURRENT_TIMESTAMP - (:stale_minutes * INTERVAL '1 minute')
+            """), {"stale_minutes": stale_minutes})
+            conn.commit()
+        return result.rowcount or 0
+
+    def list(self, *, status: Optional[str], limit: int, offset: int) -> Dict[str, Any]:
+        conditions = ["1=1"]
+        params: Dict[str, Any] = {"limit": limit, "offset": offset}
+        if status:
+            conditions.append("status = :status")
+            params["status"] = status
+        where = " AND ".join(conditions)
+        with self.client.engine.connect() as conn:
+            total = conn.execute(text(f"SELECT COUNT(*) FROM agent_tasks WHERE {where}"), params).scalar_one()
+            rows = conn.execute(text(f"""
+                SELECT * FROM agent_tasks
+                WHERE {where}
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """), params).mappings().all()
+        return {"items": [self._row_to_dict(row) for row in rows], "total": total}
 
     def _update(
         self,

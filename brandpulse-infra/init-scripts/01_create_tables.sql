@@ -226,6 +226,9 @@ CREATE TABLE IF NOT EXISTS store_operations (
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_store_operations_store_date
+    ON store_operations(store_id, record_date);
+
 CREATE INDEX IF NOT EXISTS idx_so_store_date ON store_operations(store_id, record_date);
 CREATE INDEX IF NOT EXISTS idx_so_brand_date ON store_operations(brand_id, record_date);
 
@@ -312,6 +315,102 @@ INSERT INTO brand_relationships (relation_id, brand_id, related_brand_id, relati
 ('REL_LK_SB_001', 'LK001', 'SB001', '竞品', 0.70, '同属咖啡赛道，但价格带和场景差异大'),
 ('REL_KD_SB_001', 'KD001', 'SB001', '竞品', 0.55, '价格带差异大，竞争关系较弱')
 ON CONFLICT (relation_id) DO NOTHING;
+
+-- 机器学习训练运行台账；公开基准模型默认不具备生产资格
+CREATE TABLE IF NOT EXISTS ml_training_runs (
+    run_id              VARCHAR(64) PRIMARY KEY,
+    task                VARCHAR(64) NOT NULL,
+    dataset_key         VARCHAR(128) NOT NULL,
+    status              VARCHAR(16) NOT NULL DEFAULT 'pending',
+    rq_job_id           VARCHAR(128),
+    parameters          JSONB NOT NULL DEFAULT '{}'::jsonb,
+    metrics             JSONB,
+    artifact_path       TEXT,
+    data_origin         VARCHAR(64) NOT NULL DEFAULT 'public_benchmark',
+    production_eligible BOOLEAN NOT NULL DEFAULT FALSE,
+    train_rows          BIGINT,
+    validation_rows     BIGINT,
+    error               TEXT,
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at          TIMESTAMP,
+    finished_at         TIMESTAMP,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE ml_training_runs
+    ADD COLUMN IF NOT EXISTS dataset_upload_id VARCHAR(64),
+    ADD COLUMN IF NOT EXISTS model_id VARCHAR(128);
+
+CREATE INDEX IF NOT EXISTS idx_ml_training_runs_created
+    ON ml_training_runs(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_ml_training_runs_dataset
+    ON ml_training_runs(dataset_key, created_at DESC);
+
+-- 机器学习数据输入台账；上传数据与 store_operations 保持隔离
+CREATE TABLE IF NOT EXISTS ml_dataset_uploads (
+    upload_id           VARCHAR(64) PRIMARY KEY,
+    dataset_key         VARCHAR(128) NOT NULL UNIQUE,
+    original_filename   VARCHAR(255) NOT NULL,
+    stored_path         TEXT,
+    file_format         VARCHAR(16) NOT NULL,
+    data_origin         VARCHAR(64) NOT NULL DEFAULT 'user_upload',
+    production_eligible BOOLEAN NOT NULL DEFAULT FALSE,
+    sha256              VARCHAR(64),
+    row_count           BIGINT,
+    store_count         INT,
+    item_count          INT,
+    min_date            DATE,
+    max_date            DATE,
+    validation          JSONB NOT NULL DEFAULT '{}'::jsonb,
+    status              VARCHAR(16) NOT NULL DEFAULT 'valid',
+    error               TEXT,
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ml_dataset_uploads_created
+    ON ml_dataset_uploads(created_at DESC);
+
+-- 机器学习输入、训练和导出操作日志
+CREATE TABLE IF NOT EXISTS ml_operation_logs (
+    log_id              VARCHAR(64) PRIMARY KEY,
+    operation_type      VARCHAR(32) NOT NULL,
+    status              VARCHAR(16) NOT NULL,
+    level               VARCHAR(16) NOT NULL DEFAULT 'info',
+    run_id              VARCHAR(64),
+    upload_id           VARCHAR(64),
+    export_id           VARCHAR(64),
+    message             TEXT NOT NULL,
+    details             JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ml_operation_logs_created
+    ON ml_operation_logs(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_ml_operation_logs_type
+    ON ml_operation_logs(operation_type, created_at DESC);
+
+-- 预测文件导出台账
+CREATE TABLE IF NOT EXISTS ml_forecast_exports (
+    export_id           VARCHAR(64) PRIMARY KEY,
+    run_id              VARCHAR(64),
+    model_id            VARCHAR(128) NOT NULL,
+    file_format         VARCHAR(16) NOT NULL,
+    status              VARCHAR(16) NOT NULL DEFAULT 'pending',
+    rq_job_id           VARCHAR(128),
+    file_path           TEXT,
+    row_count           BIGINT,
+    error               TEXT,
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at          TIMESTAMP,
+    finished_at         TIMESTAMP,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ml_forecast_exports_created
+    ON ml_forecast_exports(created_at DESC);
 
 -- 为应用用户 brandpulse 授予表读写权限（与 .env 中配置的用户名一致）
 GRANT ALL PRIVILEGES ON SCHEMA public TO brandpulse;

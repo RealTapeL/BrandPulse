@@ -44,6 +44,25 @@ def run(stat_date: Optional[str] = None) -> Dict[str, int]:
             logger.error(f"[指标] {name} 计算失败（已跳过，不影响其它指标）: {e}")
             stats[name] = 0
 
+    # 看板 /api/v1/indicators 使用兼容时序表；指标计算完成后立即同步，
+    # 不再依赖人工单独执行 run_aggregate.sh。
+    try:
+        from brandpulse.indicators.jobs.aggregate import aggregate
+
+        aggregate_stats = aggregate(stat_date)
+        stats["时序聚合"] = sum(aggregate_stats.values())
+    except Exception as e:
+        logger.error(f"[指标] 时序聚合失败: {e}")
+        stats["时序聚合"] = 0
+
+    try:
+        from brandpulse.indicators.custom_formulas import compute_custom_formulas
+
+        stats["自定义公式"] = compute_custom_formulas(stat_date)
+    except Exception as e:
+        logger.error(f"[指标] 自定义公式计算失败: {e}")
+        stats["自定义公式"] = 0
+
     total = sum(stats.values())
     logger.info(f"[指标] 全部完成: {stats}, 共写入 {total} 行")
     return stats

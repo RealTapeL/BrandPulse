@@ -6,7 +6,6 @@ main.run_mall_crawl（Kimi WebBridge 驱动大众点评 + 小红书）。
 TODO: 后端 /api/v1/data/raw 就绪后，把原始 JSON 通过 POST 上传而非仅更新 job 摘要。
 """
 import sys
-import json
 from pathlib import Path
 
 # main.py 不在 brandpulse 包内，把 src/backend 加入 path
@@ -15,10 +14,23 @@ if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 import main  # noqa: E402
 
-from brandpulse.db_clients.postgres_client import PostgresClient
 from brandpulse.logger.logger import get_logger
+from brandpulse.collectors.queue import enqueue_crawl
+from brandpulse.storage.crawl_job_repository import CrawlJobRepository
+from brandpulse.storage.monitoring_repository import CrawlScheduleRepository
 
 logger = get_logger(__name__)
+
+
+def _source_warning(stats: dict) -> str | None:
+    """把来源级空结果/失败压缩成计划可读的提示。"""
+    source_results = stats.get("source_results") or {}
+    incomplete = [
+        f"{site_id}:{result.get('status')}"
+        for site_id, result in source_results.items()
+        if result.get("status") != "success"
+    ]
+    return "来源未完整成功：" + ", ".join(incomplete) if incomplete else None
 
 
 def run_crawl_job(task_meta: dict) -> dict:
@@ -36,44 +48,51 @@ def run_crawl_job(task_meta: dict) -> dict:
     mall = task_meta["mall"]
     category = task_meta["category"]
     city = (task_meta.get("cities") or ["苏州"])[0]
+    schedule_id = task_meta.get("schedule_id")
 
     logger.info(f"[worker] start crawl job: id={job_id}, brand_id={brand_id}, mall={mall}, category={category}, city={city}")
-    if job_id:
-        _update_job(job_id, status="running")
+    repository = CrawlJobRepository()
+    if job_id and not repository.mark_running(job_id):
+        logger.warning(f"[worker] skip terminal or missing crawl job: {job_id}")
+        return {"status": "skipped", "job_id": job_id}
     try:
-        stats = main.run_mall_crawl(mall=mall, category=category, city=city)
+        stats = main.run_mall_crawl(
+            mall=mall,
+            category=category,
+            city=city,
+            brand_id=brand_id,
+        )
+        if not stats.get("raw"):
+            warning = _source_warning(stats)
+            detail = f"；{warning}" if warning else ""
+            raise RuntimeError(f"采集未取得任何可验证记录，拒绝将空结果标记为成功{detail}")
     except Exception as exc:
+        job = repository.get(job_id) if job_id else None
+        attempts = int((job or {}).get("attempt_count") or 0)
+        max_attempts = int(task_meta.get("max_attempts", 2))
+        if job_id and attempts < max_attempts and repository.prepare_retry(job_id, str(exc)):
+            delay_seconds = min(300, 30 * (2 ** max(attempts - 1, 0)))
+            try:
+                retry_job_id = enqueue_crawl(task_meta, delay_seconds=delay_seconds)
+                repository.set_rq_job(job_id, retry_job_id)
+                if schedule_id:
+                    CrawlScheduleRepository().record_result(schedule_id, success=False, error=str(exc))
+                logger.warning("[worker] crawl retry queued: id=%s attempt=%s/%s", job_id, attempts, max_attempts)
+                return {"status": "retry_pending", "job_id": job_id, "error": str(exc)}
+            except Exception as retry_exc:
+                exc = RuntimeError(f"采集失败且延迟重试入队失败: {retry_exc}")
         if job_id:
-            _update_job(job_id, status="failed", result={"error": str(exc)})
+            repository.finish(job_id, status="failed", result={"error": str(exc)})
+        if schedule_id:
+            CrawlScheduleRepository().record_result(schedule_id, success=False, error=str(exc))
         raise
 
     if job_id:
-        _update_job(job_id, status="completed", result=stats)
+        repository.finish(job_id, status="completed", result=stats)
+    if schedule_id:
+        CrawlScheduleRepository().record_result(
+            schedule_id,
+            success=True,
+            error=_source_warning(stats),
+        )
     return stats
-
-
-def _update_job(job_id: str, status: str, result: dict | None = None) -> None:
-    """按唯一 job_id 更新任务状态，避免并发任务互相覆盖。"""
-    sql = """
-        UPDATE crawl_jobs
-        SET status = :status,
-            result = COALESCE(:result, result),
-            finished_at = CASE
-                WHEN :status IN ('completed', 'failed') THEN CURRENT_TIMESTAMP
-                ELSE finished_at
-            END,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE job_id = :job_id
-        RETURNING job_id
-    """
-    try:
-        client = PostgresClient()
-        result = client.execute(sql, {
-            "job_id": job_id,
-            "status": status,
-            "result": json.dumps(result, ensure_ascii=False) if result is not None else None,
-        })
-        rows = result.fetchall() if result else []
-        logger.info(f"[worker] updated {len(rows)} crawl_jobs for {job_id}: {status}")
-    except Exception as e:
-        logger.error(f"[worker] failed to update crawl_jobs: {e}")

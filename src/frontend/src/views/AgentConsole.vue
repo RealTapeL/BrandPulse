@@ -73,7 +73,8 @@
     <!-- 历史任务 -->
     <el-card v-if="store.history.length" shadow="never" class="section">
       <template #header>历史任务</template>
-      <el-table :data="store.history" aria-label="历史任务列表">
+      <div class="table-scroll">
+        <el-table :data="store.history" aria-label="历史任务列表">
         <el-table-column prop="id" label="任务 ID" width="160" />
         <el-table-column prop="input" label="指令" min-width="240" show-overflow-tooltip />
         <el-table-column label="状态" width="100">
@@ -81,7 +82,8 @@
             <el-tag :type="statusType(row.status)" size="small">{{ statusText(row.status) }}</el-tag>
           </template>
         </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
     </el-card>
   </div>
 </template>
@@ -91,13 +93,19 @@
  * Agent 控制台 /agent/console：发送指令 → POST /agent/execute 拿 task_id → 轮询任务状态展示日志与输出。
  * TODO: 后端就绪后，轮询可替换为 WebSocket / SSE 实时推送。
  */
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useAgentStore } from '../stores/agent'
 
 const store = useAgentStore()
 const prompt = ref('')
 const contextText = ref('')
 const contextError = ref('')
+
+onMounted(() => {
+  store.loadHistory().catch(() => {
+    // 历史任务加载失败不影响新任务提交，统一由请求拦截器处理认证错误。
+  })
+})
 
 function parseContext() {
   contextError.value = ''
@@ -127,7 +135,11 @@ function statusText(s) {
 
 <style scoped>
 .agent-console {
-  padding: 20px;
+  width: 100%;
+  min-width: 0;
+  max-width: var(--bp-content-max-width);
+  margin: 0 auto;
+  padding: var(--bp-space-4) var(--bp-space-5) 40px;
 }
 .section {
   margin-bottom: 16px;
@@ -175,5 +187,16 @@ function statusText(s) {
 }
 .logs {
   padding-left: 4px;
+}
+
+@media (max-width: 767px) {
+  .agent-console {
+    padding: var(--bp-space-4) var(--bp-space-3) 28px;
+  }
+
+  .actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

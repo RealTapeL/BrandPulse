@@ -21,8 +21,10 @@
 import importlib
 import random
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 import requests
 import yaml
@@ -377,7 +379,7 @@ def _save_raw_records(
         for r in records:
             if not r.get("shop_name"):
                 continue
-            place = r.get("place")
+            place = r.get("place") or ""
             # shop_text 最后一段通常是商圈，如 "咖啡 | 观前街地区"
             business_area = None
             if r.get("shop_text") and "|" in r["shop_text"]:
@@ -438,7 +440,24 @@ def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional
     from brandpulse.storage.mall_heat_repository import BrandHeatRepository
 
     crawler = GenericWebCrawler()
-    records = crawler.crawl_site(site_id, brand_id=brand_id, brand_name=brand_name, city=city, **kwargs)
+    run_id = f"source_{uuid4().hex}"
+    started_at = datetime.now()
+    try:
+        records = crawler.crawl_site(site_id, brand_id=brand_id, brand_name=brand_name, city=city, **kwargs)
+    except Exception as exc:
+        try:
+            from brandpulse.data_governance.service import DataGovernanceService
+
+            DataGovernanceService().record_source_log(
+                run_id=run_id, trace_id=None, source_name=site_id,
+                source_type="webbridge" if "webbridge" in site_id else "crawler",
+                entity_type="raw", entity_id=brand_id, record_count=0,
+                status="failed", error_message=str(exc), started_at=started_at,
+                finished_at=datetime.now(), metadata={"city": city, "place": kwargs.get("place")},
+            )
+        except Exception as log_exc:
+            logger.error(f"[{site_id}] 写入采集血缘失败: {log_exc}")
+        raise
 
     today = time.strftime("%Y-%m-%d")
     place = kwargs.get("place")
@@ -504,6 +523,26 @@ def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional
         f"[{site_id}] 原始表 {raw_saved} 条，热度聚合 {heat_saved} 行，"
         f"brand_metrics {db_saved} 条，JSON 缓存 {file_saved}/{len(records)} 条"
     )
+    try:
+        from brandpulse.data_governance.service import DataGovernanceService
+
+        DataGovernanceService().record_source_log(
+            run_id=run_id, trace_id=None, source_name=site_id,
+            source_type="webbridge" if "webbridge" in site_id else "crawler",
+            entity_type="raw", entity_id=brand_id, record_count=len(records),
+            status="completed" if records else "empty",
+            error_message="来源返回空结果" if not records else "",
+            started_at=started_at, finished_at=datetime.now(),
+            metadata={
+                "city": city,
+                "place": place,
+                "raw_saved": raw_saved,
+                "heat_saved": heat_saved,
+                "cached": file_saved,
+            },
+        )
+    except Exception as log_exc:
+        logger.error(f"[{site_id}] 写入采集血缘失败: {log_exc}")
     return {
         "saved": db_saved,
         "raw_saved": raw_saved,

@@ -3,7 +3,10 @@ import json
 from typing import Any, Dict, Iterable
 
 from brandpulse.agent.agent import ask
+from brandpulse.logger.logger import get_logger
 from brandpulse.storage.agent_task_repository import AgentTaskRepository
+
+logger = get_logger(__name__)
 
 
 def _context_suffix(context: Dict[str, Any]) -> str:
@@ -37,13 +40,24 @@ def run_agent_task(task_id: str) -> None:
     task = repository.get(task_id)
     if not task:
         return
-    repository.mark_running(task_id)
-    repository.append_log(task_id, "任务开始，初始化 BrandPulse Agent")
     try:
+        if not repository.mark_running(task_id):
+            logger.warning("Agent 任务已处于终态，跳过重复执行: %s", task_id)
+            return
+        repository.append_log(task_id, "任务开始，初始化 BrandPulse Agent")
         answer, _ = ask(task["input"] + _context_suffix(task["context"]))
     except Exception as exc:
-        repository.append_log(task_id, "任务执行失败")
-        repository.finish_failure(task_id, str(exc))
-        return
-    repository.append_log(task_id, "Agent 已完成工具调用并生成结论")
-    repository.finish_success(task_id, answer)
+        logger.exception("Agent 任务执行失败: %s", task_id)
+        try:
+            repository.append_log(task_id, "任务执行失败")
+            repository.finish_failure(task_id, str(exc))
+        except Exception:
+            logger.exception("Agent 任务失败状态写回失败: %s", task_id)
+        # 同时让 RQ 记录失败，便于运维查看失败注册表；业务状态已经持久化到 agent_tasks。
+        raise
+    try:
+        repository.append_log(task_id, "Agent 已完成工具调用并生成结论")
+        repository.finish_success(task_id, answer)
+    except Exception:
+        logger.exception("Agent 任务成功状态写回失败: %s", task_id)
+        raise

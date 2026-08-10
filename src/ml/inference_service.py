@@ -1,6 +1,6 @@
 """
 ML 推理服务（FastAPI）：加载情感 & NER 模型，提供 /ml/sentiment 与 /ml/ner。
-模型不存在时返回 mock 结果并提示需先训练。
+模型不存在时明确返回 503，避免把 mock 结果混入业务数据。
 
 启动：
     PYTHONPATH=src/backend .venv/bin/python -m uvicorn src.ml.inference_service:app --port 9000
@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from transformers import AutoModelForSequenceClassification, AutoModelForTokenClassification, AutoTokenizer, pipeline
 
@@ -72,10 +72,7 @@ class NerResponse(BaseModel):
 def sentiment(req: SentimentRequest):
     pipe = _load_sentiment()
     if pipe is None:
-        return SentimentResponse(
-            predictions=[{"label": "mock_positive", "score": 0.9, "text": t} for t in req.texts],
-            model_loaded=False,
-        )
+        raise HTTPException(status_code=503, detail="情感模型未部署，请先训练并部署 models/sentiment/v1")
     predictions = pipe(req.texts)
     return SentimentResponse(predictions=predictions, model_loaded=True)
 
@@ -84,10 +81,7 @@ def sentiment(req: SentimentRequest):
 def ner(req: NerRequest):
     result = _load_ner()
     if result is None:
-        return NerResponse(
-            entities=[{"word": req.text[:6], "entity_group": "MOCK", "score": 0.9}],
-            model_loaded=False,
-        )
+        raise HTTPException(status_code=503, detail="NER 模型未部署，请先训练并部署 models/ner/v1")
     pipe, _ = result
     entities = pipe(req.text)
     return NerResponse(entities=entities, model_loaded=True)

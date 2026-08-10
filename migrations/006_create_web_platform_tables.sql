@@ -29,4 +29,18 @@ CREATE TABLE IF NOT EXISTS custom_formulas (
 
 CREATE INDEX IF NOT EXISTS idx_custom_formulas_enabled ON custom_formulas(enabled);
 
-GRANT ALL PRIVILEGES ON agent_tasks, custom_formulas TO brandpulse;
+CREATE TABLE IF NOT EXISTS custom_formula_values (
+    formula_id  VARCHAR(36) NOT NULL REFERENCES custom_formulas(formula_id) ON DELETE CASCADE,
+    brand_id    VARCHAR(32) NOT NULL,
+    stat_date   DATE NOT NULL,
+    value       NUMERIC(18, 6) NOT NULL,
+    detail      JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (formula_id, brand_id, stat_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_formula_values_brand_date
+    ON custom_formula_values(brand_id, stat_date DESC);
+
+GRANT ALL PRIVILEGES ON agent_tasks, custom_formulas, custom_formula_values TO brandpulse;

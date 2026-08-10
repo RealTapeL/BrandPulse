@@ -18,6 +18,14 @@ export function startCrawl(id, payload) {
   return api.post(`/v1/brands/${id}/crawl`, payload).then((r) => r.data)
 }
 
+export function getCrawlJob(id) {
+  return api.get(`/v1/crawl_jobs/${id}`).then((r) => r.data)
+}
+
 export function getBrandFilters() {
   return api.get('/v1/brands/filters').then((r) => r.data)
+}
+
+export function getBrandIndicatorSeries(id, indicator) {
+  return api.get(`/v1/brands/${id}/indicator-series`, { params: { indicator } }).then((r) => r.data)
 }

@@ -1,7 +1,7 @@
 /**
  * 自定义指标公式 API。
  *
- * 后端契约（待实现）：
+ * 后端契约：
  *   GET    /api/formulas          -> { formulas: [...] }
  *   POST   /api/formulas          body: Formula -> Formula（含 id）
  *   PUT    /api/formulas/{id}     body: Formula -> Formula
@@ -10,7 +10,7 @@
  * Formula: { id, name, description, expression, params: [{key, value}],
  *            enabled: boolean, remark, created_at, updated_at }
  *
- * 由 FastAPI + PostgreSQL 持久化；自定义公式当前只作管理展示，不直接参与指标计算。
+ * 由 FastAPI + PostgreSQL 持久化；启用后由指标管道按品牌真实数据计算。
  */
 import api from './index'
 
@@ -31,6 +31,13 @@ export async function updateFormula(id, patch) {
 
 export async function deleteFormula(id) {
   await api.delete(`/v1/formulas/${id}`)
+}
+
+export async function runFormula(id, statDate) {
+  const { data } = await api.post(`/v1/formulas/${id}/run`, null, {
+    params: statDate ? { stat_date: statDate } : undefined,
+  })
+  return data
 }
 
 /**

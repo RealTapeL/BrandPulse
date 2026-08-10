@@ -18,7 +18,7 @@ BrandPulse/
 │   ├── coffee_brand_database_schema.sql  # 咖啡品牌库表结构参考
 │   └── data/                       # 本地数据（不提交）
 ├── docs/                           # PRD 与 drawio 架构图
-├── migrations/                     # 应用表迁移（任务、指标、告警、Web 平台）
+├── migrations/                     # 应用表迁移（任务、指标、告警、公式、经营数据、数据治理）
 ├── data/                           # raw / processed / normalized / invalid / labelled
 ├── scripts/                        # 服务启动脚本
 ├── src/
@@ -38,11 +38,12 @@ BrandPulse/
 │   │       ├── indicators/         # 指标层：口碑 / 热度 / SOV / 趋势 + aggregate job
 │   │       ├── api/                # FastAPI：认证、看板、品牌、任务、数据表、公式等
 │   │       ├── agent/              # Pydantic AI 工具循环 + Tool registry
-│   │       └── alerts/             # 告警规则与调度器
+│   │       ├── alerts/             # 告警规则与调度器
+│   │       └── data_governance/    # 别名、门店匹配、质量扫描、采集血缘
 │   ├── frontend/                   # 前端（Vue3 + Element Plus + ECharts + Pinia）
-│   └── ml/                         # 情感分类 & NER 训练/推理（transformers）
+│   └── ml/                         # 情感/NER 与时间序列预测（transformers + scikit-learn）
 ├── models/                         # 训练后模型保存目录
-└── tests/                          # pytest（52+ 项）
+└── tests/                          # pytest（60 项）
 ```
 
 ## 快速开始
@@ -74,9 +75,18 @@ cd src/frontend && npm install && npm run build && cd ../..
 
 ```bash
 redis-server --daemonize yes --port 6379        # Redis 任务队列
-bash scripts/start_rq_worker.sh                  # RQ worker：消费 brandpulse-crawl 队列
+bash scripts/start_rq_worker.sh                  # RQ worker：消费采集与 Agent 队列
+bash scripts/start_monitoring_scheduler.sh       # 独立每日采集/报告调度器
 bash scripts/start_webbridge.sh                  # 采集通道：WebBridge MCP（ws://127.0.0.1:10086）
 bash scripts/start_web.sh                        # Web 平台：FastAPI + 前端静态托管（8000 端口）
+
+# 推荐：一键启动 Redis、RQ Worker、独立调度器、FastAPI、Vite 前端和 WebBridge
+bash scripts/start_all.sh
+# 查看状态 / 停止本脚本启动的进程
+bash scripts/start_all.sh status
+bash scripts/start_all.sh stop
+# 若默认端口被其他项目占用，脚本会自动顺延；也可显式指定：
+# BRANDPULSE_BACKEND_PORT=8001 BRANDPULSE_FRONTEND_PORT=5174 bash scripts/start_all.sh
 
 # 开发模式（热重载，前端独立 5173）
 cd src/frontend && npm run dev
@@ -104,16 +114,72 @@ cd src/frontend && npm run dev
 | `GET  /api/v1/brands/filters` | 品类、城市筛选项 |
 | `GET  /api/v1/brands/{id}` | 品牌详情、采集记录与真实指标时序 |
 | `POST /api/v1/brands/{id}/crawl` | 从品牌详情发起采集 |
-| `POST /api/v1/crawl_jobs` | 创建采集任务并 enqueue（body: brand_id, mall, category, cities?） |
-| `GET  /api/v1/crawl_jobs/{id}` | 查询任务状态 |
+| `POST /api/v1/crawl_jobs` | 创建采集任务并投递 `brandpulse-crawl` RQ 队列（body: brand_id, mall, category, cities?） |
+| `GET  /api/v1/crawl_jobs` / `GET .../{id}` | 查询持久化采集任务历史与状态 |
 | `GET  /api/v1/indicators` | 指标时序（query: brand_id, indicator, start, end） |
+| `GET /api/v1/dashboard/scopes` / `GET /api/v1/dashboard?scope_id=` | 真实项目/品类范围与范围内看板快照 |
 | `GET  /api/v1/tables/{name}` | 白名单数据表的服务端筛选、排序、分页 |
-| `GET|POST|PUT|DELETE /api/v1/formulas` | 自定义指标公式管理 |
-| `POST /api/v1/agent/execute` | 创建后台 Agent 任务；`GET /api/v1/agent/tasks/{id}` 轮询状态 |
+| `GET|POST|PUT|DELETE /api/v1/formulas` | 自定义指标公式配置 |
+| `POST /api/v1/formulas/{id}/run` / `GET .../values` | 按真实指标上下文计算并读取公式结果 |
+| `POST /api/v1/operations/preview` / `POST .../import` | 校验并导入“内部经营数据”Excel |
+| `GET /api/v1/data-governance/summary` / `POST .../scan` | 数据质量汇总与扫描 |
+| `GET /api/v1/data-governance/issues` | 查看、确认和关闭数据质量问题 |
+| `GET /api/v1/data-governance/store-aliases` | 查看外部门店别名及人工匹配状态 |
+| `GET /api/v1/data-governance/lineage` | 查看真实采集来源、任务和记录数 |
+| `POST /api/v1/agent/execute` | 创建 Agent 任务并投递 `brandpulse-agent` RQ 队列 |
+| `GET /api/v1/agent/tasks` / `GET .../tasks/{id}` | 查询持久化任务历史与单任务状态 |
 | `POST /api/v1/chat` | 对话式数据问答（需配置 LLM） |
 | `POST /api/v1/alerts/check-now` | 立即执行告警检查 |
+| `GET|POST|PUT|DELETE /api/v1/monitoring/crawl-schedules` | 自动采集计划配置、启停与持久化状态 |
+| `GET|POST|PUT|DELETE /api/v1/alerts` / `GET .../alerts/history` | 告警规则、通知配置与检查历史 |
+| `GET|POST /api/v1/reports` / `GET .../download` | 真实指标快照报告生成、查询和下载 |
+| `GET|POST|PUT|DELETE /api/v1/reports/schedules` | 日报/周报定时计划配置 |
 | `POST /ml/sentiment` | 情感分类推理 |
 | `POST /ml/ner` | 命名实体识别推理 |
+| `GET /api/v1/ml/datasets` | 公开数据集与已上传数据的登记、校验状态 |
+| `POST /api/v1/ml/datasets/upload` | 上传 CSV/XLSX/XLSM 并校验真实销售时序数据 |
+| `POST /api/v1/ml/forecasting/train` | 创建训练任务并投递 brandpulse-ml RQ 队列 |
+| `GET /api/v1/ml/forecasting/runs` | 查询训练台账、状态和回测指标 |
+| `POST /api/v1/ml/forecasting/exports` | 创建 CSV/XLSX 预测导出任务 |
+| `GET /api/v1/ml/forecasting/exports/{export_id}/download` | 下载已完成的预测文件 |
+| `GET /api/v1/ml/logs` | 查询数据输入、训练和预测导出日志 |
+| `GET /api/v1/ml/forecasting/models/{model_id}/forecast` | 读取已生成预测结果 |
+
+除登录接口外的业务 API 都需要 `Authorization: Bearer <token>`。未部署 ML 模型时推理接口返回 503，
+不会返回伪造预测。生产部署请配置 `AUTH_MODE=password`、`AUTH_SECRET`、SMTP 或告警 webhook。
+
+## 机器学习预测
+
+已完成首个公开基准销售预测模块：数据集登记、真实文件输入、下载校验、时间回测、RQ 后台训练、
+训练日志、预测导出、模型元数据、预测结果 API 和前端“机器学习预测”页面。
+
+首个数据集为 GitHub skforecast-datasets 的 store_sales.csv，原始来源为 Kaggle
+Store Item Demand Forecasting Challenge。它包含 913,000 条、10 家门店、50 个 SKU
+的日销售记录。模型工件只保存在 models/forecasting，数据只保存在 data/raw/ml/benchmark，
+不会写入 store_operations。
+
+CLI 操作：
+
+    PYTHONPATH=src/backend:src .venv/bin/python -m ml.forecasting.cli download --dataset store_sales
+    PYTHONPATH=src/backend:src .venv/bin/python -m ml.forecasting.cli train --dataset store_sales --validation-days 28 --horizon 14
+
+公开基准模型的 production_eligible 固定为 false；只有获得授权的内部 POS / 客流数据，
+完成主数据映射、质量扫描和独立回测后，才能进入生产模型流程。
+
+## 自动监控与报告
+
+看板按 `监测范围（城市 × 项目 × 品类 × 数据集 ID）` 查询；范围来自真实采集任务和数据表，
+不再在前端写死“苏州中心·咖啡”。自动采集计划、告警规则和日报/周报计划默认关闭，只有用户
+明确启用后才会执行真实浏览器采集或生成报告。
+
+自动采集计划在 Web 页面配置为北京时间固定执行时间（默认每天 09:00），数据库记录计划日期，
+同一天不会重复入队。计划默认关闭，启用后由独立的 `brandpulse.monitoring.runner` 进程检查并入队，
+不依赖 FastAPI 是否重启；RQ Worker 负责真实执行，来源级结果会分别记录为 `success`、`empty` 或
+`failed`。全部来源均无可验证记录时任务失败；部分来源为空时保留已采到的数据，同时在任务和计划中显示警告。
+
+报告导出为 XLSX（摘要、指标、点评、小红书四个工作表）或 CSV 指标快照。生成前会校验指标、
+点评和小红书数据的新鲜度，默认最多 72 小时（`REPORT_MAX_DATA_AGE_HOURS`）；数据过期时会拒绝
+生成并记录原因，不会把旧数据包装成当天结论。
 
 ## 指标计算
 
@@ -128,7 +194,7 @@ cd src/frontend && npm run dev
 - **SOV 声量份额**：门店评价数 ÷ 同商场同品类总评价数，衡量商场内的相对竞争力
 - **趋势**：周环比动量 + 近 4 期波动率（变异系数）。数据不足 2 期时不产出，属正常状态
 
-结果写入 `brand_indicators_daily`。
+结果写入 `brand_indicators_daily`；管道结束后自动同步 `indicators` 时序兼容表和启用中的自定义公式结果。
 
 ## Web 平台
 
@@ -137,9 +203,10 @@ cd src/frontend && npm run dev
 - **登录页**：真实 `/api/v1/auth/login` 接口；单团队本地部署默认接受非空凭据，也可用环境变量切换为固定账号密码
 - **数据看板**：KPI 卡片、指标趋势图、双平台明细表
 - **品牌列表 / 详情**：搜索、分页、热度趋势、最近采集、发起采集
-- **Agent 控制台**：输入指令 → 后台任务持久化 → 轮询状态 → 展示日志与输出
-- **数据表查看**：点评门店 / 小红书笔记 / 指标日表的分页、排序、筛选
-- **指标公式管理**：内置指标口径展示与自定义公式
+- **Agent 控制台**：输入指令 → PostgreSQL 持久化 → RQ `brandpulse-agent` 队列 → Worker 执行 → 轮询状态 → 展示日志与输出；页面刷新后可恢复历史任务
+- **数据表查看**：点评门店 / 小红书笔记 / 指标日表 / 门店经营数据的分页、排序、筛选
+- **内部经营数据**：在“门店经营数据”表页上传 Excel；系统先校验品牌与门店主数据，通过后才写库
+- **指标公式管理**：内置指标口径、自定义安全公式、按最新真实数据立即计算
 
 技术栈：FastAPI + Vue3 / Element Plus / ECharts + Pinia + axios（hash 路由）。
 
@@ -169,16 +236,17 @@ cd src/frontend && npm run dev
 - **原始表**：`stores`（高德）、`dp_shop_metrics`（点评门店指标）、`xhs_notes`（小红书笔记）
 - **聚合表**：`brand_heat_daily`（品牌 × 城市 × 商场 × 日期 × 平台热度）
 - **指标表**：`brand_indicators_daily`（口碑 / 热度 / SOV / 趋势，按日按门店）
+- **经营表**：`store_operations`（销售、订单、客流、成本、坪效、租售比、合同到期）
 
 ## 测试
 
 ```bash
 # 后端 + ML 测试
-PYTHONPATH=src/backend:src .venv/bin/python -m pytest tests/ -q   # 52 项
+PYTHONPATH=.:src/backend:src .venv/bin/python -m pytest tests/ -q
 
 # 前端测试（在 src/frontend 目录）
 cd src/frontend
-npm run test:unit   # 9 项
+npm run test:unit   # 10 项
 npm run cypress     # e2e 1 项
 ```
 
@@ -195,7 +263,7 @@ npm run cypress     # e2e 1 项
 ## 后续计划
 
 - 品牌别名归一、门店去重、采集血缘
-- ML 模型训练调优与模型管理
+- 内部经营数据接入后的生产预测模型与模型管理
 
 ## 注意事项
 

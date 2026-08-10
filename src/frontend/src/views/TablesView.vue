@@ -33,15 +33,23 @@
           <div class="toolbar-actions">
             <el-input
               v-model="keywordInput"
+              class="keyword-input"
               placeholder="关键字筛选（回车生效）"
               clearable
-              style="width: 260px"
               @keyup.enter="applyKeyword"
               @clear="applyKeyword"
             >
               <template #prefix><el-icon><Search /></el-icon></template>
             </el-input>
             <el-button :icon="'Refresh'" :loading="loading" @click="load">刷新</el-button>
+            <el-upload
+              v-if="currentTable === 'store_operations'"
+              :show-file-list="false"
+              accept=".xlsx,.xlsm"
+              :before-upload="handleOperationsUpload"
+            >
+              <el-button type="primary" :loading="uploading" :icon="'Upload'">导入经营 Excel</el-button>
+            </el-upload>
           </div>
         </div>
 
@@ -53,28 +61,30 @@
         </el-result>
 
         <template v-else>
-          <el-table
-            v-loading="loading"
-            :data="rows"
-            border
-            stripe
-            height="460"
-            :empty-text="keyword ? '没有匹配关键字的记录' : '该表暂无数据'"
-            @sort-change="onSortChange"
-          >
-            <el-table-column
-              v-for="col in conf.columns"
-              :key="col.prop"
-              :prop="col.prop"
-              :label="col.label"
-              :sortable="col.sortable ? 'custom' : false"
-              :width="col.width"
-              :min-width="col.minWidth"
-              show-overflow-tooltip
+          <div class="table-scroll">
+            <el-table
+              v-loading="loading"
+              :data="rows"
+              border
+              stripe
+              height="460"
+              :empty-text="keyword ? '没有匹配关键字的记录' : '该表暂无数据'"
+              @sort-change="onSortChange"
             >
-              <template #default="{ row }">{{ formatCell(row[col.prop], col.prop) }}</template>
-            </el-table-column>
-          </el-table>
+              <el-table-column
+                v-for="col in conf.columns"
+                :key="col.prop"
+                :prop="col.prop"
+                :label="col.label"
+                :sortable="col.sortable ? 'custom' : false"
+                :width="col.width"
+                :min-width="col.minWidth"
+                show-overflow-tooltip
+              >
+                <template #default="{ row }">{{ formatCell(row[col.prop], col.prop) }}</template>
+              </el-table-column>
+            </el-table>
+          </div>
 
           <div class="pager">
             <el-pagination
@@ -96,7 +106,9 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { TABLES, getTableConfig, fetchTableData } from '../api/tables'
+import { previewOperations, importOperations } from '../api/operations'
 
 const currentTable = ref(TABLES[0].name)
 const conf = computed(() => getTableConfig(currentTable.value))
@@ -111,6 +123,7 @@ const sortProp = ref('')
 const sortOrder = ref('')
 const loading = ref(false)
 const error = ref('')
+const uploading = ref(false)
 
 async function load() {
   loading.value = true
@@ -163,9 +176,36 @@ function onSortChange({ prop, order }) {
   load()
 }
 
+async function handleOperationsUpload(file) {
+  uploading.value = true
+  try {
+    const preview = await previewOperations(file)
+    if (preview.errors?.length) {
+      const first = preview.errors.slice(0, 5).map((item) => `${item.row || item.record_id || '-'}: ${item.error}`).join('\n')
+      ElMessage.error(`文件校验失败，未导入任何数据：\n${first}`)
+      return false
+    }
+    await ElMessageBox.confirm(
+      `已校验 ${preview.valid} 条真实经营记录，确认写入数据库？重复 record_id 将更新原记录。`,
+      '确认导入',
+      { type: 'warning', confirmButtonText: '确认导入', cancelButtonText: '取消' },
+    )
+    const result = await importOperations(file)
+    ElMessage.success(`已导入 ${result.saved} 条经营记录`)
+    await load()
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') {
+      ElMessage.error(e.response?.data?.detail?.message || e.message || '经营数据导入失败')
+    }
+  } finally {
+    uploading.value = false
+  }
+  return false
+}
+
 function formatCell(v, prop) {
   if (v == null || v === '') return '-'
-  if (prop === 'sov' && typeof v === 'number') return `${(v * 100).toFixed(1)}%`
+  if (prop === 'sov' && Number.isFinite(Number(v))) return `${(Number(v) * 100).toFixed(1)}%`
   return v
 }
 
@@ -178,6 +218,7 @@ onMounted(load)
   grid-template-columns: 240px 1fr;
   gap: 16px;
   align-items: start;
+  min-width: 0;
 }
 
 .table-picker :deep(.el-card__body) {
@@ -236,7 +277,12 @@ onMounted(load)
 }
 .toolbar-actions {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
+}
+.keyword-input {
+  width: 260px;
 }
 
 .pager {
@@ -248,6 +294,27 @@ onMounted(load)
 @media (max-width: 900px) {
   .tables-body {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .keyword-input {
+    width: 100%;
+  }
+
+  .toolbar-actions {
+    width: 100%;
+  }
+
+  .toolbar-actions > .el-button,
+  .toolbar-actions :deep(.el-upload) {
+    flex: 1 1 auto;
+  }
+
+  .pager {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
   }
 }
 </style>

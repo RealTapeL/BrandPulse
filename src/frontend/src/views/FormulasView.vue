@@ -33,7 +33,8 @@
       <el-button type="primary" :icon="'Plus'" @click="openCreate">新建公式</el-button>
     </div>
     <el-card shadow="never" v-loading="loading">
-      <el-table :data="formulas" border stripe empty-text="暂无自定义公式，点击右上角「新建公式」创建">
+      <div class="table-scroll">
+        <el-table :data="formulas" border stripe empty-text="暂无自定义公式，点击右上角「新建公式」创建">
         <el-table-column prop="name" label="公式名称" min-width="140" show-overflow-tooltip />
         <el-table-column prop="description" label="描述" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">{{ row.description || '-' }}</template>
@@ -72,20 +73,22 @@
         <el-table-column label="备注" min-width="140" show-overflow-tooltip>
           <template #default="{ row }">{{ row.remark || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="130" fixed="right">
+        <el-table-column label="操作" width="210" fixed="right">
           <template #default="{ row }">
+            <el-button link type="success" :loading="row._running" @click="runNow(row)">立即计算</el-button>
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="remove(row)">删除</el-button>
           </template>
         </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
     </el-card>
 
     <!-- 新建 / 编辑对话框 -->
     <el-dialog
       v-model="dialogVisible"
       :title="editingId ? '编辑公式' : '新建公式'"
-      width="620px"
+      width="min(620px, calc(100vw - 32px))"
       :close-on-click-modal="false"
       destroy-on-close
     >
@@ -101,15 +104,15 @@
             v-model="form.expression"
             type="textarea"
             :rows="3"
-            placeholder="例如：100 * ln(1 + review_count)"
+            placeholder="例如：100 * ln(1 + review_count)；变量来自真实指标和点评数据"
           />
         </el-form-item>
         <el-form-item label="参数定义">
           <div class="params-editor">
             <div v-for="(p, i) in form.params" :key="i" class="param-row">
-              <el-input v-model="p.key" placeholder="参数名，如 m" style="width: 160px" />
+              <el-input v-model="p.key" class="param-input" placeholder="参数名，如 m" />
               <span class="param-eq">=</span>
-              <el-input v-model="p.value" placeholder="默认值，如 300" style="width: 160px" />
+              <el-input v-model="p.value" class="param-input" placeholder="默认值，如 300" />
               <el-button link type="danger" :icon="'Delete'" @click="form.params.splice(i, 1)" />
             </div>
             <el-button link type="primary" :icon="'Plus'" @click="form.params.push({ key: '', value: '' })">
@@ -140,6 +143,7 @@ import {
   createFormula,
   updateFormula,
   deleteFormula,
+  runFormula,
   validateExpression,
 } from '../api/formulas'
 
@@ -282,6 +286,18 @@ async function toggleEnabled(row, val) {
   }
 }
 
+async function runNow(row) {
+  row._running = true
+  try {
+    const result = await runFormula(row.id)
+    ElMessage.success(`已按最新真实指标计算 ${result.saved} 条结果`)
+  } catch (e) {
+    ElMessage.error(`计算失败：${e.response?.data?.detail || e.message || e}`)
+  } finally {
+    row._running = false
+  }
+}
+
 async function remove(row) {
   try {
     await ElMessageBox.confirm(`确定删除公式「${row.name}」吗？该操作不可恢复。`, '删除公式', {
@@ -359,7 +375,27 @@ onMounted(load)
   gap: 8px;
   margin-bottom: 8px;
 }
+.param-input {
+  width: 160px;
+}
 .param-eq {
   color: #909399;
+}
+
+@media (max-width: 767px) {
+  .custom-head {
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .param-row {
+    flex-wrap: wrap;
+  }
+
+  .param-input {
+    flex: 1 1 140px;
+    width: auto;
+  }
 }
 </style>

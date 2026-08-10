@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS dp_shop_metrics (
     city            VARCHAR(64) NOT NULL,
     crawl_date      DATE NOT NULL,
     brand_id        VARCHAR(32) NOT NULL,
-    place           VARCHAR(255),
+    place           VARCHAR(255) NOT NULL DEFAULT '',
     score           DECIMAL(4, 2),
     review_count    INT,
     avg_price       DECIMAL(10, 2),
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS dp_shop_metrics (
     shop_text       TEXT,
     source_url      VARCHAR(512),
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (shop_name, city, crawl_date)
+    PRIMARY KEY (shop_name, city, crawl_date, brand_id, place)
 );
 
 CREATE INDEX IF NOT EXISTS idx_dp_brand_date ON dp_shop_metrics(brand_id, crawl_date);

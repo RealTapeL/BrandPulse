@@ -3,7 +3,7 @@
  * 终态：success / failed；轮询间隔 2s，上限 60 次（2 分钟）后自动放弃。
  */
 import { defineStore } from 'pinia'
-import { executeAgent, getTask } from '../api/agent'
+import { executeAgent, getTask, listTasks } from '../api/agent'
 
 const POLL_INTERVAL = 2000
 const MAX_POLLS = 60
@@ -41,6 +41,11 @@ export const useAgentStore = defineStore('agent', {
         await new Promise((r) => setTimeout(r, POLL_INTERVAL))
       }
       throw new Error('任务轮询超时')
+    },
+    async loadHistory() {
+      const result = await listTasks({ size: 20 })
+      this.history = result.items || []
+      return this.history
     },
   },
 })

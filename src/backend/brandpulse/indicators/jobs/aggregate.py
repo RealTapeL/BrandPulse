@@ -1,5 +1,5 @@
 """
-指标聚合 job：从 brand_indicators_daily（门店/笔记级指标）按 mall+date 聚合，
+指标聚合 job：从 brand_indicators_daily 门店级指标按品牌+date 聚合，
 写入 indicators 表，为 GET /api/v1/indicators 提供时序数据。
 
 按采集数据集（brand_id）和商场维度聚合，保留采集链路的真实归属。
@@ -50,13 +50,15 @@ def aggregate(date: str | None = None) -> Dict[str, int]:
         with client.engine.connect() as conn:
             rows = conn.execute(
                 text("""
-                    SELECT brand_id, mall_name, city,
+                    SELECT brand_id,
                            AVG(weighted_score) AS reputation,
                            AVG(heat_index) AS heat,
                            AVG(sov) AS sov
                     FROM brand_indicators_daily
                     WHERE stat_date = :d
-                    GROUP BY brand_id, mall_name, city
+                      AND entity_type = 'shop'
+                      AND brand_id IS NOT NULL
+                    GROUP BY brand_id
                 """),
                 {"d": d},
             ).mappings().all()
@@ -73,7 +75,7 @@ def aggregate(date: str | None = None) -> Dict[str, int]:
         for r in rows:
             brand_id = r["brand_id"]
             if not brand_id:
-                logger.warning("[aggregate] %s/%s 缺少 brand_id，跳过", r["mall_name"], r["city"])
+                logger.warning("[aggregate] %s 缺少 brand_id，跳过", d)
                 continue
             for indicator, field in METRICS.items():
                 value = r[indicator]

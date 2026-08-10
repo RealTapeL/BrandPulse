@@ -37,6 +37,30 @@ const routes = [
     meta: { title: '指标公式管理' },
   },
   {
+    path: '/data-governance',
+    name: 'data-governance',
+    component: () => import('../views/DataGovernanceView.vue'),
+    meta: { title: '数据治理' },
+  },
+  {
+    path: '/ml/forecasting',
+    name: 'ml-forecasting',
+    component: () => import('../views/MLForecastingView.vue'),
+    meta: { title: '机器学习预测' },
+  },
+  {
+    path: '/monitoring',
+    name: 'monitoring',
+    component: () => import('../views/MonitoringView.vue'),
+    meta: { title: '自动监控与告警' },
+  },
+  {
+    path: '/reports',
+    name: 'reports',
+    component: () => import('../views/ReportsView.vue'),
+    meta: { title: '自动报告与导出' },
+  },
+  {
     path: '/brands',
     name: 'brands',
     component: () => import('../views/BrandList.vue'),

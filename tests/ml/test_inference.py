@@ -8,22 +8,16 @@ from src.ml.inference_service import app
 client = TestClient(app)
 
 
-def test_sentiment_mock_when_model_missing(monkeypatch):
+def test_sentiment_requires_deployed_model(monkeypatch):
     monkeypatch.setattr("src.ml.inference_service._load_sentiment", lambda: None)
     resp = client.post("/ml/sentiment", json={"texts": ["好喝"]})
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["model_loaded"] is False
-    assert len(data["predictions"]) == 1
+    assert resp.status_code == 503
 
 
-def test_ner_mock_when_model_missing(monkeypatch):
+def test_ner_requires_deployed_model(monkeypatch):
     monkeypatch.setattr("src.ml.inference_service._load_ner", lambda: None)
     resp = client.post("/ml/ner", json={"text": "星巴克在苏州中心"})
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["model_loaded"] is False
-    assert len(data["entities"]) == 1
+    assert resp.status_code == 503
 
 
 def test_health_reports_model_presence():

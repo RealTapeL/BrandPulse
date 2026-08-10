@@ -116,6 +116,10 @@ function formatTime(iso) {
 </script>
 
 <style scoped>
+.brand-table {
+  width: 100%;
+  min-width: 0;
+}
 .brand-cell {
   display: flex;
   align-items: center;
@@ -163,5 +167,21 @@ function formatTime(iso) {
   display: flex;
   justify-content: flex-end;
   margin-top: 14px;
+}
+
+@media (max-width: 767px) {
+  .pager {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .card-head {
+    align-items: flex-start;
+  }
+
+  .card-head :deep(.el-tag) {
+    flex-shrink: 0;
+  }
 }
 </style>

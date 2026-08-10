@@ -1,7 +1,14 @@
 <template>
-  <div class="brand-list-page">
+  <div class="page brand-list-page">
+    <div class="page-header">
+      <div>
+        <h2>品牌列表</h2>
+        <p class="desc">按品牌、品类和城市筛选已登记的真实品牌数据。</p>
+      </div>
+    </div>
+
     <!-- 搜索栏 -->
-    <div class="filter-bar">
+    <div class="filter-bar toolbar">
       <el-input
         v-model="store.query.q"
         class="filter-q"
@@ -96,21 +103,28 @@ function goDetail(row) {
 
 <style scoped>
 .brand-list-page {
-  padding: 20px;
+  min-width: 0;
 }
 .filter-bar {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
+  align-items: center;
 }
 .filter-q {
-  width: 260px;
+  width: min(360px, 100%);
+  flex: 1 1 240px;
 }
 .filter-select {
-  width: 130px;
+  width: 150px;
+  flex: 0 1 150px;
 }
 .error-bar {
   margin-bottom: 12px;
+}
+
+@media (max-width: 767px) {
+  .filter-q,
+  .filter-select {
+    width: 100%;
+    flex-basis: 100%;
+  }
 }
 </style>

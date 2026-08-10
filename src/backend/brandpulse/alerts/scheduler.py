@@ -9,7 +9,6 @@ from typing import Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from brandpulse.alerts.models import AlertCreate
 from brandpulse.alerts.sender import send
 from brandpulse.db_clients.postgres_client import PostgresClient
 from brandpulse.logger.logger import get_logger
@@ -21,21 +20,48 @@ _scheduler: Optional[BackgroundScheduler] = None
 
 def _fetch_metric_value(metric: str, brand_id: Optional[str]) -> Optional[float]:
     """
-    从 indicators 表取最新指标值。
-    brand_id 为空时按指标名取全局最新一条。
-    TODO: 接入品牌基础表后可按真实 brand_id 聚合。
+    从真实指标/原始经营数据表取最新值。
     """
-    sql = """
-        SELECT value
-        FROM indicators
+    indicator_sql = """
+        SELECT value FROM indicators
         WHERE indicator = :metric
-        ORDER BY date DESC
-        LIMIT 1
+          AND (:brand_id IS NULL OR brand_id = :brand_id)
+        ORDER BY date DESC LIMIT 1
     """
-    params = {"metric": metric}
-    if brand_id:
-        sql = sql.replace("WHERE indicator = :metric", "WHERE indicator = :metric AND brand_id = :brand_id")
-        params["brand_id"] = brand_id
+    raw_sql = """
+        SELECT SUM(review_count)::numeric AS value
+        FROM dp_shop_metrics
+        WHERE crawl_date = (SELECT MAX(crawl_date) FROM dp_shop_metrics)
+          AND (:brand_id IS NULL OR brand_id = :brand_id)
+    """
+    freshness_sql = """
+        SELECT EXTRACT(EPOCH FROM (
+            CURRENT_TIMESTAMP - MAX(crawl_date)::timestamp
+        )) / 3600.0 AS value
+        FROM dp_shop_metrics
+        WHERE (:brand_id IS NULL OR brand_id = :brand_id)
+    """
+    operation_sql = {
+        "rent_to_sales_ratio": """
+            SELECT AVG(rent_to_sales_ratio)::numeric FROM store_operations
+            WHERE record_date = (SELECT MAX(record_date) FROM store_operations)
+              AND (:brand_id IS NULL OR brand_id = :brand_id)
+        """,
+        "sales_per_sqm": """
+            SELECT AVG(sales_per_sqm)::numeric FROM store_operations
+            WHERE record_date = (SELECT MAX(record_date) FROM store_operations)
+              AND (:brand_id IS NULL OR brand_id = :brand_id)
+        """,
+    }
+    if metric == "review_count":
+        sql = raw_sql
+    elif metric == "data_freshness_hours":
+        sql = freshness_sql
+    elif metric in operation_sql:
+        sql = operation_sql[metric]
+    else:
+        sql = indicator_sql
+    params = {"metric": metric, "brand_id": brand_id}
 
     try:
         client = PostgresClient()

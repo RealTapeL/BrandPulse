@@ -45,3 +45,7 @@ logs/
 src/frontend/node_modules/
 src/frontend/dist/
 dump.rdb
+
+# 机器学习下载数据与二进制模型工件
+models/forecasting/
+!models/forecasting/.gitkeep

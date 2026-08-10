@@ -7,11 +7,11 @@ TODO: worker 执行后若需持久化原始 JSON 到 data/raw，可在 queue/wor
 """
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from brandpulse.collectors.jobs import CrawlJobEnqueueError, create_crawl_job as create_job
-from brandpulse.db_clients.postgres_client import PostgresClient
+from brandpulse.storage.crawl_job_repository import CrawlJobRepository
 
 router = APIRouter(prefix="/api/v1/crawl_jobs", tags=["crawl_jobs"])
 
@@ -29,6 +29,9 @@ class CrawlJobResponse(BaseModel):
     mall: str
     category: str
     status: str
+    rq_job_id: Optional[str] = None
+    started_at: Optional[str] = None
+    attempt_count: int = 0
     created_at: Optional[str] = None
     finished_at: Optional[str] = None
     result: Optional[str] = None
@@ -50,30 +53,27 @@ def create_crawl_job(payload: CrawlJobCreate):
         raise HTTPException(status_code=500, detail=f"创建任务失败: {exc}") from exc
 
 
+@router.get("", response_model=dict)
+def list_crawl_jobs(
+    brand_id: Optional[str] = Query(default=None, max_length=32),
+    status: Optional[str] = Query(default=None, max_length=32),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+):
+    """查询持久化采集任务，页面刷新后仍能恢复真实状态。"""
+    repository = CrawlJobRepository()
+    repository.recover_stale_pending()
+    return repository.list(
+        brand_id=brand_id, status=status, limit=size, offset=(page - 1) * size
+    )
+
+
 @router.get("/{job_id}", response_model=CrawlJobResponse)
 def get_crawl_job(job_id: str):
     """查询任务状态与结果。"""
-    sql = """
-        SELECT job_id, brand_id, mall, category, status, created_at, finished_at, result
-        FROM crawl_jobs WHERE job_id = :id
-    """
-    client = PostgresClient()
-    try:
-        result = client.execute(sql, {"id": job_id})
-        row = result.fetchone()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"查询任务失败: {e}") from e
-
+    repository = CrawlJobRepository()
+    repository.recover_stale_pending()
+    row = repository.get(job_id)
     if not row:
         raise HTTPException(status_code=404, detail="任务不存在")
-
-    return CrawlJobResponse(
-        job_id=row[0],
-        brand_id=row[1],
-        mall=row[2],
-        category=row[3],
-        status=row[4],
-        created_at=str(row[5]) if row[5] else None,
-        finished_at=str(row[6]) if row[6] else None,
-        result=row[7],
-    )
+    return CrawlJobResponse(**{key: row.get(key) for key in CrawlJobResponse.model_fields})

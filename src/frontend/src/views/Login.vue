@@ -61,7 +61,8 @@ const rules = {
 }
 
 async function submit() {
-  await formRef.value.validate().catch(() => Promise.reject())
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) return
   loading.value = true
   try {
     await userStore.login(form.username, form.password)
@@ -85,7 +86,7 @@ async function submit() {
   background: linear-gradient(135deg, #001529 0%, #0b2a4a 100%);
 }
 .login-card {
-  width: 380px;
+  width: min(380px, calc(100% - 32px));
   border: none;
 }
 .login-header {

@@ -3,7 +3,7 @@
  */
 import MockAdapter from 'axios-mock-adapter'
 import api from '../../../src/api'
-import { getBrands, getBrand, startCrawl } from '../../../src/api/brands'
+import { getBrands, getBrand, startCrawl, getCrawlJob } from '../../../src/api/brands'
 
 vi.mock('element-plus', () => ({ ElMessage: { error: vi.fn(), success: vi.fn() } }))
 
@@ -43,5 +43,11 @@ describe('api/brands', () => {
 
     const data = await startCrawl(7, { mall: '苏州中心', category: '咖啡', cities: ['苏州'] })
     expect(data.job_id).toBe('job-1')
+  })
+
+  it('getCrawlJob：查询真实采集任务状态', async () => {
+    mock.onGet('/v1/crawl_jobs/job-1').reply(200, { job_id: 'job-1', status: 'running' })
+    const data = await getCrawlJob('job-1')
+    expect(data.status).toBe('running')
   })
 })

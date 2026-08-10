@@ -3,9 +3,21 @@
     <div class="page-header">
       <h2>数据看板</h2>
       <p class="desc" v-if="data">
-        指标日期：{{ data.stat_date || '-' }}　·　点评采集日：{{ data.crawl_date || '-' }}　·　数据范围：苏州中心 · 咖啡品类
+        指标日期：{{ data.stat_date || '-' }}　·　点评采集日：{{ data.crawl_date || '-' }}　·　数据范围：{{ scopeLabel(data.scope) }}
       </p>
     </div>
+
+    <el-card shadow="never" class="scope-card">
+      <div class="scope-bar">
+        <span class="scope-label">监测项目 / 品类</span>
+        <el-select v-model="scopeId" :loading="scopesLoading" class="scope-select" @change="load">
+          <el-option v-for="scope in scopes" :key="scope.scope_id" :label="scopeLabel(scope)" :value="scope.scope_id" />
+        </el-select>
+        <span v-if="data?.scope" class="scope-meta">
+          来源：{{ data.scope.data_origin }} · 指标 {{ data.scope.latest_indicator_date || '未生成' }}
+        </span>
+      </div>
+    </el-card>
 
     <!-- 加载态 -->
     <el-card v-if="loading" shadow="never">
@@ -16,7 +28,7 @@
     <el-card v-else-if="error" shadow="never">
       <el-result icon="error" title="看板数据加载失败" :sub-title="error">
         <template #extra>
-          <el-button type="primary" :loading="loading" @click="load">重新加载</el-button>
+          <el-button type="primary" :loading="loading" @click="reload">重新加载</el-button>
         </template>
       </el-result>
     </el-card>
@@ -39,7 +51,8 @@
       <!-- 指标口径说明 -->
       <h3 class="section-title">指标口径说明</h3>
       <el-card shadow="never">
-        <el-table :data="metricDocs" border stripe>
+        <div class="table-scroll">
+          <el-table :data="metricDocs" border stripe>
           <el-table-column label="指标" width="140">
             <template #default="{ row }">
               <el-link type="primary" underline="never" @click="scrollToChart(row.anchor)">
@@ -49,7 +62,8 @@
           </el-table-column>
           <el-table-column prop="method" label="计算方法" min-width="300" />
           <el-table-column prop="meaning" label="解读" min-width="320" />
-        </el-table>
+          </el-table>
+        </div>
       </el-card>
 
       <template v-if="data.indicators.length">
@@ -102,8 +116,9 @@
       <!-- 明细表 -->
       <h3 class="section-title">大众点评门店明细</h3>
       <el-card shadow="never">
-        <el-table :data="data.dp_shops" border stripe max-height="420"
-                  :empty-text="'暂无门店数据'">
+        <div class="table-scroll">
+          <el-table :data="data.dp_shops" border stripe max-height="420"
+                    :empty-text="'暂无门店数据'">
           <el-table-column prop="shop_name" label="门店" min-width="220" show-overflow-tooltip />
           <el-table-column prop="score" label="评分" width="90" sortable />
           <el-table-column prop="review_count" label="评价数" width="100" sortable />
@@ -114,20 +129,23 @@
           <el-table-column label="位置" min-width="150" show-overflow-tooltip>
             <template #default="{ row }">{{ row.place || '-' }}</template>
           </el-table-column>
-        </el-table>
+          </el-table>
+        </div>
       </el-card>
 
       <h3 class="section-title">小红书笔记明细（按点赞降序）</h3>
       <el-card shadow="never">
-        <el-table :data="data.xhs_notes" border stripe max-height="420"
-                  :empty-text="'暂无笔记数据'">
+        <div class="table-scroll">
+          <el-table :data="data.xhs_notes" border stripe max-height="420"
+                    :empty-text="'暂无笔记数据'">
           <el-table-column prop="title" label="标题" min-width="300" show-overflow-tooltip />
           <el-table-column prop="author_name" label="作者" width="140" />
           <el-table-column prop="likes" label="点赞" width="90" sortable />
           <el-table-column label="发布时间" width="150">
             <template #default="{ row }">{{ row.publish_time || '-' }}</template>
           </el-table-column>
-        </el-table>
+          </el-table>
+        </div>
       </el-card>
     </template>
   </div>
@@ -136,7 +154,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import EChart from '../components/EChart.vue'
-import { fetchDashboard } from '../api/dashboard'
+import { fetchDashboard, fetchDashboardScopes } from '../api/dashboard'
 import {
   buildQuadrantOption,
   buildScoreOption,
@@ -166,7 +184,7 @@ const metricDocs = [
     name: 'SOV 声量份额',
     anchor: ANCHOR.sov,
     method: '门店评价数 ÷ 同商场总评价数',
-    meaning: '衡量门店在苏州中心咖啡品类中的声量占比（0~1）',
+    meaning: '衡量门店在当前项目/品类范围内的声量占比（0~1）',
   },
   {
     name: '四象限图',
@@ -177,6 +195,9 @@ const metricDocs = [
 ]
 
 const data = ref(null)
+const scopes = ref([])
+const scopeId = ref('')
+const scopesLoading = ref(false)
 const loading = ref(false)
 const error = ref('')
 
@@ -184,7 +205,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    data.value = await fetchDashboard()
+    data.value = await fetchDashboard(scopeId.value)
   } catch (e) {
     error.value = String(e.message || e)
   } finally {
@@ -192,7 +213,34 @@ async function load() {
   }
 }
 
-onMounted(load)
+async function loadScopes() {
+  scopesLoading.value = true
+  try {
+    const result = await fetchDashboardScopes()
+    scopes.value = result.items || []
+    if (!scopeId.value && scopes.value.length) {
+      scopeId.value = scopes.value.find((item) => item.latest_indicator_date)?.scope_id || scopes.value[0].scope_id
+    }
+  } catch (e) {
+    error.value = String(e.message || e)
+  } finally {
+    scopesLoading.value = false
+  }
+}
+
+async function reload() {
+  await loadScopes()
+  if (!error.value) await load()
+}
+
+function scopeLabel(scope) {
+  if (!scope) return '未选择范围'
+  return `${scope.city || '-'} · ${scope.mall_name || '-'} · ${scope.category || '-'}`
+}
+
+onMounted(async () => {
+  await reload()
+})
 
 const kpis = computed(() => {
   const d = data.value
@@ -209,12 +257,12 @@ const kpis = computed(() => {
   ]
 })
 
-const quadrantOption = computed(() => buildQuadrantOption(data.value.indicators))
-const scoreOption = computed(() => buildScoreOption(data.value.dp_shops))
-const womOption = computed(() => buildWomOption(data.value.indicators))
-const heatOption = computed(() => buildHeatOption(data.value.indicators))
-const sovOption = computed(() => buildSovOption(data.value.indicators))
-const xhsOption = computed(() => buildXhsOption(data.value.xhs_notes))
+const quadrantOption = computed(() => buildQuadrantOption(data.value?.indicators || []))
+const scoreOption = computed(() => buildScoreOption(data.value?.dp_shops || []))
+const womOption = computed(() => buildWomOption(data.value?.indicators || []))
+const heatOption = computed(() => buildHeatOption(data.value?.indicators || []))
+const sovOption = computed(() => buildSovOption(data.value?.indicators || []))
+const xhsOption = computed(() => buildXhsOption(data.value?.xhs_notes || []))
 
 function scrollToChart(id) {
   const el = document.getElementById(id)
@@ -225,6 +273,27 @@ function scrollToChart(id) {
 <style scoped>
 .kpi-row {
   margin-bottom: 4px;
+}
+.scope-card {
+  margin-bottom: 16px;
+}
+.scope-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.scope-label {
+  font-weight: 600;
+}
+.scope-select {
+  width: min(320px, 100%);
+  flex: 1 1 280px;
+  max-width: 420px;
+}
+.scope-meta {
+  color: #909399;
+  font-size: 12px;
 }
 .kpi-card {
   margin-bottom: 16px;
@@ -266,5 +335,20 @@ function scrollToChart(id) {
 }
 .el-row .el-card {
   margin-bottom: 16px;
+}
+
+@media (max-width: 767px) {
+  .scope-select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .kpi-value {
+    font-size: 22px;
+  }
+
+  .scope-meta {
+    width: 100%;
+  }
 }
 </style>

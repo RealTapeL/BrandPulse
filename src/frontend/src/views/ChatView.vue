@@ -192,7 +192,7 @@ function formatTime(t) {
 
 <style scoped>
 .chat-page {
-  padding: 16px 20px;
+  padding: var(--bp-space-4) var(--bp-space-5) 28px;
   max-width: 1000px;
   width: 100%;
   margin: 0 auto;
@@ -349,5 +349,37 @@ function formatTime(t) {
   padding: 14px 16px;
   border-top: 1px solid #e4e7ed;
   align-items: flex-end;
+}
+
+@media (max-width: 767px) {
+  .chat-page {
+    padding: var(--bp-space-4) var(--bp-space-3) 16px;
+  }
+
+  .chat-header {
+    align-items: stretch;
+  }
+
+  .chat-header > .el-button {
+    align-self: flex-end;
+  }
+
+  .msg-list {
+    padding: 16px 12px;
+  }
+
+  .bubble {
+    max-width: calc(100% - 44px);
+  }
+
+  .input-area {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+  }
+
+  .input-area > .el-button {
+    width: 100%;
+  }
 }
 </style>

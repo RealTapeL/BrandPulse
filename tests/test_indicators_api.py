@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from brandpulse.api import indicators
 from brandpulse.api.app import app
 from brandpulse.indicators.jobs.aggregate import aggregate
+from tests.conftest import AUTH_HEADERS
 
 
 class FakeResult:
@@ -41,7 +42,7 @@ class FakePostgresClient:
 def test_indicators_api_returns_series(monkeypatch):
     monkeypatch.setattr(indicators, "PostgresClient", FakePostgresClient)
 
-    c = TestClient(app)
+    c = TestClient(app, headers=AUTH_HEADERS)
     resp = c.get("/api/v1/indicators?brand_id=MALL:苏州中心:苏州&indicator=heat")
     assert resp.status_code == 200
     data = resp.json()
@@ -53,7 +54,7 @@ def test_indicators_api_returns_series(monkeypatch):
 def test_indicators_api_default_params(monkeypatch):
     monkeypatch.setattr(indicators, "PostgresClient", FakePostgresClient)
 
-    c = TestClient(app)
+    c = TestClient(app, headers=AUTH_HEADERS)
     resp = c.get("/api/v1/indicators?brand_id=MALL_906d5b65&indicator=heat")
     assert resp.status_code == 200
     data = resp.json()

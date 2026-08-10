@@ -2,7 +2,7 @@
 BrandPulse 主入口
 
 # 测试数据库连接
-python main.py test
+python main.py test。
 
 # 商场×品类采集（大众点评 + 小红书同步跑）
 python src/backend/main.py crawl --mall 苏州中心 --category 咖啡 --cities 苏州
@@ -44,7 +44,13 @@ def _make_mall_search_id(mall: str, category: str, city: str) -> str:
     return f"MALL_{digest}"
 
 
-def run_mall_crawl(mall: str, category: str, city: str = "") -> dict:
+def run_mall_crawl(
+    mall: str,
+    category: str,
+    city: str = "",
+    brand_id: str | None = None,
+    brand_name: str | None = None,
+) -> dict:
     """
     商场×品类全平台采集（大众点评 + 小红书），CLI crawl 分支与 Agent 工具共用。
 
@@ -56,9 +62,23 @@ def run_mall_crawl(mall: str, category: str, city: str = "") -> dict:
         run_from_config,
     )
 
-    # 商场 + 品类搜索模式：各平台 extractor 会自行拼接 mall / city 关键词
-    brand_name = category
-    brand_id = _make_mall_search_id(mall, category, city)
+    # MALL_* 是商场 × 品类搜索范围的数据集 ID，不是 brands 表中的品牌 ID。
+    # 通过 API/定时计划再次采集该范围时必须沿用它，否则会产生第二个范围；
+    # 同时不能把它送进 BrandRepository 做品牌主数据校验。
+    is_mall_scope = not brand_id or brand_id.startswith("MALL_")
+    if not is_mall_scope:
+        if not brand_name:
+            from brandpulse.storage.pg_repository import BrandRepository
+
+            brand = BrandRepository().get_brand(brand_id)
+            brand_name = (brand or {}).get("brand_name_cn")
+        if not brand_name:
+            raise ValueError(f"品牌 {brand_id} 不存在或缺少中文名称，无法执行真实品牌采集")
+    else:
+        # 商场 + 品类搜索模式：各平台 extractor 会自行拼接 mall / city 关键词。
+        # 已有 MALL_* 时保留该 ID，首次 CLI 搜索时才创建稳定 ID。
+        brand_name = category
+        brand_id = brand_id or _make_mall_search_id(mall, category, city)
     place = mall
     logger.info(f"商场级搜索: {mall} {category}, brand_id={brand_id}")
 
@@ -70,21 +90,67 @@ def run_mall_crawl(mall: str, category: str, city: str = "") -> dict:
     logger.info(f"自动执行 {len(site_ids)} 个已启用站点: {site_ids}")
 
     results = {}
+    source_results = {}
     for site_id in site_ids:
         logger.info(f"[{site_id}] 开始采集")
-        results[site_id] = run_from_config(
-            site_id=site_id,
-            brand_id=brand_id,
-            brand_name=brand_name,
-            city=city,
-            place=place,
-        )
+        try:
+            result = run_from_config(
+                site_id=site_id,
+                brand_id=brand_id,
+                brand_name=brand_name,
+                city=city,
+                place=place,
+            )
+            results[site_id] = result
+            record_count = len(result.get("records") or [])
+            source_results[site_id] = {
+                "status": "success" if record_count else "empty",
+                "record_count": record_count,
+                "raw_saved": int(result.get("raw_saved") or 0),
+                "heat_saved": int(result.get("heat_saved") or 0),
+                "cached": int(result.get("cached") or 0),
+            }
+            if not record_count:
+                logger.warning("[%s] 来源返回空结果，本次不视为该来源成功", site_id)
+        except Exception as exc:
+            # 一个来源故障不能抹掉同一批次其它来源已取得的真实记录；
+            # 但要把失败原因写入任务结果，让页面和调度计划可见。
+            source_results[site_id] = {
+                "status": "failed",
+                "record_count": 0,
+                "raw_saved": 0,
+                "heat_saved": 0,
+                "cached": 0,
+                "error": str(exc),
+            }
+            logger.exception("[%s] 来源采集失败，继续处理其它来源", site_id)
+
+    # 采集结束后执行一次全量治理扫描，把未匹配、越界和重复问题写入治理台账。
+    # 扫描只生成问题，不会把无法确认的外部记录强行归属到品牌或门店。
+    from brandpulse.data_governance.service import DataGovernanceService
+
+    try:
+        quality = DataGovernanceService().scan(trigger_type="crawl")
+    except Exception as exc:
+        logger.exception("采集完成，但数据治理扫描失败")
+        quality = {"status": "failed", "error": str(exc)}
+
+    raw_saved = sum(result.get("raw_saved", 0) for result in results.values())
+    indicator_stats = {}
+    if raw_saved:
+        # 采集成功后立即刷新同一真实数据快照的指标，避免看板长期停留在旧日期。
+        from brandpulse.indicators.pipeline import run as run_indicators
+
+        indicator_stats = run_indicators()
 
     return {
-        "sites": list(results.keys()),
-        "raw": sum(r.get("raw_saved", 0) for r in results.values()),
+        "sites": site_ids,
+        "source_results": source_results,
+        "raw": raw_saved,
         "heat": sum(r.get("heat_saved", 0) for r in results.values()),
         "cached": sum(r.get("cached", 0) for r in results.values()),
+        "quality": quality,
+        "indicators": indicator_stats,
     }
 
 
@@ -145,6 +211,14 @@ def main():
 
         # 2. 保存到 PostgreSQL
         stats = stage1_save_stores.run(stores_by_brand)
+        from brandpulse.data_governance.service import DataGovernanceService
+
+        try:
+            quality = DataGovernanceService().scan(trigger_type="stage1")
+        except Exception as exc:
+            logger.exception("门店入库完成，但数据治理扫描失败")
+            quality = {"status": "failed", "error": str(exc)}
+        stats["quality"] = quality
         logger.info(f"数据保存完成: {stats}")
 
     elif args.command == "crawl":
@@ -161,7 +235,7 @@ def main():
         )
         print(f"执行站点: {stats['sites']}")
         print(f"原始表: {stats['raw']}, 热度聚合: {stats['heat']}, JSON 缓存: {stats['cached']}")
-        print("下一步: python src/backend/main.py indicators  # 刷新指标后看板自动更新")
+        print("指标已随本次真实采集自动刷新，看板将读取新的数据日期")
         print("看板入口: http://192.168.0.109:8000/  (Vue3 看板)")
 
     elif args.command == "indicators":

@@ -81,6 +81,7 @@ def compute_momentum(stat_date: Optional[str] = None) -> List[Dict]:
             "mall_name": row["mall_name"],
             "entity_type": row["entity_type"],
             "entity_name": row["entity_name"],
+            "brand_id": row["brand_id"],
             "wow_momentum": round(wow, 4) if wow is not None else None,
             "volatility": round(vol, 4) if vol is not None else None,
             "detail": {
