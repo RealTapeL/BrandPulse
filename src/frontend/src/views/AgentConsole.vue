@@ -3,6 +3,18 @@
     <!-- 指令输入区 -->
     <el-card shadow="never" class="section">
       <template #header>Agent 控制台</template>
+      <div class="reach-status">
+        <div>
+          <div class="block-title">外部公开信息研究</div>
+          <div class="hint">Agent-Reach 只用于网页研究，不会写入 BrandPulse 指标表。</div>
+        </div>
+        <div class="reach-status-actions">
+          <el-tag v-if="reachStatus" :type="reachStatusType(reachStatus.status)" size="small">
+            {{ reachStatusText(reachStatus.status) }}
+          </el-tag>
+          <el-button size="small" :loading="reachLoading" @click="loadReachStatus">检查状态</el-button>
+        </div>
+      </div>
       <el-input
         v-model="prompt"
         type="textarea"
@@ -94,18 +106,30 @@
  * TODO: 后端就绪后，轮询可替换为 WebSocket / SSE 实时推送。
  */
 import { onMounted, ref } from 'vue'
+import { getExternalResearchStatus } from '../api/agent'
 import { useAgentStore } from '../stores/agent'
 
 const store = useAgentStore()
 const prompt = ref('')
 const contextText = ref('')
 const contextError = ref('')
+const reachStatus = ref(null)
+const reachLoading = ref(false)
 
 onMounted(() => {
-  store.loadHistory().catch(() => {
+  Promise.all([store.loadHistory(), loadReachStatus()]).catch(() => {
     // 历史任务加载失败不影响新任务提交，统一由请求拦截器处理认证错误。
   })
 })
+
+async function loadReachStatus() {
+  reachLoading.value = true
+  try {
+    reachStatus.value = await getExternalResearchStatus()
+  } finally {
+    reachLoading.value = false
+  }
+}
 
 function parseContext() {
   contextError.value = ''
@@ -131,6 +155,14 @@ function statusType(s) {
 function statusText(s) {
   return { success: '成功', running: '运行中', pending: '排队中', failed: '失败' }[s] || s
 }
+
+function reachStatusType(status) {
+  return { ready: 'success', disabled: 'info', not_installed: 'warning', error: 'danger' }[status] || 'info'
+}
+
+function reachStatusText(status) {
+  return { ready: '已就绪', disabled: '已关闭', not_installed: '未安装', error: '检查失败' }[status] || '未知'
+}
 </script>
 
 <style scoped>
@@ -155,6 +187,23 @@ function statusText(s) {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.reach-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.reach-status-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 .hint {
   color: #909399;
@@ -197,6 +246,16 @@ function statusText(s) {
   .actions {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .reach-status {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .reach-status-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 </style>

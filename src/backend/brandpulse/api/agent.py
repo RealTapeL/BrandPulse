@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from brandpulse.agent.queue import AgentTaskEnqueueError, enqueue_agent
+from brandpulse.agent.agent_reach import get_status
 from brandpulse.storage.agent_task_repository import AgentTaskRepository
 
 router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
@@ -13,6 +14,12 @@ router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
 class AgentExecuteRequest(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=4000)
     context: Dict[str, Any] = Field(default_factory=dict)
+
+
+@router.get("/external/status")
+def external_research_status():
+    """返回 Agent-Reach 外部研究能力状态，不包含 Cookie/Token 等凭据。"""
+    return get_status()
 
 
 @router.post("/execute")

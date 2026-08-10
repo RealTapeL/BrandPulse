@@ -10,6 +10,7 @@ def test_list_tools_returns_metadata():
     assert "run_sql" in names
     assert "start_crawl" in names
     assert "query_brand" in names
+    assert "external_research" in names
     assert all("input_schema" in t for t in tools)
 
 

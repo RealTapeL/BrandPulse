@@ -69,3 +69,13 @@ def test_agent_task_history_can_be_listed():
     response = client.get("/api/v1/agent/tasks", params={"size": 10})
     assert response.status_code == 200
     assert "items" in response.json()
+
+
+def test_agent_external_research_status_is_protected():
+    client = TestClient(app, headers=AUTH_HEADERS)
+    response = client.get("/api/v1/agent/external/status")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data["enabled"], bool)
+    assert data["status"] in {"disabled", "not_installed", "ready", "error", "unknown"}
+    assert "token" not in data

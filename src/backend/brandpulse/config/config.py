@@ -77,6 +77,13 @@ class Config:
     TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
     TAVILY_BASE_URL = os.getenv("TAVILY_BASE_URL", "https://api.tavily.com/search")
 
+    # Agent-Reach 外部研究能力。默认关闭，不替代 BrandPulse 真实数据采集链路。
+    AGENT_REACH_ENABLED = os.getenv("AGENT_REACH_ENABLED", "false").lower() in {"1", "true", "yes"}
+    AGENT_REACH_COMMAND = os.getenv("AGENT_REACH_COMMAND", "agent-reach")
+    AGENT_REACH_SEARCH_COMMAND = os.getenv("AGENT_REACH_SEARCH_COMMAND", "mcporter")
+    AGENT_REACH_TIMEOUT_SECONDS = int(os.getenv("AGENT_REACH_TIMEOUT_SECONDS", "30"))
+    AGENT_REACH_MAX_RESPONSE_CHARS = int(os.getenv("AGENT_REACH_MAX_RESPONSE_CHARS", "12000"))
+
     # 项目路径
     DATA_DIR = PROJECT_ROOT / "data"
     RAW_DIR = DATA_DIR / "raw"

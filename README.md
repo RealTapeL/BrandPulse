@@ -222,6 +222,7 @@ CLI 操作：
 | `start_crawl` | 把采集任务入队 RQ，返回 job_id |
 | `run_indicators` | 调用指标管道，刷新当日指标 |
 | `crawl` | 驱动浏览器采集指定商场 × 品类数据（约 40 秒） |
+| `external_research` | 可选 Agent-Reach：读取/搜索公开网页，不写入 BrandPulse 指标表 |
 
 ```bash
 .venv/bin/python src/backend/main.py agent                          # 交互式多轮对话
@@ -229,6 +230,18 @@ CLI 操作：
 ```
 
 需在 `.env` 中配置 `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL`（OpenAI 兼容接口）。
+
+### Agent-Reach 外部研究（可选）
+
+Agent-Reach 只作为 Agent 的公开互联网研究能力，不替代 BrandPulse 的真实数据采集、数据治理和指标计算链路。默认关闭；启用前请先在独立环境安装并诊断：
+
+```bash
+pipx install https://github.com/Panniantong/agent-reach/archive/main.zip
+agent-reach install --env=auto       # 只检查依赖，不修改系统
+agent-reach doctor --json
+```
+
+确认依赖和权限后，在项目 `.env` 设置 `AGENT_REACH_ENABLED=true`。外部网页读取使用公开 Jina Reader，搜索使用已配置的 Agent-Reach/Exa `mcporter` 后端；请求有超时和长度限制，不接收或保存 Cookie、Token、密码。需要登录态的平台应使用专用账号，并遵守对应平台规则。
 
 ## 数据模型
 
@@ -253,7 +266,6 @@ npm run cypress     # e2e 1 项
 ## 当前开发分支
 
 - `develop`：集成主线
-- `feat/collectors-20260730`：本次 backend 工程能力分支（A/B/C/D/F/G/E/H）
 
 ## 分支约定
 

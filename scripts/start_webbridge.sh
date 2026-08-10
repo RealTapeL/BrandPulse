@@ -15,7 +15,13 @@ if pgrep -f "kimi-webbridge mcp" > /dev/null; then
     exit 0
 fi
 
-nohup npx -y kimi-webbridge mcp > "$LOG_DIR/webbridge.log" 2>&1 &
+if command -v setsid >/dev/null 2>&1; then
+    # 与 start_all.sh 保持一致：让 WebBridge 脱离当前终端的会话，
+    # 避免脚本退出后 npm/npx 子进程收到挂断信号而消失。
+    setsid npx -y kimi-webbridge mcp > "$LOG_DIR/webbridge.log" 2>&1 < /dev/null &
+else
+    nohup npx -y kimi-webbridge mcp > "$LOG_DIR/webbridge.log" 2>&1 < /dev/null &
+fi
 sleep 8
 echo "WebBridge MCP 状态:"
 grep -E "WebSocket|状态" "$LOG_DIR/webbridge.log" | head -2

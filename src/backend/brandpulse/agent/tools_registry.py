@@ -3,7 +3,7 @@ Agent Tool 统一注册表。
 
 把底层能力函数包装为 Tool 标准接口，供 LLM Agent、调试脚本、前端 /agent/console 调用。
 """
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -42,6 +42,15 @@ class CrawlInput(BaseModel):
     mall: str = Field(..., description="商场名")
     category: str = Field(..., description="品类")
     cities: str = Field(default="苏州", description="城市，逗号分隔")
+
+
+class ExternalResearchInput(BaseModel):
+    mode: Literal["status", "read_url", "search"] = Field(
+        default="status", description="status 查看状态；read_url 读取公开网页；search 搜索公开网页"
+    )
+    url: Optional[str] = Field(default=None, description="公开网页 URL，仅 read_url 使用")
+    query: Optional[str] = Field(default=None, description="公开网页搜索词，仅 search 使用")
+    limit: int = Field(default=5, ge=1, le=10, description="搜索结果数量，最多 10 条")
 
 
 def _query_brand(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -106,6 +115,17 @@ def _crawl(args: Dict[str, Any]) -> Dict[str, Any]:
     return {"success": "失败" not in output, "result": output, "error": output if "失败" in output else None, "meta": {}}
 
 
+def _external_research(args: Dict[str, Any]) -> Dict[str, Any]:
+    output = legacy_tools.external_research(
+        mode=args.get("mode", "status"),
+        url=args.get("url"),
+        query=args.get("query"),
+        limit=args.get("limit", 5),
+    )
+    failed = output.startswith(("外部网页读取失败", "外部搜索失败", "外部研究失败"))
+    return {"success": not failed, "result": output if not failed else None, "error": output if failed else None, "meta": {}}
+
+
 # 统一注册表
 REGISTRY: Dict[str, FunctionTool] = {
     "query_brand": FunctionTool("query_brand", "查询品牌基础信息", _query_brand, QueryBrandInput),
@@ -114,6 +134,12 @@ REGISTRY: Dict[str, FunctionTool] = {
     "list_tables": FunctionTool("list_tables", "列出数据库主要业务表结构", _list_tables, ListTablesInput),
     "run_indicators": FunctionTool("run_indicators", "刷新口碑/热度/SOV/趋势指标", _run_indicators, RunIndicatorsInput),
     "crawl": FunctionTool("crawl", "同步驱动浏览器采集（耗时约 40 秒）", _crawl, CrawlInput),
+    "external_research": FunctionTool(
+        "external_research",
+        "通过可选 Agent-Reach 读取或搜索公开网页，不写入指标表",
+        _external_research,
+        ExternalResearchInput,
+    ),
 }
 
 

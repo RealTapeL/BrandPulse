@@ -5,7 +5,7 @@ BrandPulse Agent 工具集
 所有工具返回 str，方便 LLM 直接阅读。
 """
 import re
-from typing import Optional
+from typing import Literal, Optional
 
 from brandpulse.db_clients.postgres_client import PostgresClient
 from brandpulse.logger.logger import get_logger
@@ -198,3 +198,31 @@ def list_tables() -> str:
         nullable = "可空" if is_nullable == "YES" else "非空"
         lines.append(f"  - {column_name} ({data_type}, {nullable})")
     return "\n".join(lines).strip()
+
+
+def external_research(
+    mode: Literal["status", "read_url", "search"] = "status",
+    url: Optional[str] = None,
+    query: Optional[str] = None,
+    limit: int = 5,
+) -> str:
+    """读取公开外部信息，不写入 BrandPulse 指标表。
+
+    Agent-Reach 未启用或上游依赖不可用时返回明确原因；Cookie、Token 和
+    账号登录态不由本工具接收或保存。
+    """
+    from brandpulse.agent.agent_reach import get_status, read_public_url, search_public_web
+
+    if mode == "status":
+        import json
+
+        return json.dumps(get_status(), ensure_ascii=False, indent=2)
+    if mode == "read_url":
+        if not url:
+            return "外部网页读取失败：url 不能为空"
+        return read_public_url(url)
+    if mode == "search":
+        if not query:
+            return "外部搜索失败：query 不能为空"
+        return search_public_web(query, limit)
+    return f"外部研究失败：不支持的 mode={mode}"

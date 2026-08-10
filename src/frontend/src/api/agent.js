@@ -16,3 +16,7 @@ export function getTask(id) {
 export function listTasks(params = {}) {
   return api.get('/v1/agent/tasks', { params }).then((r) => r.data)
 }
+
+export function getExternalResearchStatus() {
+  return api.get('/v1/agent/external/status').then((r) => r.data)
+}
