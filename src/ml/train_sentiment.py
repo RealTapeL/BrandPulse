@@ -7,6 +7,7 @@
     PYTHONPATH=src/backend src/ml/train_sentiment.py --epochs 1 --output_dir models/sentiment/v1
 """
 import argparse
+import csv
 import json
 from pathlib import Path
 
@@ -19,14 +20,16 @@ DEFAULT_MODEL = "uer/roberta-base-finetuned-chinanews-chinese"  # 中文分类�
 
 def load_csv(path: Path):
     texts, labels = [], []
-    with path.open(encoding="utf-8") as f:
-        header = f.readline()
-        for line in f:
-            if not line.strip():
+    with path.open(encoding="utf-8", newline="") as f:
+        for row in csv.DictReader(f):
+            text = (row.get("text") or "").strip()
+            label = (row.get("label") or "").strip()
+            if not text:
                 continue
-            text, label = line.rsplit(",", 1)
-            texts.append(text.strip('"'))
-            labels.append(LABELS.index(label.strip()))
+            if label not in LABELS:
+                raise ValueError(f"不支持的情感标签: {label}")
+            texts.append(text)
+            labels.append(LABELS.index(label))
     return texts, labels
 
 

@@ -6,7 +6,7 @@
     PYTHONPATH=src/backend src/ml/train_ner.py --epochs 1 --output_dir models/ner/v1
 """
 import argparse
-import ast
+import csv
 import json
 from pathlib import Path
 
@@ -20,15 +20,17 @@ DEFAULT_MODEL = "uer/roberta-base-finetuned-chinanews-chinese"
 
 def load_csv(path: Path):
     texts, entities_list = [], []
-    with path.open(encoding="utf-8") as f:
-        header = f.readline()
-        for line in f:
-            if not line.strip():
+    with path.open(encoding="utf-8", newline="") as f:
+        for row in csv.DictReader(f):
+            text = (row.get("text") or "").strip()
+            entities_json = (row.get("entities") or "").strip()
+            if not text:
                 continue
-            # 简单按最后一个逗号切分；entities 是 JSON 字符串
-            text, entities_json = line.rsplit(",", 1)
-            texts.append(text.strip('"'))
-            entities_list.append(ast.literal_eval(entities_json.strip()))
+            entities = json.loads(entities_json)
+            if not isinstance(entities, list):
+                raise ValueError("entities 必须是 JSON 数组")
+            texts.append(text)
+            entities_list.append(entities)
     return texts, entities_list
 
 
@@ -63,7 +65,7 @@ class NerDataset(torch.utils.data.Dataset):
         return len(self.labels)
 
     def __getitem__(self, idx):
-        item = {k: torch.tensor(self.encodings[idx][k][0]) for k in self.encodings[idx]}
+        item = {k: torch.tensor(self.encodings[idx][k]) for k in self.encodings[idx]}
         item["labels"] = torch.tensor(self.labels[idx])
         return item
 

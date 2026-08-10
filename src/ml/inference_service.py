@@ -24,6 +24,21 @@ _sentiment_pipe = None
 _ner_pipe = None
 
 
+def _json_safe(value):
+    """将 Transformers/Numpy 推理结果转换为 FastAPI 可序列化的基础类型。"""
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    item_method = getattr(value, "item", None)
+    if callable(item_method):
+        try:
+            return item_method()
+        except (TypeError, ValueError):
+            pass
+    return value
+
+
 def _load_sentiment():
     global _sentiment_pipe
     if _sentiment_pipe is not None:
@@ -73,7 +88,7 @@ def sentiment(req: SentimentRequest):
     pipe = _load_sentiment()
     if pipe is None:
         raise HTTPException(status_code=503, detail="情感模型未部署，请先训练并部署 models/sentiment/v1")
-    predictions = pipe(req.texts)
+    predictions = _json_safe(pipe(req.texts))
     return SentimentResponse(predictions=predictions, model_loaded=True)
 
 
@@ -83,7 +98,7 @@ def ner(req: NerRequest):
     if result is None:
         raise HTTPException(status_code=503, detail="NER 模型未部署，请先训练并部署 models/ner/v1")
     pipe, _ = result
-    entities = pipe(req.text)
+    entities = _json_safe(pipe(req.text))
     return NerResponse(entities=entities, model_loaded=True)
 
 

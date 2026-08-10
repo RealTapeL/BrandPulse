@@ -1,4 +1,4 @@
 text,entities
-"瑞幸咖啡在苏州中心开了一家新店","[{"word": "瑞幸咖啡", "label": "BRAND"}, {"word": "苏州中心", "label": "MALL"}]"
-"星巴克臻选位于东方之门附近","[{"word": "星巴克臻选", "label": "BRAND"}, {"word": "东方之门", "label": "MALL"}]"
-"Manner Coffee 在苏州中心二店","[{"word": "Manner Coffee", "label": "BRAND"}, {"word": "苏州中心", "label": "MALL"}]"
+"瑞幸咖啡在苏州中心开了一家新店","[{""word"": ""瑞幸咖啡"", ""label"": ""BRAND""}, {""word"": ""苏州中心"", ""label"": ""MALL""}]"
+"星巴克臻选位于东方之门附近","[{""word"": ""星巴克臻选"", ""label"": ""BRAND""}, {""word"": ""东方之门"", ""label"": ""MALL""}]"
+"Manner Coffee 在苏州中心二店","[{""word"": ""Manner Coffee"", ""label"": ""BRAND""}, {""word"": ""苏州中心"", ""label"": ""MALL""}]"

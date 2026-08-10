@@ -49,3 +49,6 @@ dump.rdb
 # 机器学习下载数据与二进制模型工件
 models/forecasting/
 !models/forecasting/.gitkeep
+# Transformer 情感/NER 模型工件体积较大，由部署环境按真实标注数据训练生成
+models/sentiment/
+models/ner/
