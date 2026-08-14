@@ -19,6 +19,7 @@
 - 复杂站点：在 collectors/extractors/ 下写 Python 插件，在 yaml 的 extractor 字段指定
 """
 import importlib
+import hashlib
 import random
 import time
 from datetime import datetime
@@ -333,6 +334,9 @@ def _save_raw_records(
     brand_id: str,
     city: Optional[str],
     crawl_date: str,
+    run_id: str,
+    crawl_job_id: Optional[str] = None,
+    scope_id: Optional[str] = None,
 ) -> int:
     """
     把爬虫原始结果写入对应的原始数据表（维度表/原始表分层架构）。
@@ -370,7 +374,22 @@ def _save_raw_records(
                 "keyword": r.get("keyword"),
                 "crawl_date": crawl_date,
             }
-            if repo.upsert_note(note):
+            lineage = {
+                "run_id": run_id,
+                "crawl_job_id": crawl_job_id,
+                "scope_id": scope_id,
+                "source_name": site_id,
+                "record_type": "xhs_note",
+                "record_key": str(r["note_id"]),
+                "crawl_date": crawl_date,
+                "metadata": {
+                    "brand_id": brand_id,
+                    "city": city,
+                    "mall_name": note["mall_name"],
+                    "note_url": note["note_url"],
+                },
+            }
+            if repo.upsert_note(note, lineage=lineage):
                 saved += 1
 
     elif site_id == "dianping_webbridge":
@@ -397,7 +416,26 @@ def _save_raw_records(
                 "shop_text": r.get("shop_text"),
                 "source_url": r.get("url"),
             }
-            if repo.upsert_shop_metric(shop):
+            identity = "\x1f".join(str(shop[key] or "") for key in (
+                "shop_name", "city", "crawl_date", "brand_id", "place",
+            ))
+            lineage = {
+                "run_id": run_id,
+                "crawl_job_id": crawl_job_id,
+                "scope_id": scope_id,
+                "source_name": site_id,
+                "record_type": "dp_shop_metric",
+                "record_key": hashlib.sha256(identity.encode("utf-8")).hexdigest(),
+                "crawl_date": crawl_date,
+                "metadata": {
+                    "brand_id": brand_id,
+                    "city": city,
+                    "place": place,
+                    "shop_name": shop["shop_name"],
+                    "source_url": shop["source_url"],
+                },
+            }
+            if repo.upsert_shop_metric(shop, lineage=lineage):
                 saved += 1
             # 自动登记商场维度
             if place:
@@ -421,7 +459,16 @@ def _save_raw_records(
 _RAW_TABLE_SITES = {"xiaohongshu_webbridge", "dianping_webbridge"}
 
 
-def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional[str] = None, **kwargs):
+def run_from_config(
+    site_id: str,
+    brand_id: str,
+    brand_name: str,
+    city: Optional[str] = None,
+    *,
+    crawl_job_id: Optional[str] = None,
+    scope_id: Optional[str] = None,
+    **kwargs,
+):
     """
     便捷入口：从配置文件运行单个站点。
 
@@ -449,11 +496,14 @@ def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional
             from brandpulse.data_governance.service import DataGovernanceService
 
             DataGovernanceService().record_source_log(
-                run_id=run_id, trace_id=None, source_name=site_id,
+                run_id=run_id, trace_id=crawl_job_id, source_name=site_id,
                 source_type="webbridge" if "webbridge" in site_id else "crawler",
                 entity_type="raw", entity_id=brand_id, record_count=0,
                 status="failed", error_message=str(exc), started_at=started_at,
-                finished_at=datetime.now(), metadata={"city": city, "place": kwargs.get("place")},
+                finished_at=datetime.now(), metadata={
+                    "city": city, "place": kwargs.get("place"),
+                    "crawl_job_id": crawl_job_id, "scope_id": scope_id,
+                },
             )
         except Exception as log_exc:
             logger.error(f"[{site_id}] 写入采集血缘失败: {log_exc}")
@@ -463,7 +513,10 @@ def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional
     place = kwargs.get("place")
 
     # 1. 原始数据表
-    raw_saved = _save_raw_records(site_id, records, brand_id, city, today)
+    raw_saved = _save_raw_records(
+        site_id, records, brand_id, city, today, run_id,
+        crawl_job_id=crawl_job_id, scope_id=scope_id,
+    )
 
     # 2. 每日聚合热度（只聚合本次采集的平台；小红书非商场维度，mall_name 置空）
     heat_saved = 0
@@ -527,7 +580,7 @@ def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional
         from brandpulse.data_governance.service import DataGovernanceService
 
         DataGovernanceService().record_source_log(
-            run_id=run_id, trace_id=None, source_name=site_id,
+            run_id=run_id, trace_id=crawl_job_id, source_name=site_id,
             source_type="webbridge" if "webbridge" in site_id else "crawler",
             entity_type="raw", entity_id=brand_id, record_count=len(records),
             status="completed" if records else "empty",
@@ -539,11 +592,14 @@ def run_from_config(site_id: str, brand_id: str, brand_name: str, city: Optional
                 "raw_saved": raw_saved,
                 "heat_saved": heat_saved,
                 "cached": file_saved,
+                "crawl_job_id": crawl_job_id,
+                "scope_id": scope_id,
             },
         )
     except Exception as log_exc:
         logger.error(f"[{site_id}] 写入采集血缘失败: {log_exc}")
     return {
+        "run_id": run_id,
         "saved": db_saved,
         "raw_saved": raw_saved,
         "heat_saved": heat_saved,

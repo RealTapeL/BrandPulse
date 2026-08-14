@@ -54,3 +54,15 @@ export async function fetchLineage({ sourceName = '', size = 100 } = {}) {
   })
   return data.items || []
 }
+
+export async function fetchRawLineage({ sourceName = '', crawlJobId = '', runId = '', size = 100 } = {}) {
+  const { data } = await api.get('/v1/data-governance/lineage/records', {
+    params: {
+      source_name: sourceName || undefined,
+      crawl_job_id: crawlJobId || undefined,
+      run_id: runId || undefined,
+      size,
+    },
+  })
+  return data.items || []
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BrandPulse 一键启动脚本
 #
-# 启动：PostgreSQL/Redis 检查、RQ Worker、FastAPI、Vite 前端、WebBridge。
+# 启动：PostgreSQL/Redis 检查、RQ Worker、FastAPI、监控调度、告警调度、Vite 前端、WebBridge。
 # 已有其他项目占用端口时自动选择备用端口，不会杀掉或覆盖其他进程。
 #
 # 用法：
@@ -47,6 +47,7 @@ BACKEND_PORT="${BRANDPULSE_BACKEND_PORT:-8000}"
 FRONTEND_PORT="${BRANDPULSE_FRONTEND_PORT:-5173}"
 START_WEBBRIDGE="${BRANDPULSE_START_WEBBRIDGE:-1}"
 START_MONITORING_SCHEDULER="${BRANDPULSE_START_MONITORING_SCHEDULER:-1}"
+START_ALERT_SCHEDULER="${BRANDPULSE_START_ALERT_SCHEDULER:-1}"
 
 if [[ -z "${BRANDPULSE_BACKEND_PORT:-}" && -z "${BRANDPULSE_FRONTEND_PORT:-}" && -f "$RUNTIME_FILE" ]]; then
     # 复用上次自动选择的端口，避免重复执行脚本时前端代理漂移。
@@ -168,7 +169,7 @@ stop_process() {
 
 status() {
     log "项目目录：$PROJECT_ROOT"
-    for name in backend worker monitoring frontend webbridge; do
+    for name in backend worker monitoring alerts frontend webbridge; do
         local pid_path
         pid_path="$(pid_file "$name")"
         if pid_is_alive "$pid_path"; then
@@ -186,6 +187,7 @@ status() {
 if [[ "${1:-start}" == "stop" ]]; then
     stop_process webbridge
     stop_process frontend
+    stop_process alerts
     stop_process monitoring
     stop_process worker
     stop_process backend
@@ -285,6 +287,20 @@ if [[ "$START_MONITORING_SCHEDULER" != "0" ]]; then
     fi
 else
     log "BRANDPULSE_START_MONITORING_SCHEDULER=0，跳过自动采集/报告调度器"
+fi
+
+# 告警调度器独立于 FastAPI，避免 API 多副本重复检查和重复通知。
+if [[ "$START_ALERT_SCHEDULER" != "0" ]]; then
+    existing_alert_pid="$(pgrep -f '[b]randpulse.alerts.runner' | head -1 || true)"
+    if [[ -n "$existing_alert_pid" ]]; then
+        printf '%s\n' "$existing_alert_pid" >"$(pid_file alerts)"
+        log "alerts 调度器已在运行（PID $existing_alert_pid），复用现有进程"
+    else
+        start_process alerts env PYTHONPATH="$PROJECT_ROOT/src/backend:$PROJECT_ROOT/src" \
+            "$PROJECT_ROOT/scripts/start_alert_scheduler.sh"
+    fi
+else
+    log "BRANDPULSE_START_ALERT_SCHEDULER=0，跳过告警调度器"
 fi
 
 if [[ "$START_WEBBRIDGE" != "0" ]]; then

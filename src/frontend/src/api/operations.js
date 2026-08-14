@@ -19,3 +19,18 @@ export async function importOperations(file) {
   })
   return data
 }
+
+export async function downloadOperationsTemplate() {
+  const { data } = await api.get('/v1/operations/template', { responseType: 'blob' })
+  return data
+}
+
+export async function fetchOperationsReadiness(scopeId) {
+  const { data } = await api.get('/v1/operations/readiness', { params: { scope_id: scopeId } })
+  return data
+}
+
+export async function fetchSalesTrend(params = {}) {
+  const { data } = await api.get('/v1/operations/metrics/sales-trend', { params })
+  return data
+}

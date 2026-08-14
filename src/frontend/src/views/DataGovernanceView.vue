@@ -108,6 +108,8 @@
       <el-tab-pane label="采集血缘" name="lineage">
         <div class="table-scroll">
           <el-table :data="lineage" border stripe empty-text="还没有采集血缘记录">
+          <el-table-column prop="run_id" label="来源批次" width="210" show-overflow-tooltip />
+          <el-table-column prop="trace_id" label="采集任务 ID" width="210" show-overflow-tooltip />
           <el-table-column prop="source_name" label="来源" width="180" />
           <el-table-column prop="source_type" label="类型" width="120" />
           <el-table-column prop="entity_id" label="实体 ID" width="160" />
@@ -115,6 +117,18 @@
           <el-table-column prop="status" label="状态" width="100" />
           <el-table-column prop="executed_at" label="执行时间" width="180" />
           <el-table-column prop="error_message" label="错误" min-width="240" show-overflow-tooltip />
+          </el-table>
+        </div>
+        <h3 class="subsection-title">原始记录追溯</h3>
+        <div class="table-scroll">
+          <el-table :data="rawLineage" border stripe empty-text="新的采集任务完成后会在这里显示记录级血缘">
+          <el-table-column prop="created_at" label="入库时间" width="180" />
+          <el-table-column prop="crawl_job_id" label="采集任务 ID" width="210" show-overflow-tooltip />
+          <el-table-column prop="run_id" label="来源批次" width="210" show-overflow-tooltip />
+          <el-table-column prop="source_name" label="来源" width="180" />
+          <el-table-column prop="record_type" label="记录类型" width="150" />
+          <el-table-column prop="record_key" label="记录键" min-width="260" show-overflow-tooltip />
+          <el-table-column prop="crawl_date" label="采集日期" width="120" />
           </el-table>
         </div>
       </el-tab-pane>
@@ -129,6 +143,7 @@ import {
   fetchBrandAliases,
   fetchGovernanceSummary,
   fetchLineage,
+  fetchRawLineage,
   fetchQualityIssues,
   fetchStoreAliases,
   fetchStoreOptions,
@@ -145,6 +160,7 @@ const issues = ref([])
 const storeAliases = ref([])
 const brandAliases = ref([])
 const lineage = ref([])
+const rawLineage = ref([])
 const issueStatus = ref('')
 const issueSeverity = ref('')
 const storeOptions = ref([])
@@ -160,24 +176,27 @@ const summaryCards = computed(() => [
   { label: '开放治理问题', value: openIssueCount.value },
   { label: '待匹配门店别名', value: pendingStoreCount.value },
   { label: '采集血缘记录', value: summary.value.records?.lineage_logs || 0 },
+  { label: '可追溯原始行', value: summary.value.records?.raw_lineage_records || 0 },
   { label: '已检查原始记录', value: (summary.value.records?.dp_shop_metrics || 0) + (summary.value.records?.xhs_notes || 0) },
 ])
 
 async function load() {
   loading.value = true
   try {
-    const [s, i, stores, brands, logs] = await Promise.all([
+    const [s, i, stores, brands, logs, rawLogs] = await Promise.all([
       fetchGovernanceSummary(),
       fetchQualityIssues({ status: issueStatus.value, severity: issueSeverity.value }),
       fetchStoreAliases({ status: 'pending' }),
       fetchBrandAliases(),
       fetchLineage(),
+      fetchRawLineage(),
     ])
     summary.value = s
     issues.value = i.items || []
     storeAliases.value = (stores.items || []).map((row) => ({ ...row, selectedStoreId: row.store_id || '' }))
     brandAliases.value = brands
     lineage.value = logs
+    rawLineage.value = rawLogs
   } finally {
     loading.value = false
   }
@@ -242,4 +261,5 @@ onMounted(load)
 .card-value { margin-top: 10px; color: #303133; font-size: 25px; font-weight: 700; }
 .section { background: #fff; }
 .toolbar { align-items: center; }
+.subsection-title { margin: 24px 0 12px; font-size: 15px; }
 </style>

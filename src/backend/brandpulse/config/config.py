@@ -33,6 +33,7 @@ class Config:
     AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "")
     AUTH_SECRET = os.getenv("AUTH_SECRET", "")
     AUTH_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_TOKEN_TTL_SECONDS", "28800"))
+    AUDIT_ENABLED = os.getenv("AUDIT_ENABLED", "true").lower() in {"1", "true", "yes"}
 
     # 逗号分隔的浏览器来源；allow_credentials=True 时不能使用通配符。
     CORS_ORIGINS = [
@@ -56,6 +57,15 @@ class Config:
     MONITORING_SCHEDULER_ENABLED = os.getenv("MONITORING_SCHEDULER_ENABLED", "true").lower() in {"1", "true", "yes"}
     MONITORING_SCHEDULER_INTERVAL_SECONDS = int(os.getenv("MONITORING_SCHEDULER_INTERVAL_SECONDS", "60"))
     REPORT_MAX_DATA_AGE_HOURS = int(os.getenv("REPORT_MAX_DATA_AGE_HOURS", "72"))
+
+    # PostgreSQL 备份状态（备份脚本与生产配置自检共用）。
+    _backup_dir_env = os.getenv("BRANDPULSE_BACKUP_DIR", "backups/postgres")
+    BACKUP_DIR = (
+        PROJECT_ROOT / _backup_dir_env
+        if not Path(_backup_dir_env).is_absolute()
+        else Path(_backup_dir_env)
+    )
+    BACKUP_RETENTION_DAYS = int(os.getenv("BRANDPULSE_BACKUP_RETENTION_DAYS", "14"))
 
     # 高德 API
     AMAP_KEY = os.getenv("AMAP_KEY", "")

@@ -41,13 +41,16 @@ def test_agent_task_can_be_created_and_queried(monkeypatch):
     assert created.status_code == 200
     task_id = created.json()["task_id"]
 
-    fetched = client.get(f"/api/v1/agent/tasks/{task_id}")
-    assert fetched.status_code == 200
-    data = fetched.json()
-    assert data["id"] == task_id
-    assert data["status"] == "pending"
-    assert data["input"] == "列出当前数据表"
-    assert data["rq_job_id"] == "rq-agent-test"
+    try:
+        fetched = client.get(f"/api/v1/agent/tasks/{task_id}")
+        assert fetched.status_code == 200
+        data = fetched.json()
+        assert data["id"] == task_id
+        assert data["status"] == "pending"
+        assert data["input"] == "列出当前数据表"
+        assert data["rq_job_id"] == "rq-agent-test"
+    finally:
+        AgentTaskRepository().delete(task_id)
 
 
 def test_agent_enqueue_failure_is_persisted_as_failed(monkeypatch):
@@ -57,11 +60,16 @@ def test_agent_enqueue_failure_is_persisted_as_failed(monkeypatch):
     monkeypatch.setattr(agent_api, "enqueue_agent", fail_enqueue)
     client = TestClient(app, headers=AUTH_HEADERS)
 
-    response = client.post("/api/v1/agent/execute", json={"prompt": "测试入队失败"})
+    prompt = f"测试入队失败_{uuid4().hex}"
+    response = client.post("/api/v1/agent/execute", json={"prompt": prompt})
     assert response.status_code == 503
 
     tasks = AgentTaskRepository().list(status="failed", limit=20, offset=0)
-    assert any(item["input"] == "测试入队失败" and "Redis 不可用" in (item["error"] or "") for item in tasks["items"])
+    task = next(item for item in tasks["items"] if item["input"] == prompt)
+    try:
+        assert "Redis 不可用" in (task["error"] or "")
+    finally:
+        AgentTaskRepository().delete(task["id"])
 
 
 def test_agent_task_history_can_be_listed():

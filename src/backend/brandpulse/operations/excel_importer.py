@@ -7,7 +7,8 @@ from datetime import date, datetime
 from io import BytesIO
 from typing import Any, Dict, List, Tuple
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font
 from sqlalchemy import text
 
 from brandpulse.db_clients.postgres_client import PostgresClient
@@ -39,6 +40,68 @@ NUMERIC_FIELDS = {
 }
 INTEGER_FIELDS = {"order_count", "customer_flow"}
 DATE_FIELDS = {"record_date", "contract_start", "contract_end"}
+
+TEMPLATE_HEADERS = [
+    "record_id",
+    "brand_id",
+    "store_id",
+    "record_date",
+    "sales_amount",
+    "order_count",
+    "customer_flow",
+    "store_area",
+    "rent",
+    "property_fee",
+    "energy_cost",
+    "contract_start",
+    "contract_end",
+    "is_in_contract",
+    "data_source",
+]
+
+TEMPLATE_FIELDS = [
+    ("record_id", "是", "POS/经营系统中的唯一记录 ID；重复导入时按该 ID 更新"),
+    ("brand_id", "是", "必须与 brands.brand_id 完全一致"),
+    ("store_id", "是", "必须与 stores.store_id 完全一致，且属于同一 brand_id"),
+    ("record_date", "是", "经营日期，格式 YYYY-MM-DD"),
+    ("sales_amount", "建议", "当日含税销售额；必须为非负数"),
+    ("order_count", "建议", "当日订单数；用于计算真实客单价"),
+    ("customer_flow", "否", "当日客流量"),
+    ("store_area", "建议", "门店经营面积；用于计算坪效"),
+    ("rent", "否", "与 record_date 相同统计周期口径的租金"),
+    ("property_fee", "否", "物业费"),
+    ("energy_cost", "否", "能耗费"),
+    ("contract_start", "否", "合同开始日期，格式 YYYY-MM-DD"),
+    ("contract_end", "否", "合同结束日期，格式 YYYY-MM-DD"),
+    ("is_in_contract", "否", "是/否、true/false 或 1/0；留空按是处理"),
+    ("data_source", "建议", "真实来源系统名称，例如 POS:系统名称；不要填写测试数据"),
+]
+
+
+def build_template() -> bytes:
+    """生成不包含示例经营数值的空白 POS 导入模板。"""
+    workbook = Workbook()
+    data_sheet = workbook.active
+    data_sheet.title = SHEET_NAME
+    data_sheet.append(TEMPLATE_HEADERS)
+    data_sheet.freeze_panes = "A2"
+    data_sheet.auto_filter.ref = f"A1:O1"
+    for index, header in enumerate(TEMPLATE_HEADERS, start=1):
+        data_sheet.cell(row=1, column=index).font = Font(bold=True)
+        data_sheet.column_dimensions[data_sheet.cell(row=1, column=index).column_letter].width = max(14, len(header) + 3)
+
+    note_sheet = workbook.create_sheet("字段说明")
+    note_sheet.append(["字段", "是否必填", "说明"])
+    for field in TEMPLATE_FIELDS:
+        note_sheet.append(field)
+    note_sheet.freeze_panes = "A2"
+    note_sheet.column_dimensions["A"].width = 22
+    note_sheet.column_dimensions["B"].width = 12
+    note_sheet.column_dimensions["C"].width = 72
+
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()
 
 
 def _normalise_header(value: Any) -> str:

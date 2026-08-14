@@ -125,3 +125,18 @@ def list_lineage(
     size: int = Query(default=50, ge=1, le=200),
 ) -> Dict[str, Any]:
     return {"items": DataGovernanceService().repo.lineage(source_name=source_name, limit=size)}
+
+
+@router.get("/lineage/records")
+def list_raw_lineage(
+    source_name: Optional[str] = Query(default=None, max_length=128),
+    crawl_job_id: Optional[str] = Query(default=None, max_length=36),
+    run_id: Optional[str] = Query(default=None, max_length=64),
+    size: int = Query(default=100, ge=1, le=500),
+) -> Dict[str, Any]:
+    return {"items": DataGovernanceService().repo.raw_lineage(
+        source_name=source_name,
+        crawl_job_id=crawl_job_id,
+        run_id=run_id,
+        limit=size,
+    )}

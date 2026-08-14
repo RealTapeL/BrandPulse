@@ -6,7 +6,7 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  # TODO: backend 接入 /metrics 端点后取消注释
-  # - job_name: 'brandpulse-backend'
-  #   static_configs:
-  #     - targets: ['host.docker.internal:8000']
+  - job_name: 'brandpulse-backend'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['host.docker.internal:8000']

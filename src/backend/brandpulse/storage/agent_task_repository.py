@@ -7,6 +7,30 @@ from uuid import uuid4
 from sqlalchemy import text
 
 from brandpulse.db_clients.postgres_client import PostgresClient
+from brandpulse.logger.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def _rq_job_state(rq_job_id: str) -> tuple[str, Optional[str]]:
+    """读取 RQ 的真实状态；Redis 暂时不可用时不误判业务任务。"""
+    from redis.exceptions import RedisError
+    from rq.exceptions import NoSuchJobError
+    from rq.job import Job
+
+    from brandpulse.agent.queue import get_agent_queue
+
+    try:
+        job = Job.fetch(rq_job_id, connection=get_agent_queue().connection)
+        raw_status = job.get_status(refresh=True)
+        status = getattr(raw_status, "value", str(raw_status))
+        error = (job.exc_info or "").strip() or None
+        return status, error
+    except NoSuchJobError:
+        return "missing", "RQ 中不存在对应任务"
+    except RedisError as exc:
+        logger.warning("Agent 任务状态对账暂不可用: %s", exc)
+        return "unavailable", None
 
 
 class AgentTaskRepository:
@@ -77,9 +101,18 @@ class AgentTaskRepository:
             """), {"task_id": task_id, "rq_job_id": rq_job_id})
             conn.commit()
 
+    def delete(self, task_id: str) -> bool:
+        """精确删除单条任务，供测试清理与受控运维使用。"""
+        with self.client.engine.begin() as conn:
+            result = conn.execute(
+                text("DELETE FROM agent_tasks WHERE task_id = :task_id"),
+                {"task_id": task_id},
+            )
+        return bool(result.rowcount)
+
     def recover_stale_pending(self, stale_minutes: int = 10) -> int:
-        """回收创建后长期没有 RQ job ID 的孤儿任务。"""
-        with self.client.engine.connect() as conn:
+        """将数据库中的陈旧中间态与 RQ 实际状态对账。"""
+        with self.client.engine.begin() as conn:
             result = conn.execute(text("""
                 UPDATE agent_tasks
                 SET status = 'failed',
@@ -90,8 +123,49 @@ class AgentTaskRepository:
                   AND rq_job_id IS NULL
                   AND created_at < CURRENT_TIMESTAMP - (:stale_minutes * INTERVAL '1 minute')
             """), {"stale_minutes": stale_minutes})
-            conn.commit()
-        return result.rowcount or 0
+            recovered = result.rowcount or 0
+            candidates = conn.execute(text("""
+                SELECT task_id, rq_job_id, status
+                FROM agent_tasks
+                WHERE status IN ('pending', 'running')
+                  AND rq_job_id IS NOT NULL
+                  AND updated_at < CURRENT_TIMESTAMP - (:stale_minutes * INTERVAL '1 minute')
+                ORDER BY updated_at
+                LIMIT 100
+            """), {"stale_minutes": stale_minutes}).mappings().all()
+
+        for candidate in candidates:
+            rq_status, rq_error = _rq_job_state(candidate["rq_job_id"])
+            if rq_status in {"unavailable", "queued", "deferred", "scheduled"}:
+                continue
+            if rq_status == "started":
+                with self.client.engine.begin() as conn:
+                    conn.execute(text("""
+                        UPDATE agent_tasks
+                        SET status = 'running',
+                            started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE task_id = :task_id AND status = 'pending'
+                    """), {"task_id": candidate["task_id"]})
+                continue
+
+            if rq_status == "finished":
+                reason = "RQ 任务已结束但业务结果未写回，已终止，请重新提交"
+            elif rq_status == "missing":
+                reason = "队列任务不存在或已过期，已自动终止，请重新提交"
+            else:
+                detail = rq_error[-1000:] if rq_error else rq_status
+                reason = f"RQ 任务已进入终态（{rq_status}）：{detail}"
+            with self.client.engine.begin() as conn:
+                updated = conn.execute(text("""
+                    UPDATE agent_tasks
+                    SET status = 'failed', error = :error,
+                        updated_at = CURRENT_TIMESTAMP,
+                        finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP)
+                    WHERE task_id = :task_id AND status IN ('pending', 'running')
+                """), {"task_id": candidate["task_id"], "error": reason})
+                recovered += updated.rowcount or 0
+        return recovered
 
     def list(self, *, status: Optional[str], limit: int, offset: int) -> Dict[str, Any]:
         conditions = ["1=1"]

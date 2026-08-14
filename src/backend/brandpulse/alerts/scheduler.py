@@ -1,15 +1,14 @@
 """
 告警调度器（APScheduler）：每 5 分钟检查所有启用的告警规则。
 
-提供 start_scheduler() / shutdown_scheduler() 生命周期函数，供 API 启动时调用。
+提供 start_scheduler() / shutdown_scheduler()，由独立 runner 进程调用；FastAPI 不再持有调度器。
 """
-import json
 from typing import Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from brandpulse.alerts.sender import send
+from brandpulse.alerts.service import process_due_deliveries, record_evaluation
 from brandpulse.db_clients.postgres_client import PostgresClient
 from brandpulse.logger.logger import get_logger
 
@@ -87,35 +86,22 @@ def _check_operator(value: float, op: str, threshold: float) -> bool:
 def _check_alert(alert: dict) -> bool:
     value = _fetch_metric_value(alert["metric"], alert.get("brand_id"))
     triggered = False
-    message = None
     if value is not None:
         triggered = _check_operator(value, alert["operator"], float(alert["threshold"]))
-        message = f"告警 [{alert['name']}]: {alert['metric']}={value}, 阈值{alert['operator']}{alert['threshold']}"
-
-    sent_log = []
-    if triggered and alert.get("destinations"):
-        sent_log = send(alert["destinations"], message)
-
-    insert_sql = """
-        INSERT INTO alert_history (alert_id, triggered, metric_value, message, sent_log)
-        VALUES (:alert_id, :triggered, :metric_value, :message, :sent_log)
-    """
     try:
-        client = PostgresClient()
-        client.execute(insert_sql, {
-            "alert_id": alert["id"],
-            "triggered": triggered,
-            "metric_value": value,
-            "message": message,
-            "sent_log": json.dumps(sent_log),
-        })
+        result = record_evaluation(alert, triggered=triggered, value=value)
     except Exception as e:
-        logger.error(f"[scheduler] 写入 alert_history 失败: {e}")
+        logger.exception("[scheduler] 告警状态记录失败: %s", e)
+        return triggered
 
-    if triggered:
-        logger.warning(message)
+    if result.get("skipped"):
+        logger.info("[scheduler] %s 正由另一个检查处理，跳过本轮", alert["name"])
+    elif result["event_type"] in {"trigger", "reminder"}:
+        logger.warning("[scheduler] %s: %s", result["event_type"], alert["name"])
+    elif result["event_type"] == "recovery":
+        logger.info("[scheduler] recovery: %s", alert["name"])
     else:
-        logger.info(f"[scheduler] {alert['name']} 未触发 (value={value})")
+        logger.info("[scheduler] %s 检查完成 (triggered=%s, value=%s)", alert["name"], triggered, value)
     return triggered
 
 
@@ -125,13 +111,22 @@ def check_all_alerts() -> int:
     with client.engine.connect() as conn:
         from sqlalchemy import text
         rows = conn.execute(
-            text("SELECT * FROM alerts WHERE enabled = TRUE")
+            text("""
+                SELECT alert.*,
+                       COALESCE(policy.cooldown_minutes, 60) AS cooldown_minutes,
+                       COALESCE(policy.notify_recovery, TRUE) AS notify_recovery
+                FROM alerts AS alert
+                LEFT JOIN alert_delivery_policies AS policy
+                  ON policy.alert_id = alert.id
+                WHERE alert.enabled = TRUE
+            """)
         ).mappings().all()
 
     triggered_count = 0
     for alert in rows:
         if _check_alert(dict(alert)):
             triggered_count += 1
+    process_due_deliveries()
     return triggered_count
 
 

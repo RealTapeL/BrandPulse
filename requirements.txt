@@ -27,6 +27,7 @@ pytest>=7.4.0
 fastapi>=0.110.0
 python-multipart>=0.0.9
 uvicorn>=0.29.0
+prometheus-client>=0.21.0
 
 # 任务队列
 redis>=5.0.0

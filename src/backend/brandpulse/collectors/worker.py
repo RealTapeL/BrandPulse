@@ -56,11 +56,18 @@ def run_crawl_job(task_meta: dict) -> dict:
         logger.warning(f"[worker] skip terminal or missing crawl job: {job_id}")
         return {"status": "skipped", "job_id": job_id}
     try:
+        crawl_kwargs = {
+            "mall": mall,
+            "category": category,
+            "city": city,
+            "brand_id": brand_id,
+        }
+        if job_id:
+            crawl_kwargs["crawl_job_id"] = job_id
+        if task_meta.get("scope_id"):
+            crawl_kwargs["scope_id"] = task_meta["scope_id"]
         stats = main.run_mall_crawl(
-            mall=mall,
-            category=category,
-            city=city,
-            brand_id=brand_id,
+            **crawl_kwargs,
         )
         if not stats.get("raw"):
             warning = _source_warning(stats)

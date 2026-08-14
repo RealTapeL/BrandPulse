@@ -43,7 +43,7 @@ BrandPulse/
 │   ├── frontend/                   # 前端（Vue3 + Element Plus + ECharts + Pinia）
 │   └── ml/                         # 情感/NER 与时间序列预测（transformers + scikit-learn）
 ├── models/                         # 训练后模型保存目录
-└── tests/                          # pytest（60 项）
+└── tests/                          # pytest（当前 104 项）
 ```
 
 ## 快速开始
@@ -77,10 +77,11 @@ cd src/frontend && npm install && npm run build && cd ../..
 redis-server --daemonize yes --port 6379        # Redis 任务队列
 bash scripts/start_rq_worker.sh                  # RQ worker：消费采集与 Agent 队列
 bash scripts/start_monitoring_scheduler.sh       # 独立每日采集/报告调度器
+bash scripts/start_alert_scheduler.sh             # 独立告警检查与通知调度器
 bash scripts/start_webbridge.sh                  # 采集通道：WebBridge MCP（ws://127.0.0.1:10086）
 bash scripts/start_web.sh                        # Web 平台：FastAPI + 前端静态托管（8000 端口）
 
-# 推荐：一键启动 Redis、RQ Worker、独立调度器、FastAPI、Vite 前端和 WebBridge
+# 推荐：一键启动 Redis、RQ Worker、采集/报告调度器、告警调度器、FastAPI、Vite 前端和 WebBridge
 bash scripts/start_all.sh
 # 查看状态 / 停止本脚本启动的进程
 bash scripts/start_all.sh status
@@ -126,10 +127,12 @@ cd src/frontend && npm run dev
 | `GET /api/v1/data-governance/issues` | 查看、确认和关闭数据质量问题 |
 | `GET /api/v1/data-governance/store-aliases` | 查看外部门店别名及人工匹配状态 |
 | `GET /api/v1/data-governance/lineage` | 查看真实采集来源、任务和记录数 |
+| `GET /api/v1/data-governance/lineage/records` | 按来源批次、采集任务追溯原始记录 |
 | `POST /api/v1/agent/execute` | 创建 Agent 任务并投递 `brandpulse-agent` RQ 队列 |
 | `GET /api/v1/agent/tasks` / `GET .../tasks/{id}` | 查询持久化任务历史与单任务状态 |
 | `POST /api/v1/chat` | 对话式数据问答（需配置 LLM） |
 | `POST /api/v1/alerts/check-now` | 立即执行告警检查 |
+| `GET /api/v1/alerts/deliveries/list` | 查看逐目标通知、失败原因和重试状态 |
 | `GET|POST|PUT|DELETE /api/v1/monitoring/crawl-schedules` | 自动采集计划配置、启停与持久化状态 |
 | `GET|POST|PUT|DELETE /api/v1/alerts` / `GET .../alerts/history` | 告警规则、通知配置与检查历史 |
 | `GET|POST /api/v1/reports` / `GET .../download` | 真实指标快照报告生成、查询和下载 |
@@ -144,9 +147,14 @@ cd src/frontend && npm run dev
 | `GET /api/v1/ml/forecasting/exports/{export_id}/download` | 下载已完成的预测文件 |
 | `GET /api/v1/ml/logs` | 查询数据输入、训练和预测导出日志 |
 | `GET /api/v1/ml/forecasting/models/{model_id}/forecast` | 读取已生成预测结果 |
+| `GET /api/v1/system/health/live` / `GET .../ready` | 无登录依赖的存活与就绪探针 |
+| `GET /api/v1/system/configuration` | 受保护的生产配置完备性检查，不返回密钥内容 |
+| `GET /metrics` | Prometheus 进程与 HTTP 请求指标 |
+| `GET /api/v1/audit/events` | 按操作者、动作、结果和请求 ID 查询操作审计 |
 
-除登录接口外的业务 API 都需要 `Authorization: Bearer <token>`。未部署 ML 模型时推理接口返回 503，
-不会返回伪造预测。生产部署请配置 `AUTH_MODE=password`、`AUTH_SECRET`、SMTP 或告警 webhook。
+除登录接口外的业务 API 都需要 `Authorization: Bearer <token>`。变更请求、登录和文件下载会写入
+`audit_events`，只记录操作者、动作、结果、耗时与请求 ID，不保存正文、密码或 Token。未部署 ML 模型时
+推理接口返回 503，不会返回伪造预测。生产部署请配置 `AUTH_MODE=password`、`AUTH_SECRET`、SMTP 或告警 webhook。
 
 ## 机器学习预测
 
@@ -177,9 +185,66 @@ CLI 操作：
 不依赖 FastAPI 是否重启；RQ Worker 负责真实执行，来源级结果会分别记录为 `success`、`empty` 或
 `failed`。全部来源均无可验证记录时任务失败；部分来源为空时保留已采到的数据，同时在任务和计划中显示警告。
 
+告警检查由独立的 `brandpulse.alerts.runner` 进程负责，FastAPI 不再启动告警调度器。这样运行多个
+API 副本时不会重复检查同一条规则或重复发送通知；`bash scripts/start_all.sh` 会默认启动该进程，
+也可以通过 `BRANDPULSE_START_ALERT_SCHEDULER=0` 禁用。首次触发、持续异常提醒和恢复事件有独立状态；
+持续提醒按规则冷却，邮箱/Webhook 各自持久化投递并采用指数退避，进程中断后会恢复未完成投递。
+
+通知通道必须使用真实凭据验证：邮件读取 `.env` 的 `SMTP_*` 配置，Webhook 由调用者显式提供地址。
+例如：
+
+```bash
+PYTHONPATH=src/backend:src .venv/bin/python scripts/test_alert_destination.py --email ops@example.com
+PYTHONPATH=src/backend:src .venv/bin/python scripts/test_alert_destination.py --webhook https://example.invalid/your-hook
+```
+
+发送失败时脚本返回非 0，不会输出 `mock_sent`。
+
+新的公开数据采集会同步写 `raw_record_lineage`：每条点评或小红书记录关联来源 `run_id`，由后台计划
+发起时还会关联 `crawl_job_id` 与 `scope_id`。历史记录不会补造无法证明的批次，因此迁移前的数据只保留
+已有来源日志，新的记录级血缘从迁移后首次真实采集开始积累。
+
 报告导出为 XLSX（摘要、指标、点评、小红书四个工作表）或 CSV 指标快照。生成前会校验指标、
 点评和小红书数据的新鲜度，默认最多 72 小时（`REPORT_MAX_DATA_AGE_HOURS`）；数据过期时会拒绝
 生成并记录原因，不会把旧数据包装成当天结论。
+
+## 内部 POS 经营数据
+
+内部经营数据通过“内部经营数据”工作表导入，必须携带业务系统中的 `record_id`、`brand_id`、
+`store_id` 和 `record_date`。导入前会校验品牌与门店主数据的真实对应关系，任何未匹配记录都会整批
+拒绝；不会根据门店名称猜测归属，也不会生成示例销售额。导入后可通过以下接口检查项目映射并读取
+按日销售趋势、订单、客流、客单价和加权坪效：
+
+- `GET /api/v1/operations/readiness?scope_id=<scope_id>`：品牌、门店、项目和经营记录映射准备度
+- `GET /api/v1/operations/metrics/sales-trend?scope_id=<scope_id>`：真实 `store_operations` 聚合结果
+
+当前数据库没有内部 POS 记录时，这两个接口会明确返回未就绪或空 `series`；收到授权的 POS 导出文件
+后，先在 Web 页面预览校验，再确认导入，最后才进行销售趋势和内部预测训练。
+
+## 运维检查与数据库备份
+
+负载均衡或容器探针使用：
+
+```bash
+curl -f http://127.0.0.1:8000/api/v1/system/health/live
+curl -f http://127.0.0.1:8000/api/v1/system/health/ready
+curl -f http://127.0.0.1:8000/metrics
+```
+
+`ready` 会真实检查 PostgreSQL 和 Redis；任一不可用时返回 503。`docker-compose.dev.yml` 的 Prometheus
+默认采集宿主机 8000 端口，若显式使用其他后端端口，需要同步修改 `brandpulse-infra/prometheus.yml`。
+
+数据库备份使用 PostgreSQL custom format，不把 `.env` 或密码写进归档：
+
+```bash
+bash scripts/backup_postgres.sh
+bash scripts/verify_postgres_backup.sh backups/postgres/brandpulse_YYYYmmdd_HHMMSS.dump
+```
+
+备份默认写入 `backups/postgres/`（Git 忽略），生成 SHA-256 校验和，并在落盘前通过 `pg_restore --list`
+检查归档。默认保留 14 天；可用 `BRANDPULSE_BACKUP_DIR` 和 `BRANDPULSE_BACKUP_RETENTION_DAYS` 调整。
+用户级每日 timer 可执行 `bash scripts/install_backup_timer.sh` 安装，默认约 02:30 运行且不需要 root；仍应
+定期使用独立临时数据库执行完整恢复演练。
 
 ## 指标计算
 
@@ -207,6 +272,7 @@ CLI 操作：
 - **数据表查看**：点评门店 / 小红书笔记 / 指标日表 / 门店经营数据的分页、排序、筛选
 - **内部经营数据**：在“门店经营数据”表页上传 Excel；系统先校验品牌与门店主数据，通过后才写库
 - **指标公式管理**：内置指标口径、自定义安全公式、按最新真实数据立即计算
+- **操作审计**：查看变更、登录和下载记录，并显示当前生产配置缺口
 
 技术栈：FastAPI + Vue3 / Element Plus / ECharts + Pinia + axios（hash 路由）。
 
@@ -274,8 +340,9 @@ npm run cypress     # e2e 1 项
 
 ## 后续计划
 
-- 品牌别名归一、门店去重、采集血缘
-- 内部经营数据接入后的生产预测模型与模型管理
+- 获得授权后接入 POS 与门店主数据，形成真实销售趋势、坪效和内部预测
+- 增加角色/项目权限、对象存储以及模型审批发布与回滚
+- 将数据库备份接入异机/对象存储，并建立定期完整恢复演练
 
 ## 注意事项
 

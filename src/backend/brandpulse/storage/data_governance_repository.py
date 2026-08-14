@@ -386,6 +386,35 @@ class DataGovernanceRepository:
             """), params).mappings().all()
         return [dict(row) for row in rows]
 
+    def raw_lineage(
+        self,
+        *,
+        source_name: Optional[str],
+        crawl_job_id: Optional[str],
+        run_id: Optional[str],
+        limit: int,
+    ) -> list[Dict[str, Any]]:
+        conditions = ["1=1"]
+        params: Dict[str, Any] = {"limit": limit}
+        for column, value in (
+            ("source_name", source_name),
+            ("crawl_job_id", crawl_job_id),
+            ("run_id", run_id),
+        ):
+            if value:
+                conditions.append(f"{column} = :{column}")
+                params[column] = value
+        with self.client.engine.connect() as conn:
+            rows = conn.execute(text(f"""
+                SELECT lineage_id, run_id, crawl_job_id, scope_id, source_name,
+                       record_type, record_key, crawl_date, metadata, created_at
+                FROM raw_record_lineage
+                WHERE {' AND '.join(conditions)}
+                ORDER BY created_at DESC, lineage_id DESC
+                LIMIT :limit
+            """), params).mappings().all()
+        return [dict(row) for row in rows]
+
     def summary(self) -> Dict[str, Any]:
         with self.client.engine.connect() as conn:
             issue_counts = conn.execute(text("""
@@ -409,6 +438,7 @@ class DataGovernanceRepository:
                   (SELECT COUNT(*) FROM dp_shop_metrics) AS dp_shop_metrics,
                   (SELECT COUNT(*) FROM xhs_notes) AS xhs_notes,
                   (SELECT COUNT(*) FROM data_source_logs) AS lineage_logs,
+                  (SELECT COUNT(*) FROM raw_record_lineage) AS raw_lineage_records,
                   (SELECT COUNT(*) FROM data_quality_issues WHERE status IN ('open','acknowledged')) AS open_issues
             """)).mappings().one()
         return {

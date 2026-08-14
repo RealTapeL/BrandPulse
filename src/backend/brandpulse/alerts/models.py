@@ -2,14 +2,28 @@
 告警数据模型：Alert 规则与 AlertHistory 触发记录。
 """
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class AlertDestination(BaseModel):
-    type: str = Field(..., description="email 或 webhook")
+    type: Literal["email", "webhook"] = Field(..., description="email 或 webhook")
     value: str = Field(..., description="邮箱地址或 webhook URL")
+
+    @model_validator(mode="after")
+    def _valid_destination(self):
+        self.value = self.value.strip()
+        if self.type == "email":
+            local, separator, domain = self.value.partition("@")
+            if not separator or not local or "." not in domain:
+                raise ValueError("邮件通知地址格式无效")
+        else:
+            parsed = urlparse(self.value)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                raise ValueError("Webhook 地址必须是完整的 http:// 或 https:// URL")
+        return self
 
 
 class AlertCreate(BaseModel):
@@ -20,6 +34,8 @@ class AlertCreate(BaseModel):
     threshold: float = Field(..., description="阈值")
     destinations: List[AlertDestination] = Field(default_factory=list, description="通知目的地")
     enabled: bool = Field(default=True, description="是否启用")
+    cooldown_minutes: int = Field(default=60, ge=5, le=10080, description="持续异常提醒冷却时间")
+    notify_recovery: bool = Field(default=True, description="恢复正常时是否通知")
 
     @field_validator("operator")
     @classmethod
@@ -45,6 +61,8 @@ class AlertUpdate(BaseModel):
     threshold: Optional[float] = None
     destinations: Optional[List[AlertDestination]] = None
     enabled: Optional[bool] = None
+    cooldown_minutes: Optional[int] = Field(default=None, ge=5, le=10080)
+    notify_recovery: Optional[bool] = None
 
     @field_validator("operator")
     @classmethod
@@ -74,4 +92,6 @@ class AlertHistoryItem(BaseModel):
     triggered: bool
     metric_value: Optional[float]
     message: Optional[str]
-    sent_log: Dict[str, Any]
+    event_type: str = "check"
+    notification_status: str = "not_requested"
+    sent_log: Any

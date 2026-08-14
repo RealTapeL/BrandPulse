@@ -61,6 +61,12 @@ const routes = [
     meta: { title: '自动报告与导出' },
   },
   {
+    path: '/audit',
+    name: 'audit',
+    component: () => import('../views/AuditView.vue'),
+    meta: { title: '操作审计' },
+  },
+  {
     path: '/brands',
     name: 'brands',
     component: () => import('../views/BrandList.vue'),

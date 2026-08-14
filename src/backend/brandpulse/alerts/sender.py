@@ -42,15 +42,25 @@ def send_webhook(url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     return {"type": "webhook", "url": url, "status": "sent", "status_code": response.status_code}
 
 
-def send(destinations: List[Dict[str, Any]], message: str) -> List[Dict[str, Any]]:
+def send(
+    destinations: List[Dict[str, Any]],
+    message: str,
+    *,
+    subject: str = "BrandPulse 告警",
+    event_type: str = "trigger",
+) -> List[Dict[str, Any]]:
     """按目的地批量发送通知。"""
     logs = []
     for d in destinations:
         try:
             if d.get("type") == "email":
-                logs.append(send_email(d["value"], "BrandPulse 告警", message))
+                logs.append(send_email(d["value"], subject, message))
             elif d.get("type") == "webhook":
-                logs.append(send_webhook(d["value"], {"message": message}))
+                logs.append(send_webhook(d["value"], {
+                    "message": message,
+                    "subject": subject,
+                    "event_type": event_type,
+                }))
             else:
                 logs.append({"type": d.get("type"), "error": "未知通知类型"})
         except Exception as e:

@@ -42,6 +42,11 @@
               <template #prefix><el-icon><Search /></el-icon></template>
             </el-input>
             <el-button :icon="'Refresh'" :loading="loading" @click="load">刷新</el-button>
+            <el-button
+              v-if="currentTable === 'store_operations'"
+              :icon="'Download'"
+              @click="handleTemplateDownload"
+            >下载空白模板</el-button>
             <el-upload
               v-if="currentTable === 'store_operations'"
               :show-file-list="false"
@@ -108,7 +113,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { TABLES, getTableConfig, fetchTableData } from '../api/tables'
-import { previewOperations, importOperations } from '../api/operations'
+import { downloadOperationsTemplate, previewOperations, importOperations } from '../api/operations'
 
 const currentTable = ref(TABLES[0].name)
 const conf = computed(() => getTableConfig(currentTable.value))
@@ -201,6 +206,20 @@ async function handleOperationsUpload(file) {
     uploading.value = false
   }
   return false
+}
+
+async function handleTemplateDownload() {
+  try {
+    const blob = await downloadOperationsTemplate()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'BrandPulse_POS_import_template.xlsx'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error(e.message || '模板下载失败')
+  }
 }
 
 function formatCell(v, prop) {

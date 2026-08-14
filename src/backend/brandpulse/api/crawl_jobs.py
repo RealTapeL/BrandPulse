@@ -3,7 +3,8 @@
 - POST /api/v1/crawl_jobs：创建任务并入队 RQ，返回 job_id
 - GET  /api/v1/crawl_jobs/{job_id}：查询任务状态
 
-TODO: worker 执行后若需持久化原始 JSON 到 data/raw，可在 queue/worker 中扩展。
+原始结果由采集 worker 按来源和批次写入标准化表及文件快照，任务状态只保存
+可追溯摘要，不在 API 进程中重复处理采集数据。
 """
 from typing import List, Optional
 

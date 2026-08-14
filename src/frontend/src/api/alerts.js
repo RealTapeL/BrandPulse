@@ -29,3 +29,8 @@ export async function fetchAlertHistory(limit = 100) {
   const { data } = await api.get('/v1/alerts/history', { params: { limit } })
   return data
 }
+
+export async function fetchAlertDeliveries(limit = 100) {
+  const { data } = await api.get('/v1/alerts/deliveries/list', { params: { limit } })
+  return data
+}

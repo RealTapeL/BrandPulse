@@ -83,6 +83,7 @@ const menus = [
   { path: '/ml/forecasting', title: '机器学习预测', icon: 'TrendCharts' },
   { path: '/monitoring', title: '自动监控与告警', icon: 'Bell' },
   { path: '/reports', title: '自动报告与导出', icon: 'DocumentChecked' },
+  { path: '/audit', title: '操作审计', icon: 'Tickets' },
 ]
 
 const activeMenu = computed(() => {

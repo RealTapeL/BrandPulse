@@ -50,6 +50,8 @@ def run_mall_crawl(
     city: str = "",
     brand_id: str | None = None,
     brand_name: str | None = None,
+    crawl_job_id: str | None = None,
+    scope_id: str | None = None,
 ) -> dict:
     """
     商场×品类全平台采集（大众点评 + 小红书），CLI crawl 分支与 Agent 工具共用。
@@ -100,10 +102,13 @@ def run_mall_crawl(
                 brand_name=brand_name,
                 city=city,
                 place=place,
+                crawl_job_id=crawl_job_id,
+                scope_id=scope_id,
             )
             results[site_id] = result
             record_count = len(result.get("records") or [])
             source_results[site_id] = {
+                "run_id": result.get("run_id"),
                 "status": "success" if record_count else "empty",
                 "record_count": record_count,
                 "raw_saved": int(result.get("raw_saved") or 0),

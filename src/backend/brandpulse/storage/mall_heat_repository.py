@@ -69,7 +69,7 @@ class XhsNoteRepository:
     def __init__(self):
         self.client = PostgresClient()
 
-    def upsert_note(self, note: Dict) -> bool:
+    def upsert_note(self, note: Dict, lineage: Optional[Dict] = None) -> bool:
         """插入或更新单条笔记（按 note_id 幂等）"""
         sql = """
         INSERT INTO xhs_notes (
@@ -92,9 +92,12 @@ class XhsNoteRepository:
             crawl_date = EXCLUDED.crawl_date
         """
         try:
-            with self.client.engine.connect() as conn:
+            with self.client.engine.begin() as conn:
                 conn.execute(text(sql), note)
-                conn.commit()
+                if lineage:
+                    from brandpulse.storage.raw_lineage_repository import RawLineageRepository
+
+                    RawLineageRepository.record(conn, **lineage)
             return True
         except Exception as e:
             logger.error(f"保存小红书笔记 {note.get('note_id')} 失败: {e}")
@@ -107,7 +110,7 @@ class DpShopMetricRepository:
     def __init__(self):
         self.client = PostgresClient()
 
-    def upsert_shop_metric(self, shop: Dict) -> bool:
+    def upsert_shop_metric(self, shop: Dict, lineage: Optional[Dict] = None) -> bool:
         """插入或更新门店指标（按 店名+城市+采集日期 幂等）"""
         sql = """
         INSERT INTO dp_shop_metrics (
@@ -128,9 +131,12 @@ class DpShopMetricRepository:
             source_url = EXCLUDED.source_url
         """
         try:
-            with self.client.engine.connect() as conn:
+            with self.client.engine.begin() as conn:
                 conn.execute(text(sql), shop)
-                conn.commit()
+                if lineage:
+                    from brandpulse.storage.raw_lineage_repository import RawLineageRepository
+
+                    RawLineageRepository.record(conn, **lineage)
             return True
         except Exception as e:
             logger.error(f"保存点评门店 {shop.get('shop_name')} 失败: {e}")

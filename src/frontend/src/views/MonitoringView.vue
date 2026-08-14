@@ -50,6 +50,8 @@
         <el-form-item label="指标"><el-select v-model="alertForm.metric" class="metric-select"><el-option label="数据新鲜度（小时）" value="data_freshness_hours" /><el-option label="热度" value="heat" /><el-option label="口碑" value="reputation" /><el-option label="SOV" value="sov" /><el-option label="评价数" value="review_count" /></el-select></el-form-item>
         <el-form-item label="条件"><el-select v-model="alertForm.operator" class="operator-select"><el-option v-for="item in operators" :key="item" :label="item" :value="item" /></el-select></el-form-item>
         <el-form-item label="阈值"><el-input-number v-model="alertForm.threshold" /></el-form-item>
+        <el-form-item label="持续提醒间隔"><el-input-number v-model="alertForm.cooldown_minutes" :min="5" :max="10080" :step="5" /><span class="form-suffix">分钟</span></el-form-item>
+        <el-form-item label="恢复通知"><el-switch v-model="alertForm.notify_recovery" /></el-form-item>
         <el-form-item label="通知渠道"><el-select v-model="alertForm.destination_type" class="operator-select"><el-option label="不发送" value="" /><el-option label="邮件" value="email" /><el-option label="Webhook" value="webhook" /></el-select></el-form-item>
         <el-form-item v-if="alertForm.destination_type" label="地址"><el-input v-model="alertForm.destination_value" placeholder="邮箱或 https:// webhook" /></el-form-item>
         <el-form-item><el-button type="primary" :loading="creatingAlert" @click="addAlert">新增规则</el-button></el-form-item>
@@ -60,6 +62,8 @@
         <el-table-column label="监测范围" min-width="210"><template #default="{ row }">{{ scopeForBrandId(row.brand_id) }}</template></el-table-column>
         <el-table-column prop="metric" label="指标" width="160" />
         <el-table-column label="条件" width="120"><template #default="{ row }">{{ row.operator }} {{ row.threshold }}</template></el-table-column>
+        <el-table-column label="提醒策略" width="175"><template #default="{ row }">{{ row.cooldown_minutes }} 分钟 / 恢复{{ row.notify_recovery ? '通知' : '静默' }}</template></el-table-column>
+        <el-table-column label="渠道" width="100"><template #default="{ row }">{{ destinationLabel(row.destinations) }}</template></el-table-column>
         <el-table-column label="启用" width="100"><template #default="{ row }"><el-switch :model-value="row.enabled" @change="(value) => setAlertEnabled(row, value)" /></template></el-table-column>
         <el-table-column label="操作" width="100"><template #default="{ row }"><el-button size="small" type="danger" link @click="removeAlert(row)">删除</el-button></template></el-table-column>
         </el-table>
@@ -72,9 +76,25 @@
         <el-table :data="history" border stripe empty-text="暂无告警检查记录">
         <el-table-column prop="checked_at" label="检查时间" width="180" />
         <el-table-column prop="alert_name" label="规则" min-width="180" />
-        <el-table-column label="结果" width="100"><template #default="{ row }"><el-tag :type="row.triggered ? 'danger' : 'success'">{{ row.triggered ? '触发' : '正常' }}</el-tag></template></el-table-column>
+        <el-table-column label="事件" width="110"><template #default="{ row }"><el-tag :type="eventType(row.event_type)">{{ eventLabel(row.event_type, row.triggered) }}</el-tag></template></el-table-column>
+        <el-table-column label="通知" width="105"><template #default="{ row }"><el-tag :type="notificationType(row.notification_status)" effect="plain">{{ notificationLabel(row.notification_status) }}</el-tag></template></el-table-column>
         <el-table-column prop="metric_value" label="指标值" width="110" />
         <el-table-column prop="message" label="详情" min-width="320" show-overflow-tooltip />
+        </el-table>
+      </div>
+    </el-card>
+
+    <el-card shadow="never" class="section">
+      <template #header><div class="section-title"><span>通知投递记录</span><span class="muted">每个邮箱或 Webhook 独立记录发送结果，失败自动退避重试。</span></div></template>
+      <div class="table-scroll">
+        <el-table :data="deliveries" border stripe empty-text="暂无通知投递记录">
+        <el-table-column prop="created_at" label="创建时间" width="180" />
+        <el-table-column prop="alert_name" label="规则" min-width="180" />
+        <el-table-column label="事件" width="100"><template #default="{ row }">{{ eventLabel(row.event_type) }}</template></el-table-column>
+        <el-table-column label="目标" min-width="220" show-overflow-tooltip><template #default="{ row }">{{ row.destination_type }} · {{ row.destination_value }}</template></el-table-column>
+        <el-table-column label="状态" width="100"><template #default="{ row }"><el-tag :type="deliveryType(row.status)">{{ deliveryLabel(row.status) }}</el-tag></template></el-table-column>
+        <el-table-column prop="attempt_count" label="尝试次数" width="100" />
+        <el-table-column prop="last_error" label="最近错误" min-width="220" show-overflow-tooltip />
         </el-table>
       </div>
     </el-card>
@@ -84,13 +104,14 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { checkAlertsNow, createAlert, deleteAlert, fetchAlertHistory, fetchAlerts, updateAlert } from '../api/alerts'
+import { checkAlertsNow, createAlert, deleteAlert, fetchAlertDeliveries, fetchAlertHistory, fetchAlerts, updateAlert } from '../api/alerts'
 import { createCrawlSchedule, deleteCrawlSchedule, fetchCrawlSchedules, fetchMonitoringScopes, runCrawlScheduleNow, updateCrawlSchedule } from '../api/monitoring'
 
 const scopes = ref([])
 const crawlSchedules = ref([])
 const alerts = ref([])
 const history = ref([])
+const deliveries = ref([])
 const loading = ref(false)
 const creatingSchedule = ref(false)
 const checkingAlerts = ref(false)
@@ -98,11 +119,18 @@ const creatingAlert = ref(false)
 const operators = ['>', '>=', '<', '<=', '=']
 const crawlForm = reactive({ scope_id: '', interval_minutes: 1440, run_hour: 9, run_minute: 0, timezone: 'Asia/Shanghai', max_attempts: 3, enabled: false })
 const crawlTime = ref('09:00')
-const alertForm = reactive({ name: '', scope_id: '', metric: 'data_freshness_hours', operator: '>', threshold: 72, destination_type: '', destination_value: '' })
+const alertForm = reactive({ name: '', scope_id: '', metric: 'data_freshness_hours', operator: '>', threshold: 72, cooldown_minutes: 60, notify_recovery: true, destination_type: '', destination_value: '' })
 
 function scopeLabel(scope) { return `${scope.city || '-'} · ${scope.mall_name || '-'} · ${scope.category || '-'}` }
 function scopeForBrandId(brandId) { return scopes.value.find((item) => item.brand_id === brandId) ? scopeLabel(scopes.value.find((item) => item.brand_id === brandId)) : (brandId || '全部范围') }
 function timeLabel(row) { return `${String(row.run_hour ?? 9).padStart(2, '0')}:${String(row.run_minute ?? 0).padStart(2, '0')}` }
+function destinationLabel(items) { return (items || []).map((item) => item.type === 'email' ? '邮件' : 'Webhook').join('、') || '不发送' }
+function eventLabel(event, triggered = false) { return { trigger: '首次触发', reminder: '持续提醒', recovery: '恢复', check: triggered ? '异常检查' : '正常检查' }[event] || event }
+function eventType(event) { return { trigger: 'danger', reminder: 'warning', recovery: 'success', check: 'info' }[event] || 'info' }
+function notificationLabel(status) { return { queued: '待发送', sent: '已发送', retrying: '重试中', failed: '失败', partial: '部分成功', suppressed: '已抑制', not_requested: '无需发送' }[status] || status }
+function notificationType(status) { return { sent: 'success', failed: 'danger', retrying: 'warning', partial: 'warning', queued: 'info', suppressed: 'info', not_requested: 'info' }[status] || 'info' }
+function deliveryLabel(status) { return { pending: '待发送', sending: '发送中', retry: '待重试', sent: '已发送', failed: '失败', cancelled: '已取消' }[status] || status }
+function deliveryType(status) { return { sent: 'success', failed: 'danger', retry: 'warning', sending: 'warning', pending: 'info', cancelled: 'info' }[status] || 'info' }
 
 async function load() {
   loading.value = true
@@ -115,7 +143,11 @@ async function load() {
   } finally { loading.value = false }
 }
 
-async function loadHistory() { history.value = (await fetchAlertHistory()).items || [] }
+async function loadHistory() {
+  const [historyResult, deliveryResult] = await Promise.all([fetchAlertHistory(), fetchAlertDeliveries()])
+  history.value = historyResult.items || []
+  deliveries.value = deliveryResult.items || []
+}
 
 async function addCrawlSchedule() {
   creatingSchedule.value = true
@@ -137,7 +169,7 @@ async function addAlert() {
     const destinations = alertForm.destination_type && alertForm.destination_value.trim()
       ? [{ type: alertForm.destination_type, value: alertForm.destination_value.trim() }]
       : []
-    await createAlert({ name: alertForm.name || `${alertForm.metric} 阈值告警`, brand_id: scope?.brand_id || null, metric: alertForm.metric, operator: alertForm.operator, threshold: alertForm.threshold, destinations, enabled: true })
+    await createAlert({ name: alertForm.name || `${alertForm.metric} 阈值告警`, brand_id: scope?.brand_id || null, metric: alertForm.metric, operator: alertForm.operator, threshold: alertForm.threshold, cooldown_minutes: alertForm.cooldown_minutes, notify_recovery: alertForm.notify_recovery, destinations, enabled: true })
     ElMessage.success('告警规则已保存'); alertForm.name = ''; alertForm.destination_value = ''; await load()
   } finally { creatingAlert.value = false }
 }
@@ -156,6 +188,7 @@ onMounted(async () => { await Promise.all([load(), loadHistory()]) })
 .time-select { width: 110px; }
 .metric-select { width: 155px; }
 .operator-select { width: 76px; }
+.form-suffix { margin-left: 6px; color: #606266; }
 .muted { color: #909399; font-size: 12px; font-weight: 400; }
 
 @media (max-width: 767px) {

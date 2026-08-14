@@ -182,6 +182,12 @@ class DataGovernanceService:
                     SELECT brand_id, COUNT(*) AS count
                     FROM dp_shop_metrics
                     WHERE NOT EXISTS (SELECT 1 FROM brands b WHERE b.brand_id = dp_shop_metrics.brand_id)
+                      AND NOT EXISTS (
+                          SELECT 1 FROM monitoring_scopes scope
+                          WHERE scope.brand_id = dp_shop_metrics.brand_id
+                            AND scope.city = dp_shop_metrics.city
+                            AND scope.mall_name = COALESCE(dp_shop_metrics.place, '')
+                      )
                     GROUP BY brand_id
                 """)).mappings().all()
                 for row in dp_unknown:
@@ -219,6 +225,12 @@ class DataGovernanceService:
                     SELECT brand_id, COUNT(*) AS count
                     FROM xhs_notes
                     WHERE NOT EXISTS (SELECT 1 FROM brands b WHERE b.brand_id = xhs_notes.brand_id)
+                      AND NOT EXISTS (
+                          SELECT 1 FROM monitoring_scopes scope
+                          WHERE scope.brand_id = xhs_notes.brand_id
+                            AND scope.city = xhs_notes.city
+                            AND scope.mall_name = COALESCE(xhs_notes.mall_name, '')
+                      )
                     GROUP BY brand_id
                 """)).mappings().all()
                 for row in xhs_unknown:

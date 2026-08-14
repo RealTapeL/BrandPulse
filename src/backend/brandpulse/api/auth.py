@@ -12,7 +12,7 @@ import time
 from hmac import compare_digest
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from brandpulse.config.config import Config
@@ -60,11 +60,13 @@ def decode_access_token(token: str) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="登录已失效，请重新登录") from exc
 
 
-def require_auth(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+def require_auth(request: Request, authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
     """所有业务 API 共用的 Bearer 认证依赖。"""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="需要 Bearer 登录令牌")
-    return decode_access_token(authorization[7:].strip())
+    auth = decode_access_token(authorization[7:].strip())
+    request.state.auth = auth
+    return auth
 
 
 class LoginRequest(BaseModel):
@@ -94,10 +96,11 @@ def _credentials_are_valid(username: str, password: str) -> bool:
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(payload: LoginRequest) -> LoginResponse:
+def login(payload: LoginRequest, request: Request) -> LoginResponse:
     """创建浏览器会话；生产环境应使用 password 模式或接入统一认证。"""
     if not _credentials_are_valid(payload.username, payload.password):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
+    request.state.auth = {"sub": payload.username, "role": "operator"}
     return LoginResponse(
         token=create_access_token(payload.username),
         user=LoginUser(id=payload.username, username=payload.username, role="operator"),

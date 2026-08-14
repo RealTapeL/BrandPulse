@@ -1,0 +1,16 @@
+[Unit]
+Description=BrandPulse PostgreSQL backup
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/BrandPulse
+ExecStart=/usr/bin/bash %h/BrandPulse/scripts/backup_postgres.sh
+Environment=BRANDPULSE_BACKUP_RETENTION_DAYS=14
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=%h/BrandPulse/backups
+
+[Install]
+WantedBy=default.target

@@ -15,12 +15,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(PROJECT_ROOT / "src" / "backend"))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from contextlib import asynccontextmanager
-
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from brandpulse.api.agent import router as agent_router
+from brandpulse.api.audit import router as audit_router
 from brandpulse.api.alerts import router as alerts_router
 from brandpulse.api.auth import router as auth_router
 from brandpulse.api.auth import require_auth
@@ -36,27 +36,22 @@ from brandpulse.api.monitoring import router as monitoring_router
 from brandpulse.api.operations import router as operations_router
 from brandpulse.api.reports import router as reports_router
 from brandpulse.api.tables import router as tables_router
+from brandpulse.api.system import protected_router as protected_system_router
+from brandpulse.api.system import router as system_router
 from brandpulse.logger.logger import get_logger
-from brandpulse.alerts.scheduler import shutdown_scheduler, start_scheduler
 from brandpulse.config.config import Config
+from brandpulse.observability import prometheus_http_middleware
+from brandpulse.audit import operation_audit_middleware
 
 logger = get_logger(__name__)
 
 WEB_DIST = PROJECT_ROOT / "src" / "frontend" / "dist"
 
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
-    if Config.ALERT_SCHEDULER_ENABLED:
-        start_scheduler(Config.ALERT_INTERVAL_MINUTES)
-    try:
-        yield
-    finally:
-        if Config.ALERT_SCHEDULER_ENABLED:
-            shutdown_scheduler()
-
-
-app = FastAPI(title="BrandPulse 招商品牌情报看板", lifespan=lifespan)
+# 告警检查由独立的 brandpulse.alerts.runner 进程负责。
+# 不把调度器绑定到 FastAPI 生命周期，避免 API 多副本导致重复检查和重复通知。
+app = FastAPI(title="BrandPulse 招商品牌情报看板")
 app.include_router(auth_router)
+app.include_router(system_router)
 protected = {"dependencies": [Depends(require_auth)]}
 app.include_router(brands_router, **protected)
 app.include_router(agent_router, **protected)
@@ -72,6 +67,8 @@ app.include_router(monitoring_router, **protected)
 app.include_router(reports_router, **protected)
 app.include_router(dashboard_router, **protected)
 app.include_router(operations_router, **protected)
+app.include_router(audit_router, **protected)
+app.include_router(protected_system_router, **protected)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=Config.CORS_ORIGINS,
@@ -79,6 +76,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(prometheus_http_middleware)
+app.middleware("http")(operation_audit_middleware)
+
+
+@app.get("/metrics", include_in_schema=False)
+def prometheus_metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
 # 静态托管 Vue 构建产物（不存在则只提供 API）；挂载在 / 之前必须先注册 API 路由
 if WEB_DIST.is_dir():
     app.mount("/", StaticFiles(directory=str(WEB_DIST), html=True), name="web")
