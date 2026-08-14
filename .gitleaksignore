@@ -1,0 +1,8 @@
+# 已核验的历史开发数据库占位密码；仅忽略对应提交与文件，不放宽检测规则。
+330a0bcef823b7e0cb145fd8af59a4087aa972f4:docker-compose.dev.yml:generic-api-key:15
+330a0bcef823b7e0cb145fd8af59a4087aa972f4:env.dev.example:generic-api-key:8
+0af7b4bb00015f84030083bb15df6b53f738d68c:scripts/build_superset_dashboard.py:generic-api-key:258
+a7a01706dce14b260f632315d2a6f9ebe43bdf1d:.env.example:generic-api-key:5
+a7a01706dce14b260f632315d2a6f9ebe43bdf1d:.env.example:generic-api-key:11
+a7a01706dce14b260f632315d2a6f9ebe43bdf1d:src/brandpulse/utils/config/modules/config.py:generic-api-key:24
+a7a01706dce14b260f632315d2a6f9ebe43bdf1d:src/brandpulse/utils/config/modules/config.py:generic-api-key:30

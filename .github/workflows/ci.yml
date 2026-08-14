@@ -1,0 +1,163 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out complete history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Scan tracked history for secrets
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.29.1
+          GITLEAKS_ENABLE_COMMENTS: "false"
+
+  backend:
+    name: Backend, migrations and API smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: .:src/backend:src
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: brandpulse
+      POSTGRES_PASSWORD: ci_only
+      POSTGRES_DB: brandpulse
+      REDIS_URL: redis://127.0.0.1:6379/0
+      AUTH_MODE: local
+      AUDIT_ENABLED: "false"
+      ALERT_SCHEDULER_ENABLED: "false"
+      MONITORING_SCHEDULER_ENABLED: "false"
+      AGENT_REACH_ENABLED: "false"
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: brandpulse
+          POSTGRES_PASSWORD: ci_only
+          POSTGRES_DB: brandpulse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U brandpulse -d brandpulse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Apply all database migrations twice
+        run: |
+          bash scripts/apply_migrations.sh
+          bash scripts/apply_migrations.sh
+
+      - name: Run backend tests
+        run: python -m pytest tests/ -q
+
+      - name: Verify API liveness and readiness
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          api_log="${RUNNER_TEMP}/brandpulse-api.log"
+          python -m uvicorn brandpulse.api.app:app \
+            --host 127.0.0.1 --port 8000 >"$api_log" 2>&1 &
+          api_pid=$!
+          cleanup() {
+            kill "$api_pid" 2>/dev/null || true
+            wait "$api_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:8000/api/v1/system/health/live >/dev/null; then
+              break
+            fi
+            if [[ "$attempt" -eq 30 ]]; then
+              sed -n '1,240p' "$api_log"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          curl --fail --silent --show-error \
+            http://127.0.0.1:8000/api/v1/system/health/live
+          curl --fail --silent --show-error \
+            http://127.0.0.1:8000/api/v1/system/health/ready
+
+  frontend:
+    name: Frontend unit tests and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run frontend unit tests
+        run: npm run test:unit
+
+      - name: Build production frontend
+        run: npm run build

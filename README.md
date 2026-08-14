@@ -1,5 +1,7 @@
 # BrandPulse 品牌情报分析系统
 
+[![CI](https://github.com/RealTapeL/BrandPulse/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/RealTapeL/BrandPulse/actions/workflows/ci.yml)
+
 面向商业地产招商运营场景的品牌情报系统。按「商场 + 品类」采集大众点评、小红书的公开数据，用确定性指标模型计算口碑、热度、声量份额，通过 Web 平台展示，并提供对话式数据问答。
 
 ## 项目结构
@@ -61,10 +63,8 @@ python -m venv .venv
 
 cp env.dev.example .env   # 编辑填入 LLM_*（对话助手）、REDIS_URL 等
 
-# 初始化数据库，按顺序执行脚本（会提示输入 sudo 密码）
-for f in brandpulse-infra/init-scripts/*.sql migrations/*.sql; do
-  sudo -u postgres psql -d brandpulse -f "$f"
-done
+# 初始化数据库，读取环境变量或 .env 中的 PostgreSQL 配置
+bash scripts/apply_migrations.sh
 
 # 前端（本机 npm 位于 ~/.local/node/bin）
 fish_add_path ~/.local/node/bin
@@ -327,6 +327,23 @@ PYTHONPATH=.:src/backend:src .venv/bin/python -m pytest tests/ -q
 cd src/frontend
 npm run test:unit   # 10 项
 npm run cypress     # e2e 1 项
+```
+
+## 持续集成
+
+`.github/workflows/ci.yml` 会在代码推送到 `develop`、向 `develop` 提交 Pull Request，或人工触发时执行：
+
+- 在全新的 PostgreSQL 16 数据库中连续应用两次全部初始化 SQL 和迁移，验证顺序和幂等性
+- 启动 Redis 7，运行后端测试，并检查 FastAPI 存活与就绪接口
+- 运行前端 10 项单元测试和 Vite 生产构建
+- 使用 Gitleaks 扫描 Git 历史，阻止 API Key、邮箱授权码等密钥进入仓库
+
+本地可使用与 CI 相同的核心命令：
+
+```bash
+bash scripts/apply_migrations.sh
+PYTHONPATH=.:src/backend:src .venv/bin/python -m pytest tests/ -q
+cd src/frontend && npm run test:unit && npm run build
 ```
 
 ## 当前开发分支
