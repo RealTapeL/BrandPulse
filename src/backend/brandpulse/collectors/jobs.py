@@ -83,6 +83,7 @@ def create_crawl_job(
         "cities": cities,
         "scope_id": scope["scope_id"],
         "collection_run_id": collection_run["collection_run_id"],
+        "snapshot_id": collection_run.get("snapshot_id"),
         "legacy_dataset_key": scope.get("legacy_dataset_key") or scope.get("brand_id"),
         "requested_brand_id": requested_brand_id,
         "schedule_id": schedule_id,
@@ -106,5 +107,6 @@ def create_crawl_job(
         "status": "pending",
         "scope_id": scope["scope_id"],
         "collection_run_id": collection_run["collection_run_id"],
+        "snapshot_id": collection_run.get("snapshot_id"),
         "created_at": str(created_at),
     }

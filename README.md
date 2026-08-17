@@ -144,6 +144,7 @@ cd src/frontend && npm run dev
 | `GET|POST|PUT|DELETE /api/v1/alerts` / `GET .../alerts/history` | 范围绑定告警、快照证据、通知配置与检查历史 |
 | `GET|POST /api/v1/reports` / `GET .../download` | 真实指标快照报告生成、查询和下载 |
 | `GET|POST|PUT|DELETE /api/v1/reports/schedules` | 日报/周报定时计划配置 |
+| `GET /api/v1/snapshots/{snapshot_id}/history` | 查看快照状态转换历史 |
 | `POST /ml/sentiment` | 情感分类推理 |
 | `POST /ml/ner` | 命名实体识别推理 |
 | `GET /api/v1/ml/datasets` | 公开数据集与已上传数据的登记、校验状态 |
