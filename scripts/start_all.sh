@@ -6,6 +6,7 @@
 #
 # 用法：
 #   bash scripts/start_all.sh
+#   bash scripts/start_all.sh restart
 #   bash scripts/start_all.sh status
 #   bash scripts/start_all.sh stop
 #
@@ -16,6 +17,7 @@ PROJECT_ROOT="$(pwd)"
 LOG_DIR="$PROJECT_ROOT/logs"
 PID_DIR="$LOG_DIR/pids"
 RUNTIME_FILE="$PID_DIR/ports.env"
+APP_SIGNATURE_FILE="$PID_DIR/app.signature"
 VENV_PYTHON="$PROJECT_ROOT/.venv/bin/python"
 
 mkdir -p "$LOG_DIR" "$PID_DIR"
@@ -24,6 +26,33 @@ export PATH="$HOME/.local/node/bin:$PATH"
 log() { printf '[BrandPulse] %s\n' "$*"; }
 warn() { printf '[BrandPulse][WARN] %s\n' "$*" >&2; }
 die() { printf '[BrandPulse][ERROR] %s\n' "$*" >&2; exit 1; }
+
+app_signature() {
+    # 只计算应用源代码、运行配置和启动子脚本的内容摘要，不输出任何配置内容。
+    # 这样即使存在未提交修改，下一次 start 也会刷新旧进程；.env 只参与哈希，不会写入日志。
+    local path
+    {
+        for path in \
+            "src/backend" \
+            "src/frontend/src" \
+            "src/frontend/index.html" \
+            "src/frontend/vite.config.js" \
+            "src/frontend/package.json" \
+            "requirements.txt" \
+            ".env" \
+            "scripts/start_rq_worker.sh" \
+            "scripts/start_monitoring_scheduler.sh" \
+            "scripts/start_alert_scheduler.sh"; do
+            if [[ -d "$path" ]]; then
+                find "$path" -type d -name '__pycache__' -prune -o -type f -print0 \
+                    | sort -z \
+                    | xargs -0 -r sha256sum
+            elif [[ -f "$path" ]]; then
+                sha256sum "$path"
+            fi
+        done
+    } | sha256sum | awk '{print $1}'
+}
 
 [[ -x "$VENV_PYTHON" ]] || die "缺少 .venv，请先执行：python -m venv .venv && .venv/bin/pip install -r requirements.txt"
 
@@ -55,6 +84,16 @@ if [[ -z "${BRANDPULSE_BACKEND_PORT:-}" && -z "${BRANDPULSE_FRONTEND_PORT:-}" &&
     source "$RUNTIME_FILE"
 fi
 
+CURRENT_APP_SIGNATURE="$(app_signature)"
+PREVIOUS_APP_SIGNATURE=""
+if [[ -f "$APP_SIGNATURE_FILE" ]]; then
+    PREVIOUS_APP_SIGNATURE="$(<"$APP_SIGNATURE_FILE")"
+fi
+REFRESH_APP_PROCESSES=0
+if [[ "${1:-start}" == "restart" || "$CURRENT_APP_SIGNATURE" != "$PREVIOUS_APP_SIGNATURE" ]]; then
+    REFRESH_APP_PROCESSES=1
+fi
+
 pid_file() { printf '%s/%s.pid' "$PID_DIR" "$1"; }
 
 pid_is_alive() {
@@ -68,6 +107,32 @@ pid_is_alive() {
 
 process_args() {
     ps -p "$1" -o args= 2>/dev/null || true
+}
+
+process_belongs_to_project() {
+    local pid="$1"
+    local args
+    local process_cwd
+    args="$(process_args "$pid")"
+    process_cwd="$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)"
+    [[ "$args" == *"$PROJECT_ROOT"* || "$process_cwd" == "$PROJECT_ROOT" || "$process_cwd" == "$PROJECT_ROOT/"* ]]
+}
+
+process_group_leader() {
+    ps -o pgid= -p "$1" 2>/dev/null | tr -d ' ' || true
+}
+
+normalize_frontend_pid() {
+    local pid="$1"
+    local process_group_id
+    process_group_id="$(process_group_leader "$pid")"
+    if [[ "$process_group_id" =~ ^[0-9]+$ ]] \
+        && [[ "$(process_args "$process_group_id")" == *"npm run dev"* ]] \
+        && process_belongs_to_project "$process_group_id"; then
+        printf '%s' "$process_group_id"
+    else
+        printf '%s' "$pid"
+    fi
 }
 
 port_in_use() {
@@ -150,20 +215,66 @@ stop_process() {
         warn "$name 的 PID $pid 不是本脚本启动的 WebBridge，未停止"
         return 0
     fi
-    if [[ "$name" != "webbridge" && "$args" != *"$PROJECT_ROOT"* ]]; then
+    if [[ "$name" != "webbridge" ]] && ! process_belongs_to_project "$pid"; then
         warn "$name 的 PID $pid 不属于当前项目，未停止"
         return 0
     fi
+    local process_group_id
+    process_group_id="$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ' || true)"
     kill "$pid" 2>/dev/null || true
+    # start_process 使用 setsid 创建独立进程组；同时结束子进程，避免 npm/RQ 子进程残留。
+    if [[ "$process_group_id" =~ ^[0-9]+$ && "$process_group_id" == "$pid" ]]; then
+        kill -- "-$process_group_id" 2>/dev/null || true
+    fi
     for _ in {1..20}; do
         kill -0 "$pid" 2>/dev/null || break
         sleep 0.2
     done
     if kill -0 "$pid" 2>/dev/null; then
-        warn "$name 未在 4 秒内退出，未强制杀进程"
-    else
-        rm -f "$pid_path"
-        log "$name 已停止"
+        if [[ "$name" != "webbridge" ]] && process_belongs_to_project "$pid"; then
+            warn "$name 未在 4 秒内退出，发送受控 SIGKILL 以避免新旧代码混用"
+            kill -KILL "$pid" 2>/dev/null || true
+            if [[ "$process_group_id" =~ ^[0-9]+$ && "$process_group_id" == "$pid" ]]; then
+                kill -KILL -- "-$process_group_id" 2>/dev/null || true
+            fi
+            for _ in {1..10}; do
+                kill -0 "$pid" 2>/dev/null || break
+                sleep 0.1
+            done
+        fi
+    fi
+    if kill -0 "$pid" 2>/dev/null; then
+        warn "$name 仍未退出，保留 PID 文件并终止本次启动"
+        return 1
+    fi
+    rm -f "$pid_path"
+    log "$name 已停止"
+}
+
+stop_matching_process() {
+    local name="$1"
+    local pattern="$2"
+    local pid
+    local pid_path
+    pid_path="$(pid_file "$name")"
+
+    # 优先使用本脚本记录的 PID；没有 PID 文件时才通过命令行识别，避免误停其他项目。
+    if pid_is_alive "$pid_path"; then
+        pid="$(<"$pid_path")"
+        if [[ "$name" == "frontend" ]]; then
+            pid="$(normalize_frontend_pid "$pid")"
+            printf '%s\n' "$pid" >"$pid_path"
+        fi
+        stop_process "$name"
+        return 0
+    fi
+    pid="$(pgrep -f "$pattern" | head -1 || true)"
+    if [[ -n "$pid" ]]; then
+        if [[ "$name" == "frontend" ]]; then
+            pid="$(normalize_frontend_pid "$pid")"
+        fi
+        printf '%s\n' "$pid" >"$pid_path"
+        stop_process "$name"
     fi
 }
 
@@ -191,7 +302,7 @@ if [[ "${1:-start}" == "stop" ]]; then
     stop_process monitoring
     stop_process worker
     stop_process backend
-    rm -f "$RUNTIME_FILE"
+    rm -f "$RUNTIME_FILE" "$APP_SIGNATURE_FILE"
     exit 0
 fi
 
@@ -200,7 +311,11 @@ if [[ "${1:-start}" == "status" ]]; then
     exit 0
 fi
 
-[[ "${1:-start}" == "start" ]] || die "用法：bash scripts/start_all.sh [start|status|stop]"
+if [[ "${1:-start}" == "restart" ]]; then
+    log "收到 restart 指令，将刷新 BrandPulse 自有应用进程"
+elif [[ "${1:-start}" != "start" ]]; then
+    die "用法：bash scripts/start_all.sh [start|restart|status|stop]"
+fi
 
 if command -v pg_isready >/dev/null 2>&1; then
     if ! pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -d "$POSTGRES_DB" >/dev/null 2>&1; then
@@ -235,6 +350,20 @@ extract_port() {
     sed -n 's/.*--port[ =]\([0-9][0-9]*\).*/\1/p' <<<"$1" | head -1
 }
 
+if [[ "$REFRESH_APP_PROCESSES" == "1" ]]; then
+    if [[ -n "$PREVIOUS_APP_SIGNATURE" ]]; then
+        log "检测到应用代码或运行配置变化，刷新旧进程以加载最新代码"
+    else
+        log "未找到应用版本标记，刷新现有 BrandPulse 进程以建立版本标记"
+    fi
+    # WebBridge 是外部工具，不随项目源代码变化重启；其余服务都必须重新导入 Python/Vue 代码。
+    stop_matching_process frontend '[n]ode .*BrandPulse/src/frontend/node_modules/.bin/vite'
+    stop_matching_process alerts '[b]randpulse.alerts.runner'
+    stop_matching_process monitoring '[b]randpulse.monitoring.runner'
+    stop_matching_process worker '[r]q worker brandpulse-crawl'
+    stop_matching_process backend '[u]vicorn brandpulse.api.app:app'
+fi
+
 existing_backend_pid="$(pgrep -f '[u]vicorn brandpulse.api.app:app' | head -1 || true)"
 if [[ -n "$existing_backend_pid" ]]; then
     existing_backend_port="$(extract_port "$(process_args "$existing_backend_pid")")"
@@ -246,6 +375,10 @@ if [[ -n "$existing_backend_pid" ]]; then
     else
         die "检测到已有 BrandPulse 后端，但无法解析其监听端口"
     fi
+    if [[ "$REFRESH_APP_PROCESSES" == "1" ]]; then
+        die "旧后端进程仍未退出（PID $existing_backend_pid），为避免新旧代码混用，请检查 $LOG_DIR/backend.log"
+    fi
+    printf '%s\n' "$existing_backend_pid" >"$(pid_file backend)"
 elif port_in_use "$BACKEND_PORT"; then
     if [[ -n "${BRANDPULSE_BACKEND_PORT:-}" ]]; then
         warn "后端端口 $BACKEND_PORT 已被占用："
@@ -267,8 +400,13 @@ else
     log "BrandPulse 后端进程已存在，跳过重复启动"
 fi
 
-# RQ worker 需要 Redis；重复执行脚本时不再创建第二个 worker。
-if pgrep -f '[r]q worker brandpulse-crawl' >/dev/null 2>&1; then
+# RQ worker 需要 Redis；代码变化时随应用一起刷新。
+existing_worker_pid="$(pgrep -f '[r]q worker brandpulse-crawl' | head -1 || true)"
+if [[ -n "$existing_worker_pid" ]]; then
+    if [[ "$REFRESH_APP_PROCESSES" == "1" ]]; then
+        die "旧 RQ Worker 仍未退出（PID $existing_worker_pid），请检查 $LOG_DIR/worker.log"
+    fi
+    printf '%s\n' "$existing_worker_pid" >"$(pid_file worker)"
     log "RQ Worker 已在运行，跳过重复启动"
 else
     start_process worker env PYTHONPATH="$PROJECT_ROOT/src/backend" REDIS_URL="$REDIS_URL" \
@@ -279,6 +417,9 @@ fi
 if [[ "$START_MONITORING_SCHEDULER" != "0" ]]; then
     existing_monitoring_pid="$(pgrep -f '[b]randpulse.monitoring.runner' | head -1 || true)"
     if [[ -n "$existing_monitoring_pid" ]]; then
+        if [[ "$REFRESH_APP_PROCESSES" == "1" ]]; then
+            die "旧 monitoring 调度器仍未退出（PID $existing_monitoring_pid），请检查 $LOG_DIR/monitoring.log"
+        fi
         printf '%s\n' "$existing_monitoring_pid" >"$(pid_file monitoring)"
         log "monitoring 调度器已在运行（PID $existing_monitoring_pid），复用现有进程"
     else
@@ -293,6 +434,9 @@ fi
 if [[ "$START_ALERT_SCHEDULER" != "0" ]]; then
     existing_alert_pid="$(pgrep -f '[b]randpulse.alerts.runner' | head -1 || true)"
     if [[ -n "$existing_alert_pid" ]]; then
+        if [[ "$REFRESH_APP_PROCESSES" == "1" ]]; then
+            die "旧 alerts 调度器仍未退出（PID $existing_alert_pid），请检查 $LOG_DIR/alerts.log"
+        fi
         printf '%s\n' "$existing_alert_pid" >"$(pid_file alerts)"
         log "alerts 调度器已在运行（PID $existing_alert_pid），复用现有进程"
     else
@@ -328,6 +472,7 @@ fi
 
 existing_frontend_pid="$(pgrep -f '[n]ode .*BrandPulse/src/frontend/node_modules/.bin/vite' | head -1 || true)"
 if [[ -n "$existing_frontend_pid" ]]; then
+    existing_frontend_pid="$(normalize_frontend_pid "$existing_frontend_pid")"
     existing_frontend_port="$(extract_port "$(process_args "$existing_frontend_pid")")"
     if [[ -n "$existing_frontend_port" ]]; then
         FRONTEND_PORT="$existing_frontend_port"
@@ -335,6 +480,10 @@ if [[ -n "$existing_frontend_pid" ]]; then
     else
         die "检测到已有 BrandPulse 前端，但无法解析其监听端口"
     fi
+    if [[ "$REFRESH_APP_PROCESSES" == "1" ]]; then
+        die "旧前端进程仍未退出（PID $existing_frontend_pid），为避免加载旧代码，请检查 $LOG_DIR/frontend.log"
+    fi
+    printf '%s\n' "$existing_frontend_pid" >"$(pid_file frontend)"
 elif port_in_use "$FRONTEND_PORT"; then
     if [[ -n "${BRANDPULSE_FRONTEND_PORT:-}" ]]; then
         warn "前端端口 $FRONTEND_PORT 已被占用："
@@ -358,6 +507,7 @@ else
 fi
 
 printf 'BACKEND_PORT=%s\nFRONTEND_PORT=%s\n' "$BACKEND_PORT" "$FRONTEND_PORT" >"$RUNTIME_FILE"
+printf '%s\n' "$CURRENT_APP_SIGNATURE" >"$APP_SIGNATURE_FILE"
 for _ in {1..15}; do
     code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 "http://127.0.0.1:$BACKEND_PORT/api/v1/brands/filters" 2>/dev/null || true)"
     if [[ "$code" != "000" && "$code" =~ ^[0-9]{3}$ ]]; then

@@ -25,6 +25,17 @@ def source_health(scope_id: str):
     return {"scope_id": scope_id, "items": SnapshotRepository().source_health(scope_id)}
 
 
+@router.get("/{snapshot_id}/history")
+def snapshot_history(snapshot_id: str):
+    snapshot = SnapshotRepository().get(snapshot_id)
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="数据快照不存在")
+    return {
+        "snapshot_id": snapshot_id,
+        "items": SnapshotRepository().status_history(snapshot_id),
+    }
+
+
 @router.get("/{snapshot_id}")
 def get_snapshot(snapshot_id: str):
     snapshot = SnapshotRepository().get(snapshot_id)

@@ -33,6 +33,18 @@ DEFAULT_SOURCE_REQUIREMENTS = (
     },
 )
 RELEASED_SNAPSHOT_STATUSES = ("ready", "published")
+SNAPSHOT_STATUS_TRANSITIONS = {
+    "draft": {"collecting", "failed", "rejected"},
+    "collecting": {"validating", "partial", "failed"},
+    "validating": {"ready", "partial", "failed", "rejected"},
+    "partial": {"collecting", "validating", "ready", "expired", "superseded"},
+    "ready": {"published", "expired", "superseded"},
+    "published": {"expired", "superseded"},
+    "failed": {"collecting", "expired"},
+    "rejected": {"collecting", "expired"},
+    "expired": set(),
+    "superseded": set(),
+}
 
 
 def scope_key(city: str, mall_name: str, category: str) -> str:
@@ -310,7 +322,10 @@ class CollectionRunRepository:
                     "requested_brand_id": requested_brand_id,
                 },
             ).mappings().one()
-        return _serialize(row)
+        result = _serialize(row)
+        # 从任务创建开始就建立 draft 快照，后续来源执行可以实时挂到同一个版本。
+        result["snapshot_id"] = SnapshotRepository().ensure_for_collection(run_id)["snapshot_id"]
+        return result
 
     def get(self, collection_run_id: str) -> Optional[Dict[str, Any]]:
         with self.client.engine.connect() as conn:
@@ -334,7 +349,10 @@ class CollectionRunRepository:
                 ),
                 {"collection_run_id": collection_run_id},
             )
-        return bool(result.rowcount)
+        changed = bool(result.rowcount)
+        if changed:
+            SnapshotRepository().transition_for_collection(collection_run_id, "collecting", "开始执行来源采集")
+        return changed
 
     def start_source_run(self, collection_run_id: str, source_name: str) -> Dict[str, Any]:
         source_run_id = f"source_{uuid4().hex}"
@@ -401,6 +419,63 @@ class CollectionRunRepository:
                     "metadata": _json(metadata or {}),
                 },
             ).mappings().one()
+            snapshot = conn.execute(
+                text(
+                    """
+                    SELECT snapshot.snapshot_id,
+                           COALESCE(requirement.is_required, FALSE) AS is_required
+                    FROM data_snapshots AS snapshot
+                    LEFT JOIN scope_source_requirements AS requirement
+                      ON requirement.scope_id = snapshot.scope_id
+                     AND requirement.source_name = :source_name
+                    WHERE snapshot.collection_run_id = :collection_run_id
+                    """
+                ),
+                {
+                    "source_name": row["source_name"],
+                    "collection_run_id": row["collection_run_id"],
+                },
+            ).mappings().first()
+            if snapshot:
+                # 来源执行完成即写入快照来源结果，采集中途也能审计已完成和失败的来源。
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO snapshot_source_results (
+                            snapshot_source_result_id, snapshot_id, source_run_id, source_name,
+                            is_required, status, record_count, validated_count, observed_at,
+                            failure_reason, metadata
+                        ) VALUES (
+                            :result_id, :snapshot_id, :source_run_id, :source_name,
+                            :is_required, :status, :record_count, :validated_count, :observed_at,
+                            :failure_reason, CAST(:metadata AS jsonb)
+                        )
+                        ON CONFLICT (snapshot_id, source_name) DO UPDATE SET
+                            source_run_id = EXCLUDED.source_run_id,
+                            is_required = EXCLUDED.is_required,
+                            status = EXCLUDED.status,
+                            record_count = EXCLUDED.record_count,
+                            validated_count = EXCLUDED.validated_count,
+                            observed_at = EXCLUDED.observed_at,
+                            failure_reason = EXCLUDED.failure_reason,
+                            metadata = EXCLUDED.metadata,
+                            updated_at = CURRENT_TIMESTAMP
+                        """
+                    ),
+                    {
+                        "result_id": f"snapshot_source_{uuid4().hex}",
+                        "snapshot_id": snapshot["snapshot_id"],
+                        "source_run_id": row["source_run_id"],
+                        "source_name": row["source_name"],
+                        "is_required": bool(snapshot["is_required"]),
+                        "status": row["status"],
+                        "record_count": row["record_count"],
+                        "validated_count": row["validated_count"],
+                        "observed_at": row["finished_at"],
+                        "failure_reason": row["failure_reason"] or "",
+                        "metadata": _json(row["metadata"] or {}),
+                    },
+                )
         return _serialize(row)
 
     def list_for_collection(self, collection_run_id: str) -> List[Dict[str, Any]]:
@@ -479,7 +554,15 @@ class RawObservationRepository:
                     :candidate_brand_id, :brand_id, :store_id, :entity_mapping_status,
                     :mapping_confidence, :quality_status, CAST(:payload AS jsonb)
                 )
-                ON CONFLICT DO UPDATE SET
+                -- 必须明确对应 raw_observations 的表达式唯一索引；PostgreSQL 不允许
+                -- 对 DO UPDATE 使用没有冲突目标的 ON CONFLICT。
+                ON CONFLICT (
+                    source_name,
+                    record_type,
+                    source_record_key,
+                    observed_date,
+                    (COALESCE(scope_id, ''::varchar))
+                ) DO UPDATE SET
                     collection_run_id = COALESCE(EXCLUDED.collection_run_id, raw_observations.collection_run_id),
                     source_run_id = COALESCE(EXCLUDED.source_run_id, raw_observations.source_run_id),
                     source_url = EXCLUDED.source_url,
@@ -501,6 +584,158 @@ class SnapshotRepository:
     def __init__(self):
         self.client = PostgresClient()
         self.collection_runs = CollectionRunRepository()
+
+    def ensure_for_collection(self, collection_run_id: str) -> Dict[str, Any]:
+        """为采集批次建立稳定的 draft 快照，保证来源执行期间已有追踪 ID。"""
+        collection = self.collection_runs.get(collection_run_id)
+        if not collection:
+            raise ValueError("采集批次不存在")
+        snapshot_id = f"snapshot_{hashlib.sha256(collection_run_id.encode('utf-8')).hexdigest()[:40]}"
+        with self.client.engine.begin() as conn:
+            inserted = conn.execute(
+                text(
+                    """
+                    INSERT INTO data_snapshots (
+                        snapshot_id, scope_id, collection_run_id, status, expected_sources,
+                        source_coverage, freshness_status, quality_grade, data_mode, failure_reason
+                    ) VALUES (
+                        :snapshot_id, :scope_id, :collection_run_id, 'draft',
+                        CAST(:expected_sources AS jsonb), '{}'::jsonb, 'unknown', 'unrated', 'raw_only', ''
+                    )
+                    ON CONFLICT (collection_run_id) DO NOTHING
+                    """
+                ),
+                {
+                    "snapshot_id": snapshot_id,
+                    "scope_id": collection["scope_id"],
+                    "collection_run_id": collection_run_id,
+                    "expected_sources": _json(collection.get("expected_sources") or []),
+                },
+            )
+            if inserted.rowcount:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO snapshot_status_history (
+                            history_id, snapshot_id, from_status, to_status, reason, metadata, transitioned_by
+                        ) VALUES (
+                            :history_id, :snapshot_id, NULL, 'draft', :reason,
+                            CAST(:metadata AS jsonb), 'system'
+                        )
+                        ON CONFLICT (history_id) DO NOTHING
+                        """
+                    ),
+                    {
+                        "history_id": f"snapshot_history_{uuid4().hex}",
+                        "snapshot_id": snapshot_id,
+                        "reason": "采集批次创建，建立待采集快照",
+                        "metadata": _json({"collection_run_id": collection_run_id}),
+                    },
+                )
+        snapshot = self.get(snapshot_id)
+        if not snapshot:
+            raise RuntimeError("采集批次对应的快照创建后无法读取")
+        return snapshot
+
+    @staticmethod
+    def _transition_in_transaction(
+        conn,
+        snapshot_id: str,
+        to_status: str,
+        *,
+        reason: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+        transitioned_by: str = "system",
+    ) -> bool:
+        row = conn.execute(
+            text("SELECT status FROM data_snapshots WHERE snapshot_id = :snapshot_id FOR UPDATE"),
+            {"snapshot_id": snapshot_id},
+        ).mappings().first()
+        if not row:
+            raise ValueError("数据快照不存在")
+        from_status = str(row["status"])
+        if from_status == to_status:
+            return False
+        if to_status not in SNAPSHOT_STATUS_TRANSITIONS.get(from_status, set()):
+            raise ValueError(f"快照状态不能从 {from_status} 转为 {to_status}")
+        conn.execute(
+            text(
+                """
+                UPDATE data_snapshots
+                SET status = :to_status, updated_at = CURRENT_TIMESTAMP
+                WHERE snapshot_id = :snapshot_id
+                """
+            ),
+            {"snapshot_id": snapshot_id, "to_status": to_status},
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO snapshot_status_history (
+                    history_id, snapshot_id, from_status, to_status, reason, metadata, transitioned_by
+                ) VALUES (
+                    :history_id, :snapshot_id, :from_status, :to_status, :reason,
+                    CAST(:metadata AS jsonb), :transitioned_by
+                )
+                """
+            ),
+            {
+                "history_id": f"snapshot_history_{uuid4().hex}",
+                "snapshot_id": snapshot_id,
+                "from_status": from_status,
+                "to_status": to_status,
+                "reason": reason,
+                "metadata": _json(metadata or {}),
+                "transitioned_by": transitioned_by,
+            },
+        )
+        return True
+
+    def transition(
+        self,
+        snapshot_id: str,
+        to_status: str,
+        *,
+        reason: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+        transitioned_by: str = "system",
+    ) -> Dict[str, Any]:
+        with self.client.engine.begin() as conn:
+            self._transition_in_transaction(
+                conn,
+                snapshot_id,
+                to_status,
+                reason=reason,
+                metadata=metadata,
+                transitioned_by=transitioned_by,
+            )
+        snapshot = self.get(snapshot_id)
+        if not snapshot:
+            raise RuntimeError("快照状态更新后无法读取")
+        return snapshot
+
+    def transition_for_collection(
+        self,
+        collection_run_id: str,
+        to_status: str,
+        reason: str = "",
+    ) -> Dict[str, Any]:
+        snapshot = self.ensure_for_collection(collection_run_id)
+        return self.transition(snapshot["snapshot_id"], to_status, reason=reason)
+
+    def status_history(self, snapshot_id: str) -> List[Dict[str, Any]]:
+        with self.client.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT * FROM snapshot_status_history
+                    WHERE snapshot_id = :snapshot_id
+                    ORDER BY transitioned_at ASC, history_id ASC
+                    """
+                ),
+                {"snapshot_id": snapshot_id},
+            ).mappings().all()
+        return [_serialize(row) for row in rows]
 
     @staticmethod
     def _coverage(requirements: List[Dict[str, Any]], source_runs: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -589,6 +824,14 @@ class SnapshotRepository:
         collection = self.collection_runs.get(collection_run_id)
         if not collection:
             raise ValueError("采集批次不存在")
+        snapshot = self.ensure_for_collection(collection_run_id)
+        # 所有来源结果已经写入后才进入 validating，最终状态只由质量门禁决定。
+        current_status = str(snapshot["status"])
+        if current_status in {"draft", "failed", "rejected"}:
+            self.transition(snapshot["snapshot_id"], "collecting", reason="重新进入快照采集流程")
+        current_status = str(self.get(snapshot["snapshot_id"])["status"])
+        if current_status != "validating":
+            self.transition(snapshot["snapshot_id"], "validating", reason="来源执行完成，开始校验快照")
         requirements = TrustedScopeRepository().source_requirements(str(collection["scope_id"]))
         source_runs = self.collection_runs.list_for_collection(collection_run_id)
         source_run_ids = [run["source_run_id"] for run in source_runs]
@@ -615,7 +858,7 @@ class SnapshotRepository:
         coverage = self._coverage(requirements, source_runs)
         status, grade, data_mode, failure_reason = self._status(coverage)
         now = datetime.now()
-        snapshot_id = f"snapshot_{hashlib.sha256(collection_run_id.encode('utf-8')).hexdigest()[:40]}"
+        snapshot_id = snapshot["snapshot_id"]
         source_times = [
             datetime.fromisoformat(str(item["observed_at"]))
             for item in coverage["sources"]
@@ -635,12 +878,12 @@ class SnapshotRepository:
                         source_coverage, observed_at, captured_at, freshness_status,
                         quality_grade, data_mode, failure_reason
                     ) VALUES (
-                        :snapshot_id, :scope_id, :collection_run_id, :status, CAST(:expected_sources AS jsonb),
+                        :snapshot_id, :scope_id, :collection_run_id, 'validating', CAST(:expected_sources AS jsonb),
                         CAST(:source_coverage AS jsonb), :observed_at, CURRENT_TIMESTAMP, :freshness_status,
                         :quality_grade, :data_mode, :failure_reason
                     )
                     ON CONFLICT (collection_run_id) DO UPDATE SET
-                        status = EXCLUDED.status,
+                        status = 'validating',
                         expected_sources = EXCLUDED.expected_sources,
                         source_coverage = EXCLUDED.source_coverage,
                         observed_at = EXCLUDED.observed_at,
@@ -656,7 +899,6 @@ class SnapshotRepository:
                     "snapshot_id": snapshot_id,
                     "scope_id": collection["scope_id"],
                     "collection_run_id": collection_run_id,
-                    "status": status,
                     "expected_sources": _json(collection.get("expected_sources") or []),
                     "source_coverage": _json(coverage),
                     "observed_at": observed_at,
@@ -704,6 +946,12 @@ class SnapshotRepository:
                         "metadata": _json(item["metadata"] or {}),
                     },
                 )
+        self.transition(
+            snapshot_id,
+            status,
+            reason=f"快照校验完成：{status}",
+            metadata={"quality_grade": grade, "data_mode": data_mode},
+        )
         collection_status = "completed" if status == "ready" else status
         self.collection_runs.finish_collection(
             collection_run_id,
@@ -739,6 +987,7 @@ class SnapshotRepository:
                 {"snapshot_id": snapshot_id},
             ).mappings().all()
         item["source_results"] = [_serialize(result) for result in results]
+        item["status_history"] = self.status_history(snapshot_id)
         return item
 
     def list(
@@ -805,6 +1054,16 @@ class SnapshotRepository:
                 raise ValueError("快照不存在")
             if row["status"] not in RELEASED_SNAPSHOT_STATUSES:
                 raise ValueError("只有 ready 或已发布快照可以发布")
+            old_snapshots = conn.execute(
+                text(
+                    """
+                    SELECT snapshot_id
+                    FROM data_snapshots
+                    WHERE scope_id = :scope_id AND status = 'published' AND snapshot_id <> :snapshot_id
+                    """
+                ),
+                {"scope_id": row["scope_id"], "snapshot_id": snapshot_id},
+            ).mappings().all()
             conn.execute(
                 text(
                     """
@@ -815,6 +1074,24 @@ class SnapshotRepository:
                 ),
                 {"scope_id": row["scope_id"], "snapshot_id": snapshot_id},
             )
+            for old_snapshot in old_snapshots:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO snapshot_status_history (
+                            history_id, snapshot_id, from_status, to_status, reason, metadata, transitioned_by
+                        ) VALUES (
+                            :history_id, :snapshot_id, 'published', 'superseded', :reason,
+                            '{}'::jsonb, 'system'
+                        )
+                        """
+                    ),
+                    {
+                        "history_id": f"snapshot_history_{uuid4().hex}",
+                        "snapshot_id": old_snapshot["snapshot_id"],
+                        "reason": f"发布新快照 {snapshot_id}，旧版本被替代",
+                    },
+                )
             conn.execute(
                 text(
                     """
@@ -825,6 +1102,24 @@ class SnapshotRepository:
                     """
                 ),
                 {"snapshot_id": snapshot_id},
+            )
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO snapshot_status_history (
+                        history_id, snapshot_id, from_status, to_status, reason, metadata, transitioned_by
+                    ) VALUES (
+                        :history_id, :snapshot_id, :from_status, 'published', :reason,
+                        '{}'::jsonb, 'system'
+                    )
+                    """
+                ),
+                {
+                    "history_id": f"snapshot_history_{uuid4().hex}",
+                    "snapshot_id": snapshot_id,
+                    "from_status": row["status"],
+                    "reason": "用户显式发布快照",
+                },
             )
         published = self.get(snapshot_id)
         if not published:
