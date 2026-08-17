@@ -55,13 +55,8 @@ def run(stat_date: Optional[str] = None) -> Dict[str, int]:
         logger.error(f"[指标] 时序聚合失败: {e}")
         stats["时序聚合"] = 0
 
-    try:
-        from brandpulse.indicators.custom_formulas import compute_custom_formulas
-
-        stats["自定义公式"] = compute_custom_formulas(stat_date)
-    except Exception as e:
-        logger.error(f"[指标] 自定义公式计算失败: {e}")
-        stats["自定义公式"] = 0
+    # 自定义公式需要显式选择可信 scope 与 ready/published 快照，不能从旧日表自动推导。
+    # 它们由 /api/v1/formulas/{id}/run 的人工动作执行，并写入 snapshot_formula_evaluations。
 
     total = sum(stats.values())
     logger.info(f"[指标] 全部完成: {stats}, 共写入 {total} 行")

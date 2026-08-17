@@ -1,6 +1,6 @@
 /**
  * 看板图表 option 构造（浅色主题）。
- * 从原单页 App.vue 迁移，逻辑保持不变，配色适配亮色卡片背景。
+ * 只保留当前工作台使用、且有可信快照口径的图表。
  */
 
 const AXIS_LABEL = { color: '#606266' }
@@ -12,7 +12,7 @@ export const shortName = (s) => (s && s.length > 12 ? s.slice(0, 12) + '…' : s
 const categoryAxis = (names) => ({
   type: 'category',
   data: names,
-  axisLabel: { ...AXIS_LABEL, rotate: 30, formatter: shortName },
+  axisLabel: { ...AXIS_LABEL, rotate: 30, hideOverlap: true, formatter: shortName },
   axisLine: AXIS_LINE,
 })
 
@@ -23,105 +23,74 @@ const valueAxis = () => ({
   splitLine: SPLIT_LINE,
 })
 
-function barOption(names, series) {
-  return {
-    tooltip: { trigger: 'axis' },
-    grid: { left: 10, right: 20, top: 30, bottom: 60, containLabel: true },
-    xAxis: categoryAxis(names),
-    yAxis: valueAxis(),
-    series,
-  }
-}
-
-/** 四象限气泡图：X=口碑分 Y=热度 气泡=SOV，分割线取均值 */
-export function buildQuadrantOption(ind) {
-  const avgScore = ind.reduce((s, r) => s + r.weighted_score, 0) / (ind.length || 1)
-  const avgHeat = ind.reduce((s, r) => s + r.heat_index, 0) / (ind.length || 1)
-  const maxSov = Math.max(...ind.map((r) => r.sov || 0), 0.01)
+/**
+ * 点评单源竞争观测：X=贝叶斯口碑，Y=点评评价份额，气泡=累计评价数。
+ * 它不把累计公开评价伪装成近期热度，也不混入小红书缺失来源。
+ */
+export function buildReviewShareOption(indicators) {
+  const rows = indicators.filter((row) => (
+    Number.isFinite(Number(row.weighted_score))
+    && Number.isFinite(Number(row.sov))
+    && Number.isFinite(Number(row.review_count))
+  ))
+  const scores = rows.map((row) => Number(row.weighted_score))
+  const shares = rows.map((row) => Number(row.sov))
+  const reviews = rows.map((row) => Math.max(Number(row.review_count), 0))
+  const avgScore = scores.reduce((sum, value) => sum + value, 0) / (scores.length || 1)
+  const avgShare = shares.reduce((sum, value) => sum + value, 0) / (shares.length || 1)
+  const maxReview = Math.max(...reviews, 1)
+  const scorePadding = Math.max((Math.max(...scores, avgScore) - Math.min(...scores, avgScore)) * 0.14, 0.08)
+  const sharePadding = Math.max((Math.max(...shares, avgShare) - Math.min(...shares, avgShare)) * 0.14, 0.01)
+  const scoreMin = Math.min(...scores, avgScore) - scorePadding
+  const scoreMax = Math.max(...scores, avgScore) + scorePadding
+  const shareMin = Math.max(0, Math.min(...shares, avgShare) - sharePadding)
+  const shareMax = Math.min(1, Math.max(...shares, avgShare) + sharePadding)
+  const labelledNames = new Set(
+    [...rows]
+      .sort((left, right) => Number(right.review_count) - Number(left.review_count))
+      .slice(0, 3)
+      .map((item) => item.entity_name)
+  )
   return {
     tooltip: {
-      formatter: (p) =>
-        `${p.data[3]}<br/>口碑分：${p.data[0]}　热度：${p.data[1]}<br/>SOV：${(p.data[2] * 100).toFixed(1)}%`,
+      formatter: (point) => {
+        const mapping = point.data[4] === 'confirmed' ? '已确认映射' : '待主数据确认'
+        return `${point.data[3]}<br/>贝叶斯口碑：${Number(point.data[0]).toFixed(2)}<br/>点评评价份额：${(Number(point.data[1]) * 100).toFixed(1)}%<br/>点评累计评价：${Number(point.data[2]).toLocaleString('zh-CN')} 条<br/>映射状态：${mapping}`
+      },
     },
-    grid: { left: 20, right: 40, top: 30, bottom: 40, containLabel: true },
-    xAxis: { type: 'value', name: '口碑分', axisLabel: AXIS_LABEL, axisLine: AXIS_LINE, splitLine: { show: false } },
-    yAxis: { type: 'value', name: '热度指数', axisLabel: AXIS_LABEL, axisLine: AXIS_LINE, splitLine: { show: false } },
-    series: [
-      {
-        type: 'scatter',
-        data: ind.map((r) => [r.weighted_score, r.heat_index, r.sov || 0, r.entity_name]),
-        symbolSize: (d) => 12 + 40 * Math.sqrt(d[2] / maxSov),
-        itemStyle: { color: '#409eff', opacity: 0.75 },
-        label: { show: true, position: 'top', color: '#606266', formatter: (p) => shortName(p.data[3]) },
-        markLine: {
-          silent: true,
-          lineStyle: { color: '#909399', type: 'dashed' },
-          label: { color: '#909399' },
-          data: [{ xAxis: avgScore }, { yAxis: avgHeat }],
-        },
+    grid: { left: 28, right: 36, top: 30, bottom: 42, containLabel: true },
+    xAxis: { type: 'value', name: '贝叶斯口碑（点评）', min: scoreMin, max: scoreMax, axisLabel: AXIS_LABEL, axisLine: AXIS_LINE, splitLine: { show: false } },
+    yAxis: { type: 'value', name: '点评评价份额', min: shareMin, max: shareMax, axisLabel: { ...AXIS_LABEL, formatter: (value) => `${(value * 100).toFixed(0)}%` }, axisLine: AXIS_LINE, splitLine: { show: false } },
+    series: [{
+      type: 'scatter',
+      data: rows.map((row) => [row.weighted_score, row.sov, row.review_count, row.entity_name, row.entity_mapping_status]),
+      symbolSize: (value) => 12 + 36 * Math.sqrt(Math.max(value[2], 0) / maxReview),
+      itemStyle: { color: '#409eff', opacity: 0.75 },
+      label: {
+        show: true,
+        position: 'top',
+        color: '#53667b',
+        fontSize: 11,
+        formatter: (point) => labelledNames.has(point.data[3]) ? shortName(point.data[3]) : '',
       },
-    ],
+      markLine: {
+        silent: true,
+        lineStyle: { color: '#909399', type: 'dashed' },
+        label: { color: '#909399' },
+        data: [{ xAxis: avgScore }, { yAxis: avgShare }],
+      },
+    }],
   }
 }
 
-/** 门店评分对比（评分 + 人均） */
-export function buildScoreOption(shops) {
-  return barOption(
-    shops.map((s) => s.shop_name),
-    [
-      { name: '评分', type: 'bar', data: shops.map((s) => s.score), itemStyle: { color: '#409eff' } },
-      { name: '人均(元)', type: 'bar', data: shops.map((s) => s.avg_price), itemStyle: { color: '#f778ba' } },
-    ]
-  )
-}
-
-/** 门店口碑分对比 */
-export function buildWomOption(ind) {
-  return barOption(
-    ind.map((r) => r.entity_name),
-    [{ name: '口碑分', type: 'bar', data: ind.map((r) => r.weighted_score), itemStyle: { color: '#67c23a' } }]
-  )
-}
-
-/** 门店热度指数对比 */
-export function buildHeatOption(ind) {
-  return barOption(
-    ind.map((r) => r.entity_name),
-    [{ name: '热度指数', type: 'bar', data: ind.map((r) => r.heat_index), itemStyle: { color: '#e6a23c' } }]
-  )
-}
-
-/** SOV 声量份额饼图 */
-export function buildSovOption(ind) {
+/** 已计算的周环比动量排序。没有历史数据时由页面展示空态，不生成伪趋势。 */
+export function buildMomentumOption(ind) {
+  const rows = [...ind].sort((a, b) => (Number(b.wow_momentum) || 0) - (Number(a.wow_momentum) || 0))
   return {
-    tooltip: { formatter: (p) => `${p.name}<br/>SOV：${(p.value * 100).toFixed(1)}%` },
-    series: [
-      {
-        type: 'pie',
-        radius: ['35%', '70%'],
-        data: ind.map((r) => ({ name: r.entity_name, value: r.sov || 0 })),
-        label: { color: '#606266', formatter: (p) => `${shortName(p.name)} ${(p.value * 100).toFixed(0)}%` },
-      },
-    ],
-  }
-}
-
-/** 小红书点赞 Top10（横向 bar） */
-export function buildXhsOption(notes) {
-  const top10 = notes.slice(0, 10).reverse()
-  return {
-    tooltip: { trigger: 'axis' },
-    grid: { left: 10, right: 40, top: 10, bottom: 10, containLabel: true },
-    xAxis: valueAxis(),
-    yAxis: { type: 'category', data: top10.map((n) => shortName(n.title)), axisLabel: AXIS_LABEL, axisLine: AXIS_LINE },
-    series: [
-      {
-        name: '点赞',
-        type: 'bar',
-        data: top10.map((n) => n.likes),
-        itemStyle: { color: '#9b59b6' },
-        label: { show: true, position: 'right', color: '#909399' },
-      },
-    ],
+    tooltip: { trigger: 'axis', formatter: (items) => `${items[0]?.name || ''}<br/>周环比动量：${((items[0]?.value || 0) * 100).toFixed(1)}%` },
+    grid: { left: 18, right: 28, top: 20, bottom: 58, containLabel: true },
+    xAxis: categoryAxis(rows.map((row) => row.entity_name)),
+    yAxis: { ...valueAxis(), axisLabel: { ...AXIS_LABEL, formatter: (value) => `${(value * 100).toFixed(0)}%` } },
+    series: [{ name: '周环比动量', type: 'bar', data: rows.map((row) => row.wow_momentum), itemStyle: { color: '#4b8ff0', borderRadius: [4, 4, 0, 0] } }],
   }
 }

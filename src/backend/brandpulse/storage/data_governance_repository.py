@@ -437,6 +437,10 @@ class DataGovernanceRepository:
                   (SELECT COUNT(*) FROM stores) AS stores,
                   (SELECT COUNT(*) FROM dp_shop_metrics) AS dp_shop_metrics,
                   (SELECT COUNT(*) FROM xhs_notes) AS xhs_notes,
+                  (SELECT COUNT(*) FROM raw_observations WHERE scope_id IS NOT NULL) AS trusted_raw_observations,
+                  (SELECT COUNT(*) FROM raw_observations
+                     WHERE scope_id IS NOT NULL AND entity_mapping_status = 'pending') AS pending_observation_mappings,
+                  (SELECT COUNT(*) FROM data_snapshots WHERE status IN ('ready', 'published')) AS released_snapshots,
                   (SELECT COUNT(*) FROM data_source_logs) AS lineage_logs,
                   (SELECT COUNT(*) FROM raw_record_lineage) AS raw_lineage_records,
                   (SELECT COUNT(*) FROM data_quality_issues WHERE status IN ('open','acknowledged')) AS open_issues

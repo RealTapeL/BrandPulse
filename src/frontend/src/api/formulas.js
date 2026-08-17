@@ -10,7 +10,7 @@
  * Formula: { id, name, description, expression, params: [{key, value}],
  *            enabled: boolean, remark, created_at, updated_at }
  *
- * 由 FastAPI + PostgreSQL 持久化；启用后由指标管道按品牌真实数据计算。
+ * 由 FastAPI + PostgreSQL 持久化；执行时必须选择可信范围，结果绑定 ready/published 快照。
  */
 import api from './index'
 
@@ -33,9 +33,9 @@ export async function deleteFormula(id) {
   await api.delete(`/v1/formulas/${id}`)
 }
 
-export async function runFormula(id, statDate) {
+export async function runFormula(id, { scopeId, snapshotId } = {}) {
   const { data } = await api.post(`/v1/formulas/${id}/run`, null, {
-    params: statDate ? { stat_date: statDate } : undefined,
+    params: { scope_id: scopeId, ...(snapshotId ? { snapshot_id: snapshotId } : {}) },
   })
   return data
 }

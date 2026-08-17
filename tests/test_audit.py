@@ -8,7 +8,7 @@ from sqlalchemy import text
 from brandpulse.api.app import app
 from brandpulse.config.config import Config
 from brandpulse.db_clients.postgres_client import PostgresClient
-from tests.conftest import AUTH_HEADERS
+from tests.conftest import ADMIN_AUTH_HEADERS, AUTH_HEADERS
 
 
 def test_mutating_request_is_audited_without_body(monkeypatch):
@@ -30,7 +30,7 @@ def test_mutating_request_is_audited_without_body(monkeypatch):
         request_ids.append(created.headers["x-request-id"])
         formula_id = created.json()["id"]
 
-        response = client.get(
+        response = TestClient(app, headers=ADMIN_AUTH_HEADERS).get(
             "/api/v1/audit/events",
             params={"request_id": request_ids[0]},
         )

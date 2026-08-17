@@ -36,7 +36,7 @@
           登 录
         </el-button>
       </el-form>
-      <div class="login-tip">本地单团队模式使用任意非空凭据；严格模式由服务端配置账号。</div>
+      <div class="login-tip">使用管理员分配的账号登录。首次使用临时密码时，系统会要求立即修改密码。</div>
     </el-card>
   </div>
 </template>

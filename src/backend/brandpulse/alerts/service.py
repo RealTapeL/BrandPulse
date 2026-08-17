@@ -23,17 +23,18 @@ _EVENT_SUBJECTS = {
 def _event_message(alert: Dict[str, Any], event_type: str, value: Optional[float]) -> str:
     value_text = "无可用值" if value is None else f"{value:.4f}".rstrip("0").rstrip(".")
     threshold = f"{alert['operator']}{alert['threshold']}"
+    scope_text = f"，范围={alert['scope_id']}" if alert.get("scope_id") else ""
     if event_type == "recovery":
         return (
             f"告警恢复 [{alert['name']}]: {alert['metric']}={value_text}，"
-            f"当前已不满足告警阈值 {threshold}"
+            f"当前已不满足告警阈值 {threshold}{scope_text}"
         )
     if event_type == "reminder":
         return (
             f"告警持续 [{alert['name']}]: {alert['metric']}={value_text}，"
-            f"阈值 {threshold}"
+            f"阈值 {threshold}{scope_text}"
         )
-    return f"告警 [{alert['name']}]: {alert['metric']}={value_text}，阈值 {threshold}"
+    return f"告警 [{alert['name']}]: {alert['metric']}={value_text}，阈值 {threshold}{scope_text}"
 
 
 def record_evaluation(
@@ -167,6 +168,24 @@ def record_evaluation(
             "event_type": event_type,
             "notification_status": notification_status,
         })
+        metric_evidence = alert.get("metric_evidence") or {}
+        if alert.get("scope_id") and metric_evidence:
+            conn.execute(text("""
+                INSERT INTO trusted_alert_evaluations (
+                    history_id, alert_id, scope_id, snapshot_id, metric_key, metric_quality, evidence
+                ) VALUES (
+                    :history_id, :alert_id, :scope_id, :snapshot_id, :metric_key, :metric_quality,
+                    CAST(:evidence AS jsonb)
+                )
+            """), {
+                "history_id": history_id,
+                "alert_id": alert["id"],
+                "scope_id": alert["scope_id"],
+                "snapshot_id": metric_evidence.get("snapshot_id"),
+                "metric_key": metric_evidence.get("metric_key", alert["metric"]),
+                "metric_quality": metric_evidence.get("metric_quality", "valid"),
+                "evidence": json.dumps(metric_evidence.get("evidence") or {}, ensure_ascii=False, default=str),
+            })
 
         delivery_ids = []
         if should_notify:
@@ -204,13 +223,25 @@ def record_evaluation(
                 ]),
             })
 
-    return {
+    result = {
         "triggered": triggered,
         "skipped": False,
         "event_type": event_type,
         "history_id": int(history_id),
         "delivery_ids": delivery_ids,
     }
+    # 告警仍可独立工作；首次真实触发则尽力创建可分派事项，事项服务异常不影响告警状态与通知。
+    if event_type == "trigger":
+        try:
+            from brandpulse.cases.service import BusinessCaseService
+
+            case = BusinessCaseService().create_from_source(
+                source_type="alert_history", source_id=str(history_id), created_by="system:alert",
+            )
+            result["case_id"] = case["case_id"]
+        except Exception as exc:
+            logger.exception("[alerts] 创建告警事项失败: history_id=%s error=%s", history_id, exc)
+    return result
 
 
 def _refresh_history(conn, history_id: int) -> None:

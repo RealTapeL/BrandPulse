@@ -48,7 +48,9 @@ def test_agent_task_can_be_created_and_queried(monkeypatch):
         assert data["id"] == task_id
         assert data["status"] == "pending"
         assert data["input"] == "列出当前数据表"
-        assert data["rq_job_id"] == "rq-agent-test"
+        # 非管理员业务用户可见任务结果，但不会看到队列 ID、工具日志等高级诊断细节。
+        assert "rq_job_id" not in data
+        assert "logs" not in data
     finally:
         AgentTaskRepository().delete(task_id)
 

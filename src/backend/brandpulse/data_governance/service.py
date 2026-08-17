@@ -266,6 +266,38 @@ class DataGovernanceService:
                         details={"city": row["city"], "mall_name": row["mall_name"], "count": row["count"]},
                     ))
 
+                # 可信原始观测优先由 scope_id 管理。待映射记录保留为公开竞争线索，
+                # 在人工确认前绝不进入真实品牌/门店指标。
+                trusted_pending = conn.execute(text("""
+                    SELECT observation.scope_id, scope.city, scope.mall_name, scope.category,
+                           observation.source_name, COUNT(*) AS count
+                    FROM raw_observations AS observation
+                    JOIN trusted_monitoring_scopes AS scope ON scope.scope_id = observation.scope_id
+                    WHERE observation.quality_status = 'accepted'
+                      AND observation.entity_mapping_status IN ('pending', 'legacy_unclassified')
+                    GROUP BY observation.scope_id, scope.city, scope.mall_name, scope.category,
+                             observation.source_name
+                """)).mappings().all()
+                for row in trusted_pending:
+                    issues.append(self._issue(
+                        entity_type="raw_observation_scope",
+                        entity_key=f"{row['scope_id']}|{row['source_name']}",
+                        source_name=row["source_name"],
+                        issue_type="pending_entity_mapping",
+                        severity="warning",
+                        message=(
+                            f"{row['city']}·{row['mall_name']}·{row['category']} 有 {row['count']} 条"
+                            "可信原始观测尚未映射到真实品牌/门店，只能作为公开竞争线索"
+                        ),
+                        details={
+                            "scope_id": row["scope_id"],
+                            "city": row["city"],
+                            "mall_name": row["mall_name"],
+                            "category": row["category"],
+                            "record_count": row["count"],
+                        },
+                    ))
+
                 for issue in issues:
                     self.repo.upsert_issue(conn, issue)
 

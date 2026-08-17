@@ -27,12 +27,19 @@ class Config:
     # Redis（任务队列与缓存）
     REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 
-    # Web 平台登录。默认 local 模式仅用于单团队本地部署，严格模式由环境变量提供凭据。
+    # Web 登录。local 仅用于测试和本机开发，rbac 为数据库用户与角色权限模式。
+    APP_ENV = os.getenv("APP_ENV", "development").lower()
     AUTH_MODE = os.getenv("AUTH_MODE", "local").lower()
-    AUTH_USERNAME = os.getenv("AUTH_USERNAME", "")
-    AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "")
     AUTH_SECRET = os.getenv("AUTH_SECRET", "")
-    AUTH_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_TOKEN_TTL_SECONDS", "28800"))
+    AUTH_ACCESS_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_ACCESS_TOKEN_TTL_SECONDS", "900"))
+    AUTH_REFRESH_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_REFRESH_TOKEN_TTL_SECONDS", "604800"))
+    AUTH_COOKIE_NAME = os.getenv("AUTH_COOKIE_NAME", "brandpulse_refresh")
+    AUTH_COOKIE_SECURE = os.getenv(
+        "AUTH_COOKIE_SECURE", "true" if APP_ENV == "production" else "false"
+    ).lower() in {"1", "true", "yes"}
+    AUTH_COOKIE_SAMESITE = os.getenv("AUTH_COOKIE_SAMESITE", "strict").lower()
+    AUTH_MAX_LOGIN_FAILURES = int(os.getenv("AUTH_MAX_LOGIN_FAILURES", "5"))
+    AUTH_LOCK_SECONDS = int(os.getenv("AUTH_LOCK_SECONDS", "1800"))
     AUDIT_ENABLED = os.getenv("AUDIT_ENABLED", "true").lower() in {"1", "true", "yes"}
 
     # 逗号分隔的浏览器来源；allow_credentials=True 时不能使用通配符。
@@ -116,6 +123,20 @@ class Config:
             f"postgresql://{cls.POSTGRES_USER}:{cls.POSTGRES_PASSWORD}"
             f"@{cls.POSTGRES_HOST}:{cls.POSTGRES_PORT}/{cls.POSTGRES_DB}"
         )
+
+    @classmethod
+    def validate_auth_configuration(cls) -> None:
+        """生产 RBAC 模式必须使用持久且足够强的签名密钥。"""
+        if cls.AUTH_MODE not in {"local", "rbac"}:
+            raise RuntimeError(f"不支持的 AUTH_MODE: {cls.AUTH_MODE}")
+        if cls.AUTH_COOKIE_SAMESITE not in {"strict", "lax", "none"}:
+            raise RuntimeError("AUTH_COOKIE_SAMESITE 必须为 strict、lax 或 none")
+        if cls.AUTH_MODE == "rbac" and len(cls.AUTH_SECRET) < 64:
+            raise RuntimeError("AUTH_MODE=rbac 时 AUTH_SECRET 必须至少 64 个字符")
+        if cls.APP_ENV == "production" and cls.AUTH_MODE != "rbac":
+            raise RuntimeError("生产环境必须设置 AUTH_MODE=rbac")
+        if cls.APP_ENV == "production" and not cls.AUTH_COOKIE_SECURE:
+            raise RuntimeError("生产环境必须设置 AUTH_COOKIE_SECURE=true")
 
     @classmethod
     def ensure_dirs(cls) -> None:

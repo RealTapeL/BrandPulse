@@ -1,7 +1,7 @@
 /**
  * 品牌接口（/api/v1/brands）：
  * getBrands  列表（q/category/city/page/per_page 查询参数）
- * getBrand   详情（含 stats.indicators 与 recent_crawls）
+ * getBrand   详情（主数据、数据边界说明与 recent_crawls）
  * startCrawl 发起采集任务 → { job_id }
  */
 import api from './index'
@@ -24,8 +24,4 @@ export function getCrawlJob(id) {
 
 export function getBrandFilters() {
   return api.get('/v1/brands/filters').then((r) => r.data)
-}
-
-export function getBrandIndicatorSeries(id, indicator) {
-  return api.get(`/v1/brands/${id}/indicator-series`, { params: { indicator } }).then((r) => r.data)
 }

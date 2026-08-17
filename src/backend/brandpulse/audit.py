@@ -23,9 +23,12 @@ def _request_id(request) -> str:
     return f"req_{uuid4().hex}"
 
 
-def _should_audit(request) -> bool:
+def _should_audit(request, status_code: int) -> bool:
     if not request.url.path.startswith("/api/v1/"):
         return False
+    # 认证和授权失败本身是安全事件，即使原请求是只读 GET。
+    if status_code in {401, 403}:
+        return True
     if request.method in _MUTATING_METHODS:
         return True
     return request.method == "GET" and request.url.path.rstrip("/").endswith("/download")
@@ -42,7 +45,7 @@ async def operation_audit_middleware(request, call_next):
         response.headers["X-Request-ID"] = request_id
         return response
     finally:
-        if Config.AUDIT_ENABLED and _should_audit(request):
+        if Config.AUDIT_ENABLED and _should_audit(request, status_code):
             auth = getattr(request.state, "auth", {}) or {}
             route = request.scope.get("route")
             route_path = getattr(route, "path", request.url.path)
@@ -63,6 +66,12 @@ async def operation_audit_middleware(request, call_next):
                     "query_keys": sorted(request.query_params.keys()),
                     "content_type": (request.headers.get("content-type") or "")[:128],
                     "content_length": (request.headers.get("content-length") or "")[:32],
+                    "required_permission": str(
+                        getattr(request.state, "required_permission", "")
+                    )[:128],
+                    "permission_denied": bool(
+                        getattr(request.state, "permission_denied", False)
+                    ),
                 },
             }
             try:

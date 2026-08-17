@@ -6,6 +6,6 @@ import api from './index'
  *   body: { question: string, history: [{ role: 'user'|'assistant', content: string }] }
  *   返回: { answer: string }
  */
-export function sendChat(question, history) {
-  return api.post('/v1/chat', { question, history }, { timeout: 30000, silent: true }).then((r) => r.data)
+export function sendChat(question, history, scopeId = '') {
+  return api.post('/v1/chat', { question, history, scope_id: scopeId || undefined }, { timeout: 30000, silent: true }).then((r) => r.data)
 }

@@ -69,7 +69,12 @@ class XhsNoteRepository:
     def __init__(self):
         self.client = PostgresClient()
 
-    def upsert_note(self, note: Dict, lineage: Optional[Dict] = None) -> bool:
+    def upsert_note(
+        self,
+        note: Dict,
+        lineage: Optional[Dict] = None,
+        observation: Optional[Dict] = None,
+    ) -> bool:
         """插入或更新单条笔记（按 note_id 幂等）"""
         sql = """
         INSERT INTO xhs_notes (
@@ -98,6 +103,10 @@ class XhsNoteRepository:
                     from brandpulse.storage.raw_lineage_repository import RawLineageRepository
 
                     RawLineageRepository.record(conn, **lineage)
+                if observation:
+                    from brandpulse.storage.trusted_data_repository import RawObservationRepository
+
+                    RawObservationRepository.upsert(conn, observation)
             return True
         except Exception as e:
             logger.error(f"保存小红书笔记 {note.get('note_id')} 失败: {e}")
@@ -110,7 +119,12 @@ class DpShopMetricRepository:
     def __init__(self):
         self.client = PostgresClient()
 
-    def upsert_shop_metric(self, shop: Dict, lineage: Optional[Dict] = None) -> bool:
+    def upsert_shop_metric(
+        self,
+        shop: Dict,
+        lineage: Optional[Dict] = None,
+        observation: Optional[Dict] = None,
+    ) -> bool:
         """插入或更新门店指标（按 店名+城市+采集日期 幂等）"""
         sql = """
         INSERT INTO dp_shop_metrics (
@@ -137,6 +151,10 @@ class DpShopMetricRepository:
                     from brandpulse.storage.raw_lineage_repository import RawLineageRepository
 
                     RawLineageRepository.record(conn, **lineage)
+                if observation:
+                    from brandpulse.storage.trusted_data_repository import RawObservationRepository
+
+                    RawObservationRepository.upsert(conn, observation)
             return True
         except Exception as e:
             logger.error(f"保存点评门店 {shop.get('shop_name')} 失败: {e}")

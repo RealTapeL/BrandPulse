@@ -52,6 +52,8 @@ def run_mall_crawl(
     brand_name: str | None = None,
     crawl_job_id: str | None = None,
     scope_id: str | None = None,
+    collection_run_id: str | None = None,
+    trigger_type: str = "cli",
 ) -> dict:
     """
     商场×品类全平台采集（大众点评 + 小红书），CLI crawl 分支与 Agent 工具共用。
@@ -64,30 +66,78 @@ def run_mall_crawl(
         run_from_config,
     )
 
-    # MALL_* 是商场 × 品类搜索范围的数据集 ID，不是 brands 表中的品牌 ID。
-    # 通过 API/定时计划再次采集该范围时必须沿用它，否则会产生第二个范围；
-    # 同时不能把它送进 BrandRepository 做品牌主数据校验。
-    is_mall_scope = not brand_id or brand_id.startswith("MALL_")
-    if not is_mall_scope:
-        if not brand_name:
-            from brandpulse.storage.pg_repository import BrandRepository
+    from brandpulse.storage.trusted_data_repository import (
+        CollectionRunRepository,
+        SnapshotRepository,
+        TrustedScopeRepository,
+        compatibility_dataset_key,
+    )
 
-            brand = BrandRepository().get_brand(brand_id)
-            brand_name = (brand or {}).get("brand_name_cn")
+    trusted_scopes = TrustedScopeRepository()
+    scope = trusted_scopes.get(scope_id) if scope_id else None
+    if scope_id and not scope:
+        raise ValueError("可信监测范围不存在")
+    if scope is None:
+        scope = trusted_scopes.register(
+            city=city,
+            mall_name=mall,
+            category=category,
+            legacy_dataset_key=(brand_id if brand_id and brand_id.startswith("MALL_") else None),
+            data_origin="external_webbridge",
+        )
+    scope_id = str(scope["scope_id"])
+    legacy_dataset_key = str(scope.get("legacy_dataset_key") or compatibility_dataset_key(city, mall, category))
+
+    # 真实品牌仅是本次查询的候选上下文；采集范围与原始记录不会因此自动获得品牌归属。
+    requested_brand_id = None
+    if brand_id and not brand_id.startswith("MALL_"):
+        from brandpulse.storage.pg_repository import BrandRepository
+
+        brand = BrandRepository().get_brand(brand_id)
+        if not brand:
+            raise ValueError(f"品牌 {brand_id} 不存在，不能作为采集候选品牌")
+        requested_brand_id = brand_id
+        brand_name = brand_name or brand.get("brand_name_cn")
         if not brand_name:
-            raise ValueError(f"品牌 {brand_id} 不存在或缺少中文名称，无法执行真实品牌采集")
+            raise ValueError(f"品牌 {brand_id} 缺少中文名称，无法执行真实品牌采集")
     else:
-        # 商场 + 品类搜索模式：各平台 extractor 会自行拼接 mall / city 关键词。
-        # 已有 MALL_* 时保留该 ID，首次 CLI 搜索时才创建稳定 ID。
+        # 商场+品类搜索由来源 connector 按城市/商场/品类构造关键词。
         brand_name = category
-        brand_id = brand_id or _make_mall_search_id(mall, category, city)
+
+    collection_runs = CollectionRunRepository()
+    if collection_run_id:
+        collection_run = collection_runs.get(collection_run_id)
+        if not collection_run or collection_run["scope_id"] != scope_id:
+            raise ValueError("采集批次与监测范围不一致")
+    else:
+        collection_run = collection_runs.create(
+            scope_id=scope_id,
+            crawl_job_id=crawl_job_id,
+            trigger_type=trigger_type if trigger_type in {"manual", "schedule", "agent", "cli", "retry"} else "cli",
+            requested_brand_id=requested_brand_id,
+        )
+        collection_run_id = str(collection_run["collection_run_id"])
+    collection_runs.mark_collecting(collection_run_id)
+
     place = mall
-    logger.info(f"商场级搜索: {mall} {category}, brand_id={brand_id}")
+    logger.info(
+        "商场级搜索: %s %s, scope_id=%s, legacy_dataset_key=%s, candidate_brand=%s",
+        mall,
+        category,
+        scope_id,
+        legacy_dataset_key,
+        requested_brand_id,
+    )
 
     # 自动执行所有已启用的平台（大众点评、小红书等）
     crawler = GenericWebCrawler()
     site_ids = crawler.list_sites()
     if not site_ids:
+        collection_runs.finish_collection(
+            collection_run_id,
+            status="failed",
+            failure_reason="没有已启用的站点可执行，请检查 crawler_sites.yaml",
+        )
         raise RuntimeError("没有已启用的站点可执行，请检查 crawler_sites.yaml")
     logger.info(f"自动执行 {len(site_ids)} 个已启用站点: {site_ids}")
 
@@ -95,28 +145,61 @@ def run_mall_crawl(
     source_results = {}
     for site_id in site_ids:
         logger.info(f"[{site_id}] 开始采集")
+        source_run = collection_runs.start_source_run(collection_run_id, site_id)
         try:
             result = run_from_config(
                 site_id=site_id,
-                brand_id=brand_id,
+                brand_id=legacy_dataset_key,
                 brand_name=brand_name,
                 city=city,
                 place=place,
                 crawl_job_id=crawl_job_id,
                 scope_id=scope_id,
+                collection_run_id=collection_run_id,
+                source_run_id=source_run["source_run_id"],
+                scope_category=scope["category"],
+                candidate_brand_id=requested_brand_id,
             )
             results[site_id] = result
             record_count = len(result.get("records") or [])
+            raw_saved = int(result.get("raw_saved") or 0)
+            if raw_saved > 0:
+                source_status = "success"
+                source_error = ""
+            elif record_count == 0:
+                source_status = "empty_validated"
+                source_error = "来源返回空结果"
+            else:
+                source_status = "failed"
+                source_error = "解析到了记录，但没有任何记录通过原始观测入库校验"
+            collection_runs.finish_source_run(
+                source_run["source_run_id"],
+                status=source_status,
+                record_count=record_count,
+                validated_count=raw_saved,
+                raw_saved_count=raw_saved,
+                external_run_id=result.get("run_id"),
+                failure_reason=source_error,
+                metadata={
+                    "crawl_job_id": crawl_job_id,
+                    "scope_id": scope_id,
+                    "collection_run_id": collection_run_id,
+                    "raw_saved": raw_saved,
+                    "heat_saved": int(result.get("heat_saved") or 0),
+                    "cached": int(result.get("cached") or 0),
+                },
+            )
             source_results[site_id] = {
                 "run_id": result.get("run_id"),
-                "status": "success" if record_count else "empty",
+                "status": source_status,
                 "record_count": record_count,
-                "raw_saved": int(result.get("raw_saved") or 0),
+                "raw_saved": raw_saved,
                 "heat_saved": int(result.get("heat_saved") or 0),
                 "cached": int(result.get("cached") or 0),
             }
-            if not record_count:
-                logger.warning("[%s] 来源返回空结果，本次不视为该来源成功", site_id)
+            if source_status != "success":
+                source_results[site_id]["error"] = source_error
+                logger.warning("[%s] 来源结果为 %s：%s", site_id, source_status, source_error)
         except Exception as exc:
             # 一个来源故障不能抹掉同一批次其它来源已取得的真实记录；
             # 但要把失败原因写入任务结果，让页面和调度计划可见。
@@ -128,6 +211,19 @@ def run_mall_crawl(
                 "cached": 0,
                 "error": str(exc),
             }
+            collection_runs.finish_source_run(
+                source_run["source_run_id"],
+                status="failed",
+                record_count=0,
+                validated_count=0,
+                raw_saved_count=0,
+                failure_reason=str(exc),
+                metadata={
+                    "crawl_job_id": crawl_job_id,
+                    "scope_id": scope_id,
+                    "collection_run_id": collection_run_id,
+                },
+            )
             logger.exception("[%s] 来源采集失败，继续处理其它来源", site_id)
 
     # 采集结束后执行一次全量治理扫描，把未匹配、越界和重复问题写入治理台账。
@@ -141,6 +237,17 @@ def run_mall_crawl(
         quality = {"status": "failed", "error": str(exc)}
 
     raw_saved = sum(result.get("raw_saved", 0) for result in results.values())
+    snapshot = SnapshotRepository().finalize_collection(collection_run_id)
+    snapshot_metrics = {}
+    if snapshot.get("status") in {"ready", "published"}:
+        try:
+            from brandpulse.indicators.snapshot_metrics import SnapshotMetricService
+
+            snapshot_metrics = SnapshotMetricService().calculate(snapshot["snapshot_id"])
+        except Exception as exc:
+            # 指标计算故障不能伪造数值，也不能抹掉已保存的原始快照；后台可按 snapshot_id 重算。
+            logger.exception("可信快照已创建，但正式指标计算失败: snapshot_id=%s", snapshot.get("snapshot_id"))
+            snapshot_metrics = {"status": "failed", "error": str(exc)}
     indicator_stats = {}
     if raw_saved:
         # 采集成功后立即刷新同一真实数据快照的指标，避免看板长期停留在旧日期。
@@ -151,6 +258,10 @@ def run_mall_crawl(
     return {
         "sites": site_ids,
         "source_results": source_results,
+        "scope_id": scope_id,
+        "collection_run_id": collection_run_id,
+        "snapshot": snapshot,
+        "snapshot_metrics": snapshot_metrics,
         "raw": raw_saved,
         "heat": sum(r.get("heat_saved", 0) for r in results.values()),
         "cached": sum(r.get("cached", 0) for r in results.values()),

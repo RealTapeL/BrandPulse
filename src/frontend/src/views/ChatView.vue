@@ -90,6 +90,7 @@ import { ref, nextTick, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import MarkdownText from '../components/MarkdownText.vue'
 import { sendChat } from '../api/chat'
+import { useScopeStore } from '../stores/scope'
 
 const STORAGE_KEY = 'brandpulse.chat-history.v1'
 // 发送给后端的历史窗口（只含 user/assistant，不含系统提示）
@@ -97,8 +98,8 @@ const HISTORY_WINDOW = 10
 
 const examples = [
   '苏州中心咖啡品类里口碑最好的门店是哪家？',
-  '帮我对比一下各门店的热度指数',
-  '哪些品牌 SOV 声量份额最高？',
+  '当前范围有哪些数据质量问题影响判断？',
+  '当前快照有哪些待人工确认的机会信号？',
   '最近有什么高点赞的小红书笔记？',
 ]
 
@@ -106,6 +107,7 @@ const messages = ref([])
 const input = ref('')
 const sending = ref(false)
 const msgListEl = ref(null)
+const scopeStore = useScopeStore()
 
 onMounted(() => {
   try {
@@ -154,8 +156,8 @@ async function send() {
     .map((m) => ({ role: m.role, content: m.content }))
 
   try {
-    const resp = await sendChat(question, history)
-    messages.value.push({ role: 'assistant', content: resp.answer || '（服务未返回内容）', time: Date.now() })
+    const resp = await sendChat(question, history, scopeStore.currentId)
+    messages.value.push({ role: 'assistant', content: formatAnswer(resp), time: Date.now() })
   } catch (e) {
     messages.value.push({
       role: 'system',
@@ -187,6 +189,16 @@ async function clearHistory() {
 function formatTime(t) {
   if (!t) return ''
   return new Date(t).toLocaleString('zh-CN', { hour12: false })
+}
+
+function formatAnswer(result) {
+  const answer = result.answer || '（服务未返回内容）'
+  const evidence = result.evidence || {}
+  if (evidence.status === 'scope_not_selected') return `${answer}\n\n---\n**数据上下文**：当前未选择监测范围，不能将回答视为特定项目的可信结论。`
+  if (evidence.status === 'unavailable') return `${answer}\n\n---\n**数据上下文**：${evidence.message || '当前范围未取得可信快照。'}`
+  const snapshot = evidence.snapshot || {}
+  const scope = evidence.scope || {}
+  return `${answer}\n\n---\n**当前范围证据**：${scope.city || '-'} · ${scope.mall_name || '-'} · ${scope.category || '-'}；快照 \`${snapshot.snapshot_id || '-'}\`；截止 ${snapshot.observed_at || '-'}；质量 ${snapshot.quality_grade || '-'}；来源覆盖 ${JSON.stringify(snapshot.source_coverage || {})}。`
 }
 </script>
 

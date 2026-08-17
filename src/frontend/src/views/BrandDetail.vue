@@ -16,25 +16,26 @@
             </div>
           </template>
         </el-page-header>
-        <el-button type="primary" aria-label="发起采集" @click="crawlDialog = true">发起采集</el-button>
+        <div class="detail-actions">
+          <el-tag :type="trustedStatus.type" effect="plain">{{ trustedStatus.label }}</el-tag>
+          <el-button plain @click="toggleWatch"><el-icon><Star /></el-icon>{{ watched ? '已关注' : '加入关注' }}</el-button>
+          <el-button v-if="canCrawl" type="primary" aria-label="发起采集" :disabled="!scopeStore.currentId" @click="crawlDialog = true">按当前范围采集</el-button>
+        </div>
       </div>
 
-      <!-- 指标趋势图 -->
+      <!-- 可信快照指标：只读当前范围中已确认映射的公开观测，不回退到历史热度字段。 -->
       <el-card class="section" shadow="never">
         <template #header>
           <div class="chart-head">
-            <span>{{ indicatorLabel }}趋势（近 30 个数据期）</span>
-            <el-select v-model="indicator" size="small" class="indicator-select" @change="loadIndicator">
-              <el-option label="热度指数" value="heat" />
-              <el-option label="口碑分" value="reputation" />
-              <el-option label="SOV 声量份额" value="sov" />
-              <el-option label="周环比动量" value="momentum" />
-              <el-option label="波动率" value="volatility" />
-            </el-select>
+            <div><strong>当前范围可信公开观测</strong><p>{{ scopeStore.current ? `${scopeStore.label} · 仅展示已确认到该品牌的门店记录` : '请选择监测范围后查看快照数据' }}</p></div>
+            <DataFreshnessBadge :value="trustedDashboard?.snapshot?.observed_at" source="快照" />
           </div>
         </template>
-        <EChart :option="chartOption" height="320px" />
-        <el-empty v-if="!indicatorLoading && !indicatorSeries.length" description="该品牌尚无已确认归属的真实指标数据" :image-size="72" />
+        <template v-if="trustedObservations.length">
+          <el-alert type="info" :closable="false" show-icon title="以下是公开点评观测，不代表销售、坪效、租户健康度或自动招商结论。" />
+          <div class="table-scroll trusted-table"><el-table :data="trustedObservations" size="small"><el-table-column prop="entity_name" label="已确认门店" min-width="220" /><el-table-column label="贝叶斯口碑" width="120"><template #default="{ row }">{{ number(row.weighted_score, 2) }}</template></el-table-column><el-table-column label="点评评价份额" width="135"><template #default="{ row }">{{ percent(row.sov) }}</template></el-table-column><el-table-column label="累计评价" width="120"><template #default="{ row }">{{ number(row.review_count) }}</template></el-table-column></el-table></div>
+        </template>
+        <el-empty v-else description="当前范围没有已确认映射到该品牌的可信公开观测。请先在数据中心核对原始记录，系统不会用名称猜测归属。" :image-size="72"><el-button type="primary" link @click="router.push('/data?tab=matching')">处理原始记录映射</el-button></el-empty>
       </el-card>
 
       <!-- 最近采集记录 -->
@@ -60,18 +61,12 @@
       </el-card>
 
       <!-- 发起采集对话框 -->
-      <el-dialog v-model="crawlDialog" title="发起采集" width="min(420px, calc(100vw - 32px))">
-        <el-form label-position="top">
-          <el-form-item label="商场">
-            <el-input v-model="crawlForm.mall" aria-label="商场名" placeholder="如：苏州中心" />
-          </el-form-item>
-          <el-form-item label="品类">
-            <el-input v-model="crawlForm.category" aria-label="品类" placeholder="如：咖啡" />
-          </el-form-item>
-          <el-form-item label="城市（逗号分隔，可空）">
-            <el-input v-model="crawlForm.citiesText" aria-label="城市列表" placeholder="如：苏州" />
-          </el-form-item>
-        </el-form>
+      <el-dialog v-model="crawlDialog" title="按可信范围发起采集" width="min(480px, calc(100vw - 32px))">
+        <el-alert type="info" :closable="false" show-icon title="采集会绑定当前城市 × 商场 × 品类范围。该品牌仅作为候选归属，结果不会自动确认实体映射。" />
+        <el-descriptions class="crawl-scope" :column="1" border>
+          <el-descriptions-item label="当前范围">{{ scopeStore.label }}</el-descriptions-item>
+          <el-descriptions-item label="候选品牌">{{ brand.name }}</el-descriptions-item>
+        </el-descriptions>
         <template #footer>
           <el-button @click="crawlDialog = false">取消</el-button>
           <el-button type="primary" :loading="crawling" aria-label="确认发起采集" @click="submitCrawl">
@@ -92,86 +87,81 @@
 
 <script setup>
 /**
- * 品牌详情页 /brands/:id：品牌信息、可切换指标趋势、最近采集记录和发起采集。
+ * 品牌详情页 /brands/:id：品牌主数据、范围内可信公开观测、最近采集和候选采集。
  */
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import EChart from '../components/EChart.vue'
 import { useBrandsStore } from '../stores/brands'
-import { getBrandIndicatorSeries } from '../api/brands'
+import { usePermissions } from '../composables/usePermissions'
+import { useScopeStore } from '../stores/scope'
+import { fetchDashboard } from '../api/dashboard'
+import DataFreshnessBadge from '../components/DataFreshnessBadge.vue'
 
 const route = useRoute()
 const router = useRouter()
 const store = useBrandsStore()
+const scopeStore = useScopeStore()
+const { can } = usePermissions()
+const canCrawl = can('crawl.execute')
 
 const brandId = computed(() => String(route.params.id || ''))
 const brand = computed(() => store.detail?.brand)
 const crawls = computed(() => store.detail?.recent_crawls || [])
-const indicator = ref('heat')
-const indicatorSeries = ref([])
-const indicatorLoading = ref(false)
-let indicatorRequestId = 0
-const indicatorLabels = { heat: '热度指数', reputation: '口碑分', sov: 'SOV 声量份额', momentum: '周环比动量', volatility: '波动率' }
-const indicatorLabel = computed(() => indicatorLabels[indicator.value] || indicator.value)
+const trustedDashboard = ref(null)
+const trustedObservations = computed(() => (trustedDashboard.value?.indicators || []).filter((item) => item.brand_id === brandId.value && item.entity_mapping_status === 'confirmed'))
+const trustedStatus = computed(() => {
+  if (!scopeStore.currentId) return { type: 'info', label: '未选择范围' }
+  if (!trustedDashboard.value?.snapshot) return { type: 'warning', label: '快照未就绪' }
+  return trustedObservations.value.length ? { type: 'success', label: '有可信公开观测' } : { type: 'warning', label: '映射未完成' }
+})
 
 const crawlDialog = ref(false)
 const crawling = ref(false)
-const crawlForm = reactive({ mall: '苏州中心', category: '咖啡', citiesText: '苏州' })
+const WATCHLIST_KEY = 'brandpulse.watchlist.brand-ids.v1'
+const watched = ref(false)
 
 load()
 watch(() => route.params.id, (next, previous) => {
   if (next && next !== previous) load(String(next))
 })
 
-function load(id = brandId.value) {
+async function load(id = brandId.value) {
   if (!id) return
-  store.fetchDetail(id)
-  loadIndicator(id)
+  watched.value = getWatchedIds().includes(id)
+  await Promise.all([store.fetchDetail(id), loadTrustedData()])
 }
 
-async function loadIndicator(id = brandId.value) {
-  if (!id) return
-  const requestId = ++indicatorRequestId
-  indicatorLoading.value = true
+async function loadTrustedData() {
+  await scopeStore.load()
+  if (!scopeStore.currentId) { trustedDashboard.value = null; return }
+  trustedDashboard.value = await fetchDashboard(scopeStore.currentId)
+}
+
+function getWatchedIds() {
   try {
-    const result = await getBrandIndicatorSeries(id, indicator.value)
-    if (requestId === indicatorRequestId && id === brandId.value) indicatorSeries.value = result.series || []
-  } finally {
-    if (requestId === indicatorRequestId) indicatorLoading.value = false
-  }
+    const value = JSON.parse(localStorage.getItem(WATCHLIST_KEY) || '[]')
+    return Array.isArray(value) ? value.map(String) : []
+  } catch { return [] }
 }
 
-const chartOption = computed(() => {
-  const series = indicatorSeries.value
-  return {
-    grid: { left: 40, right: 20, top: 30, bottom: 30 },
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: series.map((p) => p.date) },
-    yAxis: { type: 'value', name: indicatorLabel.value },
-    series: [
-      {
-        name: indicatorLabel.value,
-        type: 'line',
-        smooth: true,
-        data: series.map((p) => p.value),
-        areaStyle: { opacity: 0.12 },
-      },
-    ],
-  }
-})
+function toggleWatch() {
+  const ids = getWatchedIds()
+  const next = watched.value ? ids.filter((id) => id !== brandId.value) : [...new Set([...ids, brandId.value])]
+  localStorage.setItem(WATCHLIST_KEY, JSON.stringify(next))
+  watched.value = !watched.value
+  ElMessage.success(watched.value ? '已加入当前浏览器的关注清单' : '已取消关注')
+}
 
 async function submitCrawl() {
+  if (!scopeStore.currentId) {
+    ElMessage.warning('请先在顶部选择可信监测范围')
+    return
+  }
   crawling.value = true
   try {
-    const cities = crawlForm.citiesText
-      .split(/[,，]/)
-      .map((s) => s.trim())
-      .filter(Boolean)
     const { job_id } = await store.crawl(brandId.value, {
-      mall: crawlForm.mall,
-      category: crawlForm.category,
-      cities: cities.length ? cities : undefined,
+      scope_id: scopeStore.currentId,
     })
     ElMessage.info(`采集任务已入队：${job_id}`)
     crawlDialog.value = false
@@ -205,11 +195,14 @@ async function pollCrawlJob(jobId) {
 function crawlStatusType(s) {
   return { success: 'success', running: 'warning', failed: 'danger' }[s] || 'info'
 }
+function number(value, digits = 0) { return Number.isFinite(Number(value)) ? Number(value).toLocaleString('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits }) : '-' }
+function percent(value) { return Number.isFinite(Number(value)) ? `${(Number(value) * 100).toFixed(1)}%` : '-' }
 
 function formatTime(iso) {
   if (!iso) return '-'
   return new Date(iso).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
 }
+watch(() => scopeStore.currentId, () => { loadTrustedData().catch(() => {}) })
 </script>
 
 <style scoped>
@@ -224,6 +217,7 @@ function formatTime(iso) {
   gap: 12px;
   flex-wrap: wrap;
 }
+.detail-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .header-brand {
   display: flex;
   align-items: center;
@@ -241,6 +235,7 @@ function formatTime(iso) {
 .section {
   margin-bottom: 16px;
 }
+.crawl-scope { margin-top: 16px; }
 .chart-head {
   display: flex;
   align-items: center;
@@ -248,17 +243,14 @@ function formatTime(iso) {
   gap: 12px;
   flex-wrap: wrap;
 }
-.indicator-select {
-  width: 150px;
-}
 
 @media (max-width: 767px) {
   .detail-header :deep(.el-page-header) {
     width: 100%;
   }
 
-  .detail-header > .el-button,
-  .indicator-select {
+  .detail-actions,
+  .detail-actions > .el-button {
     width: 100%;
   }
 }

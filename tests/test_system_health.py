@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 
 from brandpulse.api.app import app
-from tests.conftest import AUTH_HEADERS
+from tests.conftest import ADMIN_AUTH_HEADERS
 
 
 def test_liveness_does_not_require_login():
@@ -33,7 +33,7 @@ def test_configuration_status_is_protected_and_contains_no_secrets():
     anonymous = TestClient(app).get("/api/v1/system/configuration")
     assert anonymous.status_code == 401
 
-    response = TestClient(app, headers=AUTH_HEADERS).get("/api/v1/system/configuration")
+    response = TestClient(app, headers=ADMIN_AUTH_HEADERS).get("/api/v1/system/configuration")
     assert response.status_code == 200
     payload = response.json()
     assert isinstance(payload["production_ready"], bool)

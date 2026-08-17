@@ -1,23 +1,41 @@
 /* 全局样式：布局基调、卡片、滚动条、markdown 渲染 */
 
 :root {
-  --bp-sidebar-bg: #001529;
-  --bp-sidebar-active: #409eff;
-  --bp-content-bg: #f0f2f5;
-  --bp-card-border: #e4e7ed;
-  --bp-text-primary: #303133;
-  --bp-text-secondary: #606266;
-  --bp-text-muted: #909399;
+  --bp-sidebar-bg: #10243d;
+  --bp-sidebar-active: #e8f1ff;
+  --bp-content-bg: #f4f7fb;
+  --bp-surface: #ffffff;
+  --bp-surface-subtle: #f8fafc;
+  --bp-card-border: #e5eaf1;
+  --bp-primary: #2676e8;
+  --bp-primary-hover: #1764cb;
+  --bp-text-strong: #162b45;
+  --bp-text-primary: #273b53;
+  --bp-text-secondary: #5e7084;
+  --bp-text-muted: #8795a8;
   --bp-space-1: 4px;
   --bp-space-2: 8px;
   --bp-space-3: 12px;
   --bp-space-4: 16px;
   --bp-space-5: 20px;
   --bp-space-6: 24px;
-  --bp-radius-sm: 6px;
-  --bp-radius-md: 8px;
-  --bp-shadow-card: 0 1px 3px rgba(0, 21, 41, 0.04);
-  --bp-content-max-width: 1560px;
+  --bp-radius-sm: 8px;
+  --bp-radius-md: 12px;
+  --bp-shadow-card: 0 4px 14px rgba(20, 43, 74, 0.045);
+  --bp-content-max-width: 1440px;
+  --el-color-primary: var(--bp-primary);
+  --el-color-primary-light-3: #6ea6f3;
+  --el-color-primary-light-5: #94bdf6;
+  --el-color-primary-light-7: #c1d9fa;
+  --el-color-primary-light-8: #d8e7fc;
+  --el-color-primary-light-9: #edf5ff;
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 6px;
+  --el-border-color: var(--bp-card-border);
+  --el-text-color-primary: var(--bp-text-primary);
+  --el-text-color-regular: var(--bp-text-secondary);
+  --el-text-color-secondary: var(--bp-text-muted);
+  --el-fill-color-light: #f5f8fc;
 }
 
 * {
@@ -33,7 +51,7 @@ body {
 
 body {
   background: var(--bp-content-bg);
-  color: #303133;
+  color: var(--bp-text-primary);
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, system-ui, sans-serif;
   font-size: 14px;
 }
@@ -86,7 +104,7 @@ body {
 .page {
   width: 100%;
   min-width: 0;
-  padding: var(--bp-space-4) var(--bp-space-5) 40px;
+  padding: 24px var(--bp-space-6) 44px;
   max-width: var(--bp-content-max-width);
   margin: 0 auto;
 }
@@ -172,8 +190,27 @@ body {
   width: 4px;
   height: 16px;
   border-radius: 2px;
-  background: var(--bp-sidebar-active);
+  background: var(--bp-primary);
 }
+
+/* 统一基础控件：通过留白、细分隔与轻阴影建立层次，不使用厚重边框。 */
+.el-card {
+  border-color: var(--bp-card-border);
+  border-radius: var(--bp-radius-md);
+  box-shadow: var(--bp-shadow-card);
+}
+.el-card__header { border-bottom-color: #eef2f7; }
+.el-button { min-height: 32px; font-weight: 500; }
+.el-button--primary { box-shadow: 0 2px 5px rgba(38, 118, 232, .16); }
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner { box-shadow: 0 0 0 1px #dce4ee inset; }
+.el-input__wrapper:hover,
+.el-select__wrapper:hover { box-shadow: 0 0 0 1px #afc8e9 inset; }
+.el-table { --el-table-header-bg-color: #f7f9fc; --el-table-border-color: #e8edf3; --el-table-row-hover-bg-color: #f6f9fd; }
+.el-table th.el-table__cell { color: #5c6c7d; font-size: 12px; font-weight: 600; }
+.el-table td.el-table__cell { color: var(--bp-text-primary); }
+.el-tag { border-radius: 6px; }
 
 .formula-code {
   font-family: 'JetBrains Mono', Consolas, Menlo, monospace;
@@ -258,7 +295,7 @@ body {
 
 @media (max-width: 767px) {
   .page {
-    padding: var(--bp-space-4) var(--bp-space-3) 28px;
+    padding: 18px var(--bp-space-3) 32px;
   }
 
   .page-header,

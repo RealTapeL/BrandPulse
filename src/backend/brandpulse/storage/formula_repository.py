@@ -58,6 +58,7 @@ class FormulaRepository:
         return len(rows)
 
     def list_values(self, formula_id: str, brand_id: Optional[str] = None, limit: int = 30) -> List[Dict[str, Any]]:
+        """读取旧 brand/date 结果，仅供历史兼容；新计算应使用 list_snapshot_evaluations。"""
         sql = "SELECT * FROM custom_formula_values WHERE formula_id = :formula_id"
         params: Dict[str, Any] = {"formula_id": formula_id, "limit": limit}
         if brand_id:
@@ -66,6 +67,59 @@ class FormulaRepository:
         sql += " ORDER BY stat_date DESC, brand_id LIMIT :limit"
         with self.client.engine.connect() as conn:
             rows = conn.execute(text(sql), params).mappings().all()
+        return [dict(row) for row in rows]
+
+    def upsert_snapshot_evaluation(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        """写入绑定范围和快照的公式计算证据，绝不复用旧 brand/date 聚合结果。"""
+        evaluation_id = f"formula_eval_{uuid4().hex}"
+        with self.client.engine.begin() as conn:
+            saved = conn.execute(text("""
+                INSERT INTO snapshot_formula_evaluations (
+                    evaluation_id, formula_id, scope_id, snapshot_id, status, value,
+                    input_metrics, formula_definition, evidence, failure_reason
+                ) VALUES (
+                    :evaluation_id, :formula_id, :scope_id, :snapshot_id, :status, :value,
+                    CAST(:input_metrics AS jsonb), CAST(:formula_definition AS jsonb),
+                    CAST(:evidence AS jsonb), :failure_reason
+                )
+                ON CONFLICT (formula_id, snapshot_id) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    value = EXCLUDED.value,
+                    input_metrics = EXCLUDED.input_metrics,
+                    formula_definition = EXCLUDED.formula_definition,
+                    evidence = EXCLUDED.evidence,
+                    failure_reason = EXCLUDED.failure_reason,
+                    evaluated_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING *
+            """), {
+                **row,
+                "evaluation_id": evaluation_id,
+                "input_metrics": json.dumps(row.get("input_metrics") or {}, ensure_ascii=False, default=str),
+                "formula_definition": json.dumps(row.get("formula_definition") or {}, ensure_ascii=False, default=str),
+                "evidence": json.dumps(row.get("evidence") or {}, ensure_ascii=False, default=str),
+            }).mappings().one()
+        return dict(saved)
+
+    def list_snapshot_evaluations(
+        self,
+        formula_id: str,
+        *,
+        scope_id: Optional[str] = None,
+        limit: int = 30,
+    ) -> List[Dict[str, Any]]:
+        clauses = ["formula_id = :formula_id"]
+        params: Dict[str, Any] = {"formula_id": formula_id, "limit": min(max(limit, 1), 200)}
+        if scope_id:
+            clauses.append("scope_id = :scope_id")
+            params["scope_id"] = scope_id
+        with self.client.engine.connect() as conn:
+            rows = conn.execute(text(f"""
+                SELECT * FROM snapshot_formula_evaluations
+                WHERE {' AND '.join(clauses)}
+                ORDER BY evaluated_at DESC, evaluation_id DESC
+                LIMIT :limit
+            """), params).mappings().all()
         return [dict(row) for row in rows]
 
     def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:

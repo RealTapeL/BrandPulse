@@ -15,6 +15,8 @@
           <el-button size="small" :loading="reachLoading" @click="loadReachStatus">检查状态</el-button>
         </div>
       </div>
+      <el-alert v-if="!canOperate" type="info" :closable="false" title="当前账号可使用对话助手和查看自己的任务，但不能创建后台 Agent 任务。" class="context-error" />
+      <template v-else>
       <el-input
         v-model="prompt"
         type="textarea"
@@ -44,6 +46,7 @@
         <span v-if="store.running" class="hint">任务执行中，正在轮询状态…</span>
       </div>
       <el-alert v-if="contextError" type="error" :title="contextError" :closable="false" class="context-error" />
+      </template>
     </el-card>
 
     <!-- 当前任务 -->
@@ -61,13 +64,13 @@
       </div>
 
       <div class="task-block">
-        <div class="block-title">执行日志</div>
-        <el-timeline v-if="store.task.logs?.length" class="logs">
+        <div class="block-title">{{ canAdvancedDebug ? '执行日志' : '任务状态' }}</div>
+        <el-timeline v-if="canAdvancedDebug && store.task.logs?.length" class="logs">
           <el-timeline-item v-for="(log, i) in store.task.logs" :key="i" :timestamp="log.time || ''">
             {{ log.message ?? log }}
           </el-timeline-item>
         </el-timeline>
-        <el-text v-else type="info">暂无日志</el-text>
+        <el-text v-else type="info">{{ canAdvancedDebug ? '暂无日志' : '工具调用与运行日志仅在管理员高级诊断中可见。' }}</el-text>
       </div>
 
       <div v-if="store.task.output" class="task-block">
@@ -78,7 +81,7 @@
     </el-card>
 
     <!-- 错误态：retry -->
-    <el-alert v-if="store.error" type="error" title="Agent 任务执行失败" :closable="false" class="section">
+    <el-alert v-if="store.error && canOperate" type="error" title="Agent 任务执行失败" :closable="false" class="section">
       <el-button size="small" aria-label="重试 Agent 任务" @click="submit">重试</el-button>
     </el-alert>
 
@@ -105,9 +108,11 @@
  * Agent 控制台 /agent/console：发送指令 → POST /agent/execute 拿 task_id → 轮询任务状态展示日志与输出。
  * TODO: 后端就绪后，轮询可替换为 WebSocket / SSE 实时推送。
  */
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { getExternalResearchStatus } from '../api/agent'
 import { useAgentStore } from '../stores/agent'
+import { usePermissions } from '../composables/usePermissions'
+import { useScopeStore } from '../stores/scope'
 
 const store = useAgentStore()
 const prompt = ref('')
@@ -115,6 +120,10 @@ const contextText = ref('')
 const contextError = ref('')
 const reachStatus = ref(null)
 const reachLoading = ref(false)
+const { userStore } = usePermissions()
+const scopeStore = useScopeStore()
+const canOperate = computed(() => userStore.hasPermission('agent.operate'))
+const canAdvancedDebug = computed(() => userStore.user?.role === 'admin')
 
 onMounted(() => {
   Promise.all([store.loadHistory(), loadReachStatus()]).catch(() => {
@@ -145,7 +154,11 @@ function parseContext() {
 async function submit() {
   const context = parseContext()
   if (context === null || !prompt.value.trim()) return
-  await store.execute(prompt.value.trim(), context)
+  await scopeStore.load()
+  await store.execute(prompt.value.trim(), {
+    ...context,
+    current_scope_id: context.current_scope_id || scopeStore.currentId || null,
+  })
 }
 
 function statusType(s) {

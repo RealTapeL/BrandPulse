@@ -8,6 +8,20 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+# 只有这些指标来自 scope 绑定的 ready/published 快照；它们可以用于新告警规则。
+TRUSTED_SCOPE_METRICS = {
+    "data_freshness_hours",
+    "dp_review_count_stock",
+    "source_coverage_ratio",
+    "entity_mapping_coverage",
+}
+# 旧接口仍可读取和编辑历史指标，但未绑定 scope 的规则不会被可信调度器执行。
+LEGACY_METRICS = {
+    "reputation", "heat", "sov", "review_count", "rent_to_sales_ratio", "sales_per_sqm",
+}
+ALLOWED_METRICS = TRUSTED_SCOPE_METRICS | LEGACY_METRICS
+
+
 class AlertDestination(BaseModel):
     type: Literal["email", "webhook"] = Field(..., description="email 或 webhook")
     value: str = Field(..., description="邮箱地址或 webhook URL")
@@ -28,8 +42,15 @@ class AlertDestination(BaseModel):
 
 class AlertCreate(BaseModel):
     name: str = Field(..., min_length=1, description="告警名")
-    brand_id: Optional[str] = Field(default=None, description="品牌 ID，空则监控全量")
-    metric: str = Field(..., description="指标名：reputation/heat/sov/review_count/data_freshness_hours")
+    scope_id: Optional[str] = Field(
+        default=None,
+        description="可信监测范围 ID；新规则必须提供，空值仅用于兼容历史未分范围规则",
+    )
+    brand_id: Optional[str] = Field(default=None, description="历史数据集键兼容字段，不作为可信告警筛选条件")
+    metric: str = Field(
+        ...,
+        description="可信范围指标：data_freshness_hours/dp_review_count_stock/source_coverage_ratio/entity_mapping_coverage",
+    )
     operator: str = Field(..., description="比较运算符：> < = >= <=")
     threshold: float = Field(..., description="阈值")
     destinations: List[AlertDestination] = Field(default_factory=list, description="通知目的地")
@@ -47,14 +68,28 @@ class AlertCreate(BaseModel):
     @field_validator("metric")
     @classmethod
     def _valid_metric(cls, v: str) -> str:
-        allowed = {"reputation", "heat", "sov", "review_count", "data_freshness_hours", "rent_to_sales_ratio", "sales_per_sqm"}
-        if v not in allowed:
-            raise ValueError(f"metric 必须是: {', '.join(sorted(allowed))}")
+        if v not in ALLOWED_METRICS:
+            raise ValueError(f"metric 必须是: {', '.join(sorted(ALLOWED_METRICS))}")
         return v
+
+    @field_validator("scope_id")
+    @classmethod
+    def _clean_scope_id(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip() or None if v else None
+
+    @model_validator(mode="after")
+    def _validate_trusted_scope_metric(self):
+        if self.scope_id and self.metric not in TRUSTED_SCOPE_METRICS:
+            raise ValueError(
+                "绑定监测范围的告警只能使用快照可信指标："
+                f"{', '.join(sorted(TRUSTED_SCOPE_METRICS))}"
+            )
+        return self
 
 
 class AlertUpdate(BaseModel):
     name: Optional[str] = None
+    scope_id: Optional[str] = None
     brand_id: Optional[str] = None
     metric: Optional[str] = None
     operator: Optional[str] = None
@@ -74,13 +109,19 @@ class AlertUpdate(BaseModel):
     @field_validator("metric")
     @classmethod
     def _valid_update_metric(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v not in {"reputation", "heat", "sov", "review_count", "data_freshness_hours", "rent_to_sales_ratio", "sales_per_sqm"}:
+        if v is not None and v not in ALLOWED_METRICS:
             raise ValueError("不支持的告警指标")
         return v
+
+    @field_validator("scope_id")
+    @classmethod
+    def _clean_update_scope_id(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip() or None if v else None
 
 
 class AlertResponse(AlertCreate):
     id: int
+    rule_scope_status: Literal["trusted_scope", "legacy_unscoped"] = "legacy_unscoped"
     created_at: datetime
     updated_at: datetime
 

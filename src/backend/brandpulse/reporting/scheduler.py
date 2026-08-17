@@ -21,7 +21,7 @@ def process_due_report_schedules(now: datetime) -> int:
         if not due_today or not due_time:
             continue
         try:
-            require_report_ready(schedule["scope_id"])
+            readiness = require_report_ready(schedule["scope_id"], require_snapshot=True)
         except ReportDataNotReadyError as exc:
             # 保持未领取状态；当同一天稍后采集补齐数据时仍可生成正式报告。
             report_schedules.record_error(schedule["schedule_id"], str(exc))
@@ -34,6 +34,12 @@ def process_due_report_schedules(now: datetime) -> int:
             trigger_type="schedule",
             report_type=schedule["frequency"],
             file_format=schedule["file_format"],
+            snapshot_id=readiness["snapshot_id"],
+            template_id=schedule.get("template_id") or "trusted_snapshot_brief",
+            template_version=schedule.get("template_version") or "v1",
+            audience=schedule.get("audience") or [],
+            notification_channel=schedule.get("notification_channel") or "download",
+            requested_by="system:schedule",
         )
         try:
             run_repository.set_rq_job(run["report_id"], enqueue_report(run["report_id"]))

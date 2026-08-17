@@ -49,14 +49,37 @@ class AgentTaskRepository:
                 item[key] = str(item[key])
         return item
 
-    def create(self, prompt: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    def create(
+        self,
+        prompt: str,
+        context: Dict[str, Any],
+        *,
+        actor_id: str,
+        actor_username: str,
+        actor_role: str,
+        allowed_tools: list[str],
+    ) -> Dict[str, Any]:
         task_id = str(uuid4())
         with self.client.engine.connect() as conn:
             row = conn.execute(text("""
-                INSERT INTO agent_tasks (task_id, prompt, context, status, logs)
-                VALUES (:task_id, :prompt, CAST(:context AS jsonb), 'pending', '[]'::jsonb)
+                INSERT INTO agent_tasks (
+                    task_id, prompt, context, status, logs,
+                    actor_id, actor_username, actor_role, allowed_tools
+                )
+                VALUES (
+                    :task_id, :prompt, CAST(:context AS jsonb), 'pending', '[]'::jsonb,
+                    :actor_id, :actor_username, :actor_role, CAST(:allowed_tools AS jsonb)
+                )
                 RETURNING *
-            """), {"task_id": task_id, "prompt": prompt, "context": json.dumps(context, ensure_ascii=False)}).mappings().one()
+            """), {
+                "task_id": task_id,
+                "prompt": prompt,
+                "context": json.dumps(context, ensure_ascii=False),
+                "actor_id": actor_id,
+                "actor_username": actor_username,
+                "actor_role": actor_role,
+                "allowed_tools": json.dumps(sorted(set(allowed_tools)), ensure_ascii=False),
+            }).mappings().one()
             conn.commit()
         return self._row_to_dict(row)
 
@@ -110,8 +133,15 @@ class AgentTaskRepository:
             )
         return bool(result.rowcount)
 
-    def recover_stale_pending(self, stale_minutes: int = 10) -> int:
-        """将数据库中的陈旧中间态与 RQ 实际状态对账。"""
+    def recover_stale_pending(
+        self, stale_minutes: int = 10, *, actor_id: Optional[str] = None
+    ) -> int:
+        """将陈旧中间态与 RQ 实际状态对账；非管理员只处理自己的任务。"""
+        owner_clause = ""
+        owner_params: Dict[str, Any] = {}
+        if actor_id is not None:
+            owner_clause = " AND actor_id = :actor_id"
+            owner_params["actor_id"] = actor_id
         with self.client.engine.begin() as conn:
             result = conn.execute(text("""
                 UPDATE agent_tasks
@@ -122,7 +152,7 @@ class AgentTaskRepository:
                 WHERE status = 'pending'
                   AND rq_job_id IS NULL
                   AND created_at < CURRENT_TIMESTAMP - (:stale_minutes * INTERVAL '1 minute')
-            """), {"stale_minutes": stale_minutes})
+            """ + owner_clause), {"stale_minutes": stale_minutes, **owner_params})
             recovered = result.rowcount or 0
             candidates = conn.execute(text("""
                 SELECT task_id, rq_job_id, status
@@ -130,9 +160,10 @@ class AgentTaskRepository:
                 WHERE status IN ('pending', 'running')
                   AND rq_job_id IS NOT NULL
                   AND updated_at < CURRENT_TIMESTAMP - (:stale_minutes * INTERVAL '1 minute')
+                  """ + owner_clause + """
                 ORDER BY updated_at
                 LIMIT 100
-            """), {"stale_minutes": stale_minutes}).mappings().all()
+            """), {"stale_minutes": stale_minutes, **owner_params}).mappings().all()
 
         for candidate in candidates:
             rq_status, rq_error = _rq_job_state(candidate["rq_job_id"])
@@ -140,13 +171,16 @@ class AgentTaskRepository:
                 continue
             if rq_status == "started":
                 with self.client.engine.begin() as conn:
-                    conn.execute(text("""
-                        UPDATE agent_tasks
-                        SET status = 'running',
-                            started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE task_id = :task_id AND status = 'pending'
-                    """), {"task_id": candidate["task_id"]})
+                    conn.execute(
+                        text("""
+                            UPDATE agent_tasks
+                            SET status = 'running',
+                                started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE task_id = :task_id AND status = 'pending'
+                        """ + owner_clause),
+                        {"task_id": candidate["task_id"], **owner_params},
+                    )
                 continue
 
             if rq_status == "finished":
@@ -157,22 +191,35 @@ class AgentTaskRepository:
                 detail = rq_error[-1000:] if rq_error else rq_status
                 reason = f"RQ 任务已进入终态（{rq_status}）：{detail}"
             with self.client.engine.begin() as conn:
-                updated = conn.execute(text("""
-                    UPDATE agent_tasks
-                    SET status = 'failed', error = :error,
-                        updated_at = CURRENT_TIMESTAMP,
-                        finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP)
-                    WHERE task_id = :task_id AND status IN ('pending', 'running')
-                """), {"task_id": candidate["task_id"], "error": reason})
+                updated = conn.execute(
+                    text("""
+                        UPDATE agent_tasks
+                        SET status = 'failed', error = :error,
+                            updated_at = CURRENT_TIMESTAMP,
+                            finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP)
+                        WHERE task_id = :task_id AND status IN ('pending', 'running')
+                    """ + owner_clause),
+                    {"task_id": candidate["task_id"], "error": reason, **owner_params},
+                )
                 recovered += updated.rowcount or 0
         return recovered
 
-    def list(self, *, status: Optional[str], limit: int, offset: int) -> Dict[str, Any]:
+    def list(
+        self,
+        *,
+        status: Optional[str],
+        limit: int,
+        offset: int,
+        actor_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         conditions = ["1=1"]
         params: Dict[str, Any] = {"limit": limit, "offset": offset}
         if status:
             conditions.append("status = :status")
             params["status"] = status
+        if actor_id is not None:
+            conditions.append("actor_id = :actor_id")
+            params["actor_id"] = actor_id
         where = " AND ".join(conditions)
         with self.client.engine.connect() as conn:
             total = conn.execute(text(f"SELECT COUNT(*) FROM agent_tasks WHERE {where}"), params).scalar_one()

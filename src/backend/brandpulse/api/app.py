@@ -24,8 +24,10 @@ from brandpulse.api.audit import router as audit_router
 from brandpulse.api.alerts import router as alerts_router
 from brandpulse.api.auth import router as auth_router
 from brandpulse.api.auth import require_auth
+from brandpulse.api.users import router as users_router
 from brandpulse.api.brands import router as brands_router
 from brandpulse.api.chat import router as chat_router
+from brandpulse.api.cases import router as cases_router
 from brandpulse.api.crawl_jobs import router as crawl_jobs_router
 from brandpulse.api.data_governance import router as data_governance_router
 from brandpulse.api.dashboard import router as dashboard_router
@@ -33,8 +35,11 @@ from brandpulse.api.formulas import router as formulas_router
 from brandpulse.api.indicators import router as indicators_router
 from brandpulse.api.ml_forecasting import router as ml_forecasting_router
 from brandpulse.api.monitoring import router as monitoring_router
+from brandpulse.api.metrics import router as metrics_router
 from brandpulse.api.operations import router as operations_router
+from brandpulse.api.opportunities import router as opportunities_router
 from brandpulse.api.reports import router as reports_router
+from brandpulse.api.snapshots import router as snapshots_router
 from brandpulse.api.tables import router as tables_router
 from brandpulse.api.system import protected_router as protected_system_router
 from brandpulse.api.system import router as system_router
@@ -44,6 +49,8 @@ from brandpulse.observability import prometheus_http_middleware
 from brandpulse.audit import operation_audit_middleware
 
 logger = get_logger(__name__)
+
+Config.validate_auth_configuration()
 
 WEB_DIST = PROJECT_ROOT / "src" / "frontend" / "dist"
 
@@ -64,10 +71,15 @@ app.include_router(data_governance_router, **protected)
 app.include_router(indicators_router, **protected)
 app.include_router(ml_forecasting_router, **protected)
 app.include_router(monitoring_router, **protected)
+app.include_router(metrics_router, **protected)
 app.include_router(reports_router, **protected)
+app.include_router(snapshots_router, **protected)
 app.include_router(dashboard_router, **protected)
 app.include_router(operations_router, **protected)
+app.include_router(opportunities_router, **protected)
+app.include_router(cases_router, **protected)
 app.include_router(audit_router, **protected)
+app.include_router(users_router, **protected)
 app.include_router(protected_system_router, **protected)
 app.add_middleware(
     CORSMiddleware,

@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { ref } from 'vue'
+import { useUserStore } from '../stores/user'
 
 // 路由切换 loading 状态（App.vue 顶部进度条用）
 export const routeLoading = ref(false)
@@ -12,78 +13,96 @@ const routes = [
     meta: { title: '登录', public: true },
   },
   {
+    path: '/change-password',
+    name: 'change-password',
+    component: () => import('../views/ChangePassword.vue'),
+    meta: { title: '修改密码', passwordChangeOnly: true },
+  },
+  {
     path: '/',
     name: 'dashboard',
     component: () => import('../views/DashboardView.vue'),
-    meta: { title: '数据看板' },
+    meta: { title: '工作台', group: '工作台' },
     alias: '/dashboard',
   },
   {
-    path: '/chat',
-    name: 'chat',
+    path: '/assistant',
+    name: 'assistant',
     component: () => import('../views/ChatView.vue'),
-    meta: { title: '对话助手' },
+    meta: { title: '智能助手' },
   },
+  { path: '/chat', redirect: '/assistant' },
   {
-    path: '/tables',
-    name: 'tables',
-    component: () => import('../views/TablesView.vue'),
-    meta: { title: '数据表查看' },
+    path: '/data',
+    name: 'data-center',
+    component: () => import('../views/DataCenterView.vue'),
+    meta: { title: '数据中心', group: '数据中心' },
   },
+  { path: '/tables', redirect: { path: '/data', query: { tab: 'tables' } } },
   {
     path: '/formulas',
     name: 'formulas',
     component: () => import('../views/FormulasView.vue'),
-    meta: { title: '指标公式管理' },
+    meta: { title: '指标与公式', group: '系统设置' },
   },
-  {
-    path: '/data-governance',
-    name: 'data-governance',
-    component: () => import('../views/DataGovernanceView.vue'),
-    meta: { title: '数据治理' },
-  },
+  { path: '/data-governance', redirect: { path: '/data', query: { tab: 'quality' } } },
   {
     path: '/ml/forecasting',
     name: 'ml-forecasting',
     component: () => import('../views/MLForecastingView.vue'),
-    meta: { title: '机器学习预测' },
+    meta: { title: '实验室 · 机器学习预测', group: '系统设置' },
   },
   {
-    path: '/monitoring',
-    name: 'monitoring',
-    component: () => import('../views/MonitoringView.vue'),
-    meta: { title: '自动监控与告警' },
+    path: '/automation',
+    name: 'automation-center',
+    component: () => import('../views/AutomationCenterView.vue'),
+    meta: { title: '自动化中心', group: '自动化中心' },
   },
-  {
-    path: '/reports',
-    name: 'reports',
-    component: () => import('../views/ReportsView.vue'),
-    meta: { title: '自动报告与导出' },
-  },
+  { path: '/monitoring', redirect: { path: '/automation', query: { tab: 'collection' } } },
+  { path: '/reports', redirect: { path: '/automation', query: { tab: 'reports' } } },
   {
     path: '/audit',
     name: 'audit',
     component: () => import('../views/AuditView.vue'),
-    meta: { title: '操作审计' },
+    meta: { title: '操作审计', group: '系统设置', permission: 'audit.read' },
+  },
+  {
+    path: '/users',
+    name: 'users',
+    component: () => import('../views/UserManagementView.vue'),
+    meta: { title: '用户与权限', group: '系统设置', permission: 'user.manage' },
   },
   {
     path: '/brands',
     name: 'brands',
     component: () => import('../views/BrandList.vue'),
-    meta: { title: '品牌列表' },
+    meta: { title: '品牌库', group: '品牌洞察', navActive: '/brands' },
   },
   {
     path: '/brands/:id',
     name: 'brand-detail',
     component: () => import('../views/BrandDetail.vue'),
-    meta: { title: '品牌详情' },
+    meta: { title: '品牌详情', group: '品牌洞察', navActive: '/brands' },
   },
   {
-    path: '/agent/console',
+    path: '/opportunities',
+    name: 'opportunities',
+    component: () => import('../views/OpportunityRadarView.vue'),
+    meta: { title: '机会雷达', group: '品牌洞察', navActive: '/opportunities' },
+  },
+  {
+    path: '/watchlist',
+    name: 'watchlist',
+    component: () => import('../views/WatchlistView.vue'),
+    meta: { title: '关注清单', group: '品牌洞察', navActive: '/watchlist' },
+  },
+  {
+    path: '/assistant/advanced',
     name: 'agent-console',
     component: () => import('../views/AgentConsole.vue'),
-    meta: { title: 'Agent 控制台' },
+    meta: { title: '智能助手 · 高级任务', group: '系统设置', permission: 'agent.operate' },
   },
+  { path: '/agent/console', redirect: '/assistant/advanced' },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
@@ -92,18 +111,28 @@ const router = createRouter({
   routes,
 })
 
-// 鉴权守卫：无 token 一律跳转 /login（public 路由除外），已登录访问 /login 则回首页。
-// 直接读 localStorage 而不经过 Pinia，避免守卫与 store 初始化的先后耦合。
-router.beforeEach((to, from, next) => {
+// 鉴权守卫从 HttpOnly 刷新 Cookie 恢复会话；后端仍是最终权限裁决方。
+router.beforeEach(async (to) => {
   routeLoading.value = true
-  const token = localStorage.getItem('token')
-  if (!to.meta.public && !token) {
-    return next({ path: '/login', query: { redirect: to.fullPath } })
+  const userStore = useUserStore()
+  if (to.meta.public) {
+    await userStore.restoreSession()
+    return userStore.isLoggedIn ? { path: '/' } : true
   }
-  if (to.path === '/login' && token) {
-    return next({ path: '/' })
+  const restored = await userStore.restoreSession()
+  if (!restored) {
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
-  next()
+  if (userStore.user?.must_change_password && !to.meta.passwordChangeOnly) {
+    return { path: '/change-password' }
+  }
+  if (to.meta.passwordChangeOnly && !userStore.user?.must_change_password) {
+    return { path: '/' }
+  }
+  if (to.meta.permission && !userStore.hasPermission(to.meta.permission)) {
+    return { path: '/' }
+  }
+  return true
 })
 
 router.afterEach((to) => {

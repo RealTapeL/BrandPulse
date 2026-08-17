@@ -337,6 +337,10 @@ def _save_raw_records(
     run_id: str,
     crawl_job_id: Optional[str] = None,
     scope_id: Optional[str] = None,
+    collection_run_id: Optional[str] = None,
+    source_run_id: Optional[str] = None,
+    scope_category: Optional[str] = None,
+    candidate_brand_id: Optional[str] = None,
 ) -> int:
     """
     把爬虫原始结果写入对应的原始数据表（维度表/原始表分层架构）。
@@ -389,7 +393,36 @@ def _save_raw_records(
                     "note_url": note["note_url"],
                 },
             }
-            if repo.upsert_note(note, lineage=lineage):
+            observation = {
+                "observation_id": f"rawobs_{hashlib.sha256(f'xhs|{scope_id or ""}|{r["note_id"]}|{crawl_date}'.encode('utf-8')).hexdigest()[:40]}",
+                "scope_id": scope_id,
+                "collection_run_id": collection_run_id,
+                "source_run_id": source_run_id,
+                "source_name": site_id,
+                "record_type": "xhs_note",
+                "source_record_key": str(r["note_id"]),
+                "source_url": note["note_url"] or "",
+                "legacy_dataset_key": brand_id,
+                "observed_date": crawl_date,
+                "raw_category": scope_category or "",
+                "standard_category": scope_category or "",
+                "category_mapping_status": "confirmed" if scope_id else "legacy_unclassified",
+                "candidate_brand_id": candidate_brand_id,
+                "entity_mapping_status": "pending" if scope_id else "legacy_unclassified",
+                "quality_status": "accepted" if scope_id else "legacy_unclassified",
+                "payload": {
+                    "note_id": r["note_id"],
+                    "title": note["title"],
+                    "author_name": note["author_name"],
+                    "likes": note["likes"],
+                    "publish_time": note["publish_time"],
+                    "city": city,
+                    "mall_name": note["mall_name"],
+                    "keyword": note["keyword"],
+                    "note_url": note["note_url"],
+                },
+            }
+            if repo.upsert_note(note, lineage=lineage, observation=observation):
                 saved += 1
 
     elif site_id == "dianping_webbridge":
@@ -435,7 +468,36 @@ def _save_raw_records(
                     "source_url": shop["source_url"],
                 },
             }
-            if repo.upsert_shop_metric(shop, lineage=lineage):
+            observation = {
+                "observation_id": f"rawobs_{hashlib.sha256(f'dp|{scope_id or ""}|{identity}'.encode('utf-8')).hexdigest()[:40]}",
+                "scope_id": scope_id,
+                "collection_run_id": collection_run_id,
+                "source_run_id": source_run_id,
+                "source_name": site_id,
+                "record_type": "dp_shop_metric",
+                "source_record_key": lineage["record_key"],
+                "source_url": shop["source_url"] or "",
+                "legacy_dataset_key": brand_id,
+                "observed_date": crawl_date,
+                "raw_category": scope_category or "",
+                "standard_category": scope_category or "",
+                "category_mapping_status": "confirmed" if scope_id else "legacy_unclassified",
+                "candidate_brand_id": candidate_brand_id,
+                "entity_mapping_status": "pending" if scope_id else "legacy_unclassified",
+                "quality_status": "accepted" if scope_id else "legacy_unclassified",
+                "payload": {
+                    "shop_name": shop["shop_name"],
+                    "city": city,
+                    "place": place,
+                    "score": shop["score"],
+                    "review_count": shop["review_count"],
+                    "avg_price": shop["avg_price"],
+                    "business_area": shop["business_area"],
+                    "shop_text": shop["shop_text"],
+                    "source_url": shop["source_url"],
+                },
+            }
+            if repo.upsert_shop_metric(shop, lineage=lineage, observation=observation):
                 saved += 1
             # 自动登记商场维度
             if place:
@@ -467,6 +529,10 @@ def run_from_config(
     *,
     crawl_job_id: Optional[str] = None,
     scope_id: Optional[str] = None,
+    collection_run_id: Optional[str] = None,
+    source_run_id: Optional[str] = None,
+    scope_category: Optional[str] = None,
+    candidate_brand_id: Optional[str] = None,
     **kwargs,
 ):
     """
@@ -503,6 +569,7 @@ def run_from_config(
                 finished_at=datetime.now(), metadata={
                     "city": city, "place": kwargs.get("place"),
                     "crawl_job_id": crawl_job_id, "scope_id": scope_id,
+                    "collection_run_id": collection_run_id, "source_run_id": source_run_id,
                 },
             )
         except Exception as log_exc:
@@ -516,6 +583,10 @@ def run_from_config(
     raw_saved = _save_raw_records(
         site_id, records, brand_id, city, today, run_id,
         crawl_job_id=crawl_job_id, scope_id=scope_id,
+        collection_run_id=collection_run_id,
+        source_run_id=source_run_id,
+        scope_category=scope_category,
+        candidate_brand_id=candidate_brand_id,
     )
 
     # 2. 每日聚合热度（只聚合本次采集的平台；小红书非商场维度，mall_name 置空）
@@ -594,6 +665,8 @@ def run_from_config(
                 "cached": file_saved,
                 "crawl_job_id": crawl_job_id,
                 "scope_id": scope_id,
+                "collection_run_id": collection_run_id,
+                "source_run_id": source_run_id,
             },
         )
     except Exception as log_exc:

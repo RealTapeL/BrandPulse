@@ -1,9 +1,9 @@
-"""自定义指标公式 API：配置、试算和读取真实计算结果。"""
+"""自定义指标公式 API：配置、试算和 scope 快照绑定的真实计算结果。"""
 import re
 import math
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import IntegrityError
 
@@ -161,7 +161,7 @@ class FormulaPreviewRequest(BaseModel):
 
 @router.post("/{formula_id}/preview")
 def preview_formula(formula_id: str, payload: FormulaPreviewRequest):
-    """在显式传入上下文上试算，不写库；正式结果由指标管道按品牌数据生成。"""
+    """在显式传入上下文上试算，不写库，不作为正式招商指标。"""
     formula = FormulaRepository().get(formula_id)
     if not formula:
         raise HTTPException(status_code=404, detail="公式不存在")
@@ -179,26 +179,53 @@ def preview_formula(formula_id: str, payload: FormulaPreviewRequest):
 
 
 @router.post("/{formula_id}/run")
-def run_formula(formula_id: str, stat_date: Optional[str] = None):
-    """按真实指标上下文立即计算指定公式。"""
+def run_formula(
+    formula_id: str,
+    scope_id: Optional[str] = Query(default=None, min_length=1, max_length=64),
+    snapshot_id: Optional[str] = Query(default=None, min_length=1, max_length=64),
+    # 兼容旧客户端参数；不再用 brand/date 聚合计算。
+    stat_date: Optional[str] = Query(default=None),
+):
+    """按一个可信范围的 ready/published 快照计算指定公式。"""
     formula = FormulaRepository().get(formula_id)
     if not formula:
         raise HTTPException(status_code=404, detail="公式不存在")
     if not formula["enabled"]:
         raise HTTPException(status_code=409, detail="公式未启用")
-    saved = compute_custom_formulas(stat_date=stat_date, formula_id=formula_id)
-    return {"formula_id": formula_id, "saved": saved, "stat_date": stat_date}
+    if not scope_id:
+        detail = "自定义公式必须指定 scope_id，以绑定可信范围和快照"
+        if stat_date:
+            detail += "；stat_date 旧参数不再用于正式计算"
+        raise HTTPException(status_code=422, detail=detail)
+    try:
+        result = compute_custom_formulas(
+            scope_id=scope_id, snapshot_id=snapshot_id, formula_id=formula_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"formula_id": formula_id, **result}
 
 
 @router.get("/{formula_id}/values")
 def list_formula_values(
     formula_id: str,
     brand_id: Optional[str] = None,
+    scope_id: Optional[str] = None,
     limit: int = 30,
 ):
-    if not FormulaRepository().get(formula_id):
+    repo = FormulaRepository()
+    if not repo.get(formula_id):
         raise HTTPException(status_code=404, detail="公式不存在")
-    return {"values": FormulaRepository().list_values(formula_id, brand_id=brand_id, limit=limit)}
+    if scope_id:
+        return {
+            "mode": "snapshot",
+            "values": repo.list_snapshot_evaluations(formula_id, scope_id=scope_id, limit=limit),
+        }
+    return {
+        "mode": "legacy_brand_date",
+        "warning": "未传 scope_id，返回旧 brand/date 兼容结果；该结果不能用于正式招商判断。",
+        "values": repo.list_values(formula_id, brand_id=brand_id, limit=limit),
+    }
 
 
 @router.delete("/{formula_id}")

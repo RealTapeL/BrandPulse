@@ -1,6 +1,6 @@
 <template>
-  <div class="page tables-page">
-    <div class="page-header">
+  <div :class="[{ page: !embedded }, 'tables-page', { 'embedded-view': embedded }]">
+    <div v-if="!embedded" class="page-header">
       <h2>数据表查看</h2>
       <p class="desc">浏览底层业务数据表，支持筛选、排序与分页</p>
     </div>
@@ -29,6 +29,7 @@
           <div class="toolbar-info">
             <span class="toolbar-title">{{ conf.label }}</span>
             <span class="toolbar-desc">{{ conf.desc }}</span>
+            <el-tag v-if="conf.requiresScope" size="small" type="info" effect="plain">{{ scopeStore.label }}</el-tag>
           </div>
           <div class="toolbar-actions">
             <el-input
@@ -48,7 +49,7 @@
               @click="handleTemplateDownload"
             >下载空白模板</el-button>
             <el-upload
-              v-if="currentTable === 'store_operations'"
+              v-if="currentTable === 'store_operations' && canImport"
               :show-file-list="false"
               accept=".xlsx,.xlsm"
               :before-upload="handleOperationsUpload"
@@ -110,10 +111,18 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { TABLES, getTableConfig, fetchTableData } from '../api/tables'
 import { downloadOperationsTemplate, previewOperations, importOperations } from '../api/operations'
+import { usePermissions } from '../composables/usePermissions'
+import { useScopeStore } from '../stores/scope'
+
+defineProps({ embedded: { type: Boolean, default: false } })
+
+const { can } = usePermissions()
+const canImport = can('operations.import')
+const scopeStore = useScopeStore()
 
 const currentTable = ref(TABLES[0].name)
 const conf = computed(() => getTableConfig(currentTable.value))
@@ -131,6 +140,12 @@ const error = ref('')
 const uploading = ref(false)
 
 async function load() {
+  if (conf.value.requiresScope && !scopeStore.currentId) {
+    rows.value = []
+    total.value = 0
+    error.value = '请先在顶部选择可信监测范围'
+    return
+  }
   loading.value = true
   error.value = ''
   try {
@@ -140,6 +155,7 @@ async function load() {
       keyword: keyword.value,
       sortProp: sortProp.value,
       sortOrder: sortOrder.value,
+      scopeId: conf.value.requiresScope ? scopeStore.currentId : '',
     })
     rows.value = resp.rows
     total.value = resp.total
@@ -222,13 +238,21 @@ async function handleTemplateDownload() {
   }
 }
 
-function formatCell(v, prop) {
+function formatCell(v) {
   if (v == null || v === '') return '-'
-  if (prop === 'sov' && Number.isFinite(Number(v))) return `${(Number(v) * 100).toFixed(1)}%`
   return v
 }
 
-onMounted(load)
+watch(() => scopeStore.currentId, () => {
+  if (conf.value.requiresScope) {
+    page.value = 1
+    load()
+  }
+})
+onMounted(async () => {
+  await scopeStore.load().catch(() => {})
+  await load()
+})
 </script>
 
 <style scoped>

@@ -63,11 +63,29 @@ def test_mall_scope_dataset_id_does_not_require_brand_master_record(monkeypatch)
             return []
 
     monkeypatch.setattr("brandpulse.collectors.crawler.GenericWebCrawler", EmptyCrawler)
-
-    with pytest.raises(RuntimeError, match="没有已启用的站点"):
-        worker.main.run_mall_crawl(
-            mall="苏州中心",
-            category="咖啡",
-            city="苏州",
-            brand_id="MALL_906d5b65",
-        )
+    with PostgresClient().engine.connect() as conn:
+        before = set(conn.execute(text(
+            "SELECT collection_run_id FROM collection_runs"
+        )).scalars())
+    try:
+        with pytest.raises(RuntimeError, match="没有已启用的站点"):
+            worker.main.run_mall_crawl(
+                mall="苏州中心",
+                category="咖啡",
+                city="苏州",
+                brand_id="MALL_906d5b65",
+            )
+    finally:
+        with PostgresClient().engine.begin() as conn:
+            created = list(conn.execute(text("""
+                SELECT collection_run_id FROM collection_runs
+                WHERE crawl_job_id IS NULL
+            """)).scalars())
+            created = [run_id for run_id in created if run_id not in before]
+            if created:
+                conn.execute(text(
+                    "DELETE FROM data_snapshots WHERE collection_run_id = ANY(:run_ids)"
+                ), {"run_ids": created})
+                conn.execute(text(
+                    "DELETE FROM collection_runs WHERE collection_run_id = ANY(:run_ids)"
+                ), {"run_ids": created})

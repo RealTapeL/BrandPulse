@@ -18,6 +18,7 @@ from brandpulse.logger.logger import get_logger
 from brandpulse.collectors.queue import enqueue_crawl
 from brandpulse.storage.crawl_job_repository import CrawlJobRepository
 from brandpulse.storage.monitoring_repository import CrawlScheduleRepository
+from brandpulse.storage.trusted_data_repository import CollectionRunRepository
 
 logger = get_logger(__name__)
 
@@ -49,6 +50,7 @@ def run_crawl_job(task_meta: dict) -> dict:
     category = task_meta["category"]
     city = (task_meta.get("cities") or ["苏州"])[0]
     schedule_id = task_meta.get("schedule_id")
+    collection_run_id = task_meta.get("collection_run_id")
 
     logger.info(f"[worker] start crawl job: id={job_id}, brand_id={brand_id}, mall={mall}, category={category}, city={city}")
     repository = CrawlJobRepository()
@@ -60,12 +62,15 @@ def run_crawl_job(task_meta: dict) -> dict:
             "mall": mall,
             "category": category,
             "city": city,
-            "brand_id": brand_id,
+            "brand_id": task_meta.get("requested_brand_id") or task_meta.get("legacy_dataset_key") or brand_id,
         }
         if job_id:
             crawl_kwargs["crawl_job_id"] = job_id
         if task_meta.get("scope_id"):
             crawl_kwargs["scope_id"] = task_meta["scope_id"]
+        if collection_run_id:
+            crawl_kwargs["collection_run_id"] = collection_run_id
+            crawl_kwargs["trigger_type"] = task_meta.get("trigger_type") or "manual"
         stats = main.run_mall_crawl(
             **crawl_kwargs,
         )
@@ -90,6 +95,12 @@ def run_crawl_job(task_meta: dict) -> dict:
                 exc = RuntimeError(f"采集失败且延迟重试入队失败: {retry_exc}")
         if job_id:
             repository.finish(job_id, status="failed", result={"error": str(exc)})
+        if collection_run_id:
+            CollectionRunRepository().finish_collection(
+                collection_run_id,
+                status="failed",
+                failure_reason=str(exc),
+            )
         if schedule_id:
             CrawlScheduleRepository().record_result(schedule_id, success=False, error=str(exc))
         raise

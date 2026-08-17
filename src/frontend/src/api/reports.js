@@ -29,6 +29,31 @@ export async function downloadReport(reportId) {
   URL.revokeObjectURL(objectUrl)
 }
 
+export async function approveReport(reportId, note = '') {
+  const { data } = await api.post(`/v1/reports/${reportId}/approve`, { note })
+  return data
+}
+
+export async function dispatchReport(reportId) {
+  const { data } = await api.post(`/v1/reports/${reportId}/dispatch`)
+  return data
+}
+
+export async function retryReportDeliveries(reportId) {
+  const { data } = await api.post(`/v1/reports/${reportId}/retry-deliveries`)
+  return data
+}
+
+export async function fetchReportDeliveries(reportId) {
+  const { data } = await api.get(`/v1/reports/${reportId}/deliveries`)
+  return data
+}
+
+export async function fetchAllReportDeliveries() {
+  const { data } = await api.get('/v1/reports/deliveries/list')
+  return data
+}
+
 export async function fetchReportSchedules() {
   const { data } = await api.get('/v1/reports/schedules/list')
   return data

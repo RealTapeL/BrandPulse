@@ -2,37 +2,20 @@
 
 from __future__ import annotations
 
-import hashlib
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from sqlalchemy import text
 
 from brandpulse.db_clients.postgres_client import PostgresClient
-
-
-def _scope_id(brand_id: str, city: str, mall_name: str, category: str) -> str:
-    value = f"{brand_id}|{city}|{mall_name}|{category}".encode("utf-8")
-    return f"scope_{hashlib.sha256(value).hexdigest()[:24]}"
+from brandpulse.storage.trusted_data_repository import TrustedScopeRepository
 
 
 class MonitoringScopeRepository:
-    def __init__(self):
-        self.client = PostgresClient()
+    """旧模块名的兼容外观；实际范围由 trusted_monitoring_scopes 管理。"""
 
-    @staticmethod
-    def _row(row: Any) -> Dict[str, Any]:
-        item = dict(row)
-        for key in (
-            "created_at",
-            "updated_at",
-            "latest_indicator_date",
-            "latest_dianping_date",
-            "latest_xiaohongshu_date",
-        ):
-            if item.get(key) is not None:
-                item[key] = str(item[key])
-        return item
+    def __init__(self):
+        self.trusted = TrustedScopeRepository()
 
     def register(
         self,
@@ -43,109 +26,19 @@ class MonitoringScopeRepository:
         category: str,
         data_origin: str = "external_webbridge",
     ) -> Dict[str, Any]:
-        scope_id = _scope_id(brand_id, city, mall_name, category)
-        with self.client.engine.connect() as conn:
-            row = conn.execute(
-                text(
-                    """
-                    INSERT INTO monitoring_scopes
-                        (scope_id, brand_id, city, mall_name, category, data_origin)
-                    VALUES
-                        (:scope_id, :brand_id, :city, :mall_name, :category, :data_origin)
-                    ON CONFLICT (brand_id, city, mall_name, category) DO UPDATE SET
-                        is_active = TRUE,
-                        updated_at = CURRENT_TIMESTAMP
-                    RETURNING *
-                    """
-                ),
-                {
-                    "scope_id": scope_id,
-                    "brand_id": brand_id,
-                    "city": city,
-                    "mall_name": mall_name,
-                    "category": category,
-                    "data_origin": data_origin,
-                },
-            ).mappings().one()
-            conn.commit()
-        return self._row(row)
+        return self.trusted.register(
+            city=city,
+            mall_name=mall_name,
+            category=category,
+            legacy_dataset_key=brand_id,
+            data_origin=data_origin,
+        )
 
     def get(self, scope_id: str) -> Optional[Dict[str, Any]]:
-        with self.client.engine.connect() as conn:
-            row = conn.execute(
-                text(
-                    """
-                    SELECT scope.*,
-                           indicator.latest_indicator_date,
-                           dianping.latest_dianping_date,
-                           xiaohongshu.latest_xiaohongshu_date
-                    FROM monitoring_scopes AS scope
-                    LEFT JOIN LATERAL (
-                        SELECT MAX(stat_date) AS latest_indicator_date
-                        FROM brand_indicators_daily
-                        WHERE brand_id = scope.brand_id
-                          AND city = scope.city
-                          AND mall_name = scope.mall_name
-                    ) AS indicator ON TRUE
-                    LEFT JOIN LATERAL (
-                        SELECT MAX(crawl_date) AS latest_dianping_date
-                        FROM dp_shop_metrics
-                        WHERE brand_id = scope.brand_id
-                          AND city = scope.city
-                          AND place = scope.mall_name
-                    ) AS dianping ON TRUE
-                    LEFT JOIN LATERAL (
-                        SELECT MAX(crawl_date) AS latest_xiaohongshu_date
-                        FROM xhs_notes
-                        WHERE brand_id = scope.brand_id
-                          AND city = scope.city
-                          AND COALESCE(mall_name, '') = scope.mall_name
-                    ) AS xiaohongshu ON TRUE
-                    WHERE scope.scope_id = :scope_id
-                    """
-                ),
-                {"scope_id": scope_id},
-            ).mappings().first()
-        return self._row(row) if row else None
+        return self.trusted.get(scope_id)
 
     def list(self, *, active_only: bool = True) -> List[Dict[str, Any]]:
-        where = "WHERE scope.is_active = TRUE" if active_only else ""
-        with self.client.engine.connect() as conn:
-            rows = conn.execute(
-                text(
-                    f"""
-                    SELECT scope.*,
-                           indicator.latest_indicator_date,
-                           dianping.latest_dianping_date,
-                           xiaohongshu.latest_xiaohongshu_date
-                    FROM monitoring_scopes AS scope
-                    LEFT JOIN LATERAL (
-                        SELECT MAX(stat_date) AS latest_indicator_date
-                        FROM brand_indicators_daily
-                        WHERE brand_id = scope.brand_id
-                          AND city = scope.city
-                          AND mall_name = scope.mall_name
-                    ) AS indicator ON TRUE
-                    LEFT JOIN LATERAL (
-                        SELECT MAX(crawl_date) AS latest_dianping_date
-                        FROM dp_shop_metrics
-                        WHERE brand_id = scope.brand_id
-                          AND city = scope.city
-                          AND place = scope.mall_name
-                    ) AS dianping ON TRUE
-                    LEFT JOIN LATERAL (
-                        SELECT MAX(crawl_date) AS latest_xiaohongshu_date
-                        FROM xhs_notes
-                        WHERE brand_id = scope.brand_id
-                          AND city = scope.city
-                          AND COALESCE(mall_name, '') = scope.mall_name
-                    ) AS xiaohongshu ON TRUE
-                    {where}
-                    ORDER BY scope.city, scope.mall_name, scope.category, scope.created_at
-                    """
-                )
-            ).mappings().all()
-        return [self._row(row) for row in rows]
+        return self.trusted.list(active_only=active_only)
 
 
 class CrawlScheduleRepository:
@@ -210,9 +103,10 @@ class CrawlScheduleRepository:
             rows = conn.execute(
                 text(
                     """
-                    SELECT schedule.*, scope.city, scope.mall_name, scope.category, scope.brand_id
+                    SELECT schedule.*, scope.city, scope.mall_name, scope.category,
+                           scope.legacy_dataset_key AS brand_id
                     FROM crawl_schedules AS schedule
-                    JOIN monitoring_scopes AS scope ON scope.scope_id = schedule.scope_id
+                    JOIN trusted_monitoring_scopes AS scope ON scope.scope_id = schedule.scope_id
                     ORDER BY schedule.created_at DESC
                     """
                 )
@@ -274,10 +168,10 @@ class CrawlScheduleRepository:
                             (CURRENT_TIMESTAMP AT TIME ZONE schedule.timezone)::date,
                         last_error = NULL,
                         updated_at = CURRENT_TIMESTAMP
-                    FROM monitoring_scopes AS scope
+                    FROM trusted_monitoring_scopes AS scope
                     WHERE schedule.scope_id = scope.scope_id
                       AND schedule.enabled = TRUE
-                      AND scope.is_active = TRUE
+                      AND scope.status = 'active'
                       AND (
                           schedule.last_enqueued_for IS NULL
                           OR schedule.last_enqueued_for <
@@ -285,7 +179,8 @@ class CrawlScheduleRepository:
                       )
                       AND (CURRENT_TIMESTAMP AT TIME ZONE schedule.timezone)::time >=
                           make_time(schedule.run_hour, schedule.run_minute, 0)
-                    RETURNING schedule.*, scope.brand_id, scope.city, scope.mall_name, scope.category
+                    RETURNING schedule.*, scope.legacy_dataset_key AS brand_id,
+                              scope.city, scope.mall_name, scope.category
                     """
                 )
             ).mappings().all()

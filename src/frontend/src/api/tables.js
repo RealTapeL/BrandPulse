@@ -11,38 +11,36 @@ import api from './index'
  */
 export const TABLES = [
   {
-    name: 'dp_shop_metrics',
-    label: '点评门店',
-    desc: '大众点评门店采集指标',
+    name: 'raw_observations',
+    label: '原始观测',
+    desc: '当前可信范围内已采集、可追溯的原始来源记录',
+    requiresScope: true,
     columns: [
-      { prop: 'shop_name', label: '门店名称', sortable: true, minWidth: 220 },
-      { prop: 'score', label: '评分', sortable: true, width: 100 },
-      { prop: 'review_count', label: '评价数', sortable: true, width: 110 },
-      { prop: 'avg_price', label: '人均(元)', sortable: true, width: 110 },
-      { prop: 'business_area', label: '商圈', sortable: true, minWidth: 130 },
-      { prop: 'place', label: '位置', sortable: false, minWidth: 150 },
+      { prop: 'source_name', label: '来源', sortable: true, minWidth: 170 },
+      { prop: 'record_type', label: '记录类型', sortable: true, minWidth: 140 },
+      { prop: 'observed_date', label: '观测日期', sortable: true, width: 120 },
+      { prop: 'source_record_key', label: '来源记录键', sortable: true, minWidth: 220 },
+      { prop: 'entity_mapping_status', label: '实体映射', sortable: true, width: 120 },
+      { prop: 'category_mapping_status', label: '品类映射', sortable: true, width: 120 },
+      { prop: 'quality_status', label: '质量状态', sortable: true, width: 120 },
+      { prop: 'source_url', label: '来源链接', sortable: true, minWidth: 220 },
     ],
   },
   {
-    name: 'xhs_notes',
-    label: '小红书笔记',
-    desc: '小红书品牌相关笔记',
+    name: 'metric_observations',
+    label: '快照指标',
+    desc: '当前可信范围下、绑定快照与口径版本的指标事实',
+    requiresScope: true,
     columns: [
-      { prop: 'title', label: '标题', sortable: false, minWidth: 300 },
-      { prop: 'author_name', label: '作者', sortable: true, width: 140 },
-      { prop: 'likes', label: '点赞数', sortable: true, width: 100 },
-      { prop: 'publish_time', label: '发布时间', sortable: true, width: 140 },
-    ],
-  },
-  {
-    name: 'brand_indicators_daily',
-    label: '指标日表',
-    desc: '门店级日度指标（口碑分 / 热度指数 / SOV）',
-    columns: [
-      { prop: 'entity_name', label: '门店名称', sortable: true, minWidth: 220 },
-      { prop: 'weighted_score', label: '口碑分', sortable: true, width: 110 },
-      { prop: 'heat_index', label: '热度指数', sortable: true, width: 110 },
-      { prop: 'sov', label: 'SOV 声量份额', sortable: true, width: 140 },
+      { prop: 'snapshot_id', label: '快照 ID', sortable: true, minWidth: 210 },
+      { prop: 'metric_key', label: '指标', sortable: true, minWidth: 190 },
+      { prop: 'entity_type', label: '实体层级', sortable: true, width: 110 },
+      { prop: 'entity_key', label: '实体键', sortable: true, minWidth: 180 },
+      { prop: 'value', label: '值', sortable: true, width: 130 },
+      { prop: 'unit', label: '单位', sortable: true, width: 90 },
+      { prop: 'quality_status', label: '质量状态', sortable: true, width: 120 },
+      { prop: 'metric_version', label: '口径版本', sortable: true, minWidth: 130 },
+      { prop: 'calculated_at', label: '计算时间', sortable: true, minWidth: 180 },
     ],
   },
   {
@@ -74,9 +72,9 @@ export function getTableConfig(name) {
  * 查询数据表。
  * @returns {Promise<{ total: number, rows: object[] }>}
  */
-export async function fetchTableData(tableName, { page = 1, size = 20, keyword = '', sortProp = '', sortOrder = '' } = {}) {
+export async function fetchTableData(tableName, { page = 1, size = 20, keyword = '', sortProp = '', sortOrder = '', scopeId = '' } = {}) {
   const { data } = await api.get(`/v1/tables/${tableName}`, {
-    params: { page, size, keyword: keyword.trim(), sort_prop: sortProp, sort_order: sortOrder },
+    params: { page, size, keyword: keyword.trim(), sort_prop: sortProp, sort_order: sortOrder, scope_id: scopeId },
   })
   return data
 }

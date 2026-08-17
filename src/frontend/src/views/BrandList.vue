@@ -1,11 +1,8 @@
 <template>
   <div class="page brand-list-page">
-    <div class="page-header">
-      <div>
-        <h2>品牌列表</h2>
-        <p class="desc">按品牌、品类和城市筛选已登记的真实品牌数据。</p>
-      </div>
-    </div>
+    <PageHeader title="品牌库" description="按品牌、品类和城市筛选已登记的真实品牌主数据；指标与趋势需进入详情页查看。">
+      <template #actions><el-button plain @click="router.push('/watchlist')"><el-icon><Star /></el-icon>关注清单</el-button></template>
+    </PageHeader>
 
     <!-- 搜索栏 -->
     <div class="filter-bar toolbar">
@@ -74,6 +71,7 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import BrandTable from '../components/BrandTable.vue'
+import PageHeader from '../components/PageHeader.vue'
 import { useBrandsStore } from '../stores/brands'
 
 const router = useRouter()
@@ -107,6 +105,11 @@ function goDetail(row) {
 }
 .filter-bar {
   align-items: center;
+  padding: 14px;
+  border: 1px solid var(--bp-card-border);
+  border-radius: var(--bp-radius-md);
+  background: var(--bp-surface);
+  box-shadow: var(--bp-shadow-card);
 }
 .filter-q {
   width: min(360px, 100%);

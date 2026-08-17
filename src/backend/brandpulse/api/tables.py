@@ -16,23 +16,21 @@ class TableSpec:
     fields: Tuple[str, ...]
     searchable_fields: Tuple[str, ...]
     default_order: str
+    requires_scope: bool = False
 
 
 TABLE_SPECS: Dict[str, TableSpec] = {
-    "dp_shop_metrics": TableSpec(
-        fields=("shop_name", "city", "crawl_date", "score", "review_count", "avg_price", "business_area", "place"),
-        searchable_fields=("shop_name", "city", "business_area", "place"),
-        default_order="crawl_date DESC, shop_name ASC",
+    "raw_observations": TableSpec(
+        fields=("source_name", "record_type", "observed_date", "source_record_key", "entity_mapping_status", "category_mapping_status", "quality_status", "source_url"),
+        searchable_fields=("source_name", "record_type", "source_record_key", "source_url"),
+        default_order="observed_date DESC, source_name ASC, source_record_key ASC",
+        requires_scope=True,
     ),
-    "xhs_notes": TableSpec(
-        fields=("title", "author_name", "likes", "publish_time", "city", "mall_name", "crawl_date"),
-        searchable_fields=("title", "author_name", "city", "mall_name"),
-        default_order="crawl_date DESC, likes DESC NULLS LAST",
-    ),
-    "brand_indicators_daily": TableSpec(
-        fields=("stat_date", "entity_name", "city", "mall_name", "weighted_score", "heat_index", "sov", "wow_momentum", "volatility"),
-        searchable_fields=("entity_name", "city", "mall_name"),
-        default_order="stat_date DESC, heat_index DESC NULLS LAST",
+    "metric_observations": TableSpec(
+        fields=("snapshot_id", "metric_key", "entity_type", "entity_key", "value", "unit", "quality_status", "metric_version", "calculated_at"),
+        searchable_fields=("snapshot_id", "metric_key", "entity_type", "entity_key", "quality_status"),
+        default_order="calculated_at DESC, metric_key ASC",
+        requires_scope=True,
     ),
     "store_operations": TableSpec(
         fields=("op_id", "brand_id", "store_id", "record_date", "sales_amount", "order_count", "customer_price", "customer_flow", "rent", "store_area", "rent_to_sales_ratio", "sales_per_sqm", "contract_end", "data_source"),
@@ -50,16 +48,23 @@ def browse_table(
     keyword: str = Query(default="", max_length=128),
     sort_prop: str = Query(default="", max_length=64),
     sort_order: str = Query(default="", pattern="^(|ascending|descending)$"),
+    scope_id: str = Query(default="", max_length=64),
 ):
     spec = TABLE_SPECS.get(table_name)
     if not spec:
         raise HTTPException(status_code=404, detail="不支持的数据表")
 
-    where = ""
+    conditions = []
     params = {"limit": size, "offset": (page - 1) * size}
+    if spec.requires_scope:
+        if not scope_id.strip():
+            raise HTTPException(status_code=422, detail="该数据表必须选择可信监测范围")
+        conditions.append("scope_id = :scope_id")
+        params["scope_id"] = scope_id.strip()
     if keyword.strip():
-        where = " WHERE " + " OR ".join(f"CAST({field} AS TEXT) ILIKE :keyword" for field in spec.searchable_fields)
+        conditions.append("(" + " OR ".join(f"CAST({field} AS TEXT) ILIKE :keyword" for field in spec.searchable_fields) + ")")
         params["keyword"] = f"%{keyword.strip()}%"
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
 
     if sort_prop in spec.fields and sort_order:
         order = f"{sort_prop} {'ASC' if sort_order == 'ascending' else 'DESC'} NULLS LAST"

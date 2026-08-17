@@ -22,6 +22,7 @@
       </template>
       <div class="upload-row">
         <el-upload
+          v-if="canManage"
           action="#"
           :auto-upload="true"
           :show-file-list="false"
@@ -82,7 +83,7 @@
           <span class="muted">训练、回测和模型落盘由 brandpulse-ml 后台队列执行</span>
         </div>
       </template>
-      <el-form :inline="true" :model="form">
+      <el-form v-if="canManage" :inline="true" :model="form">
         <el-form-item label="数据集">
           <el-select v-model="form.datasetKey" class="dataset-select">
             <el-option
@@ -136,7 +137,7 @@
         <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
             <el-button
-              v-if="row.status === 'success' && row.model_id"
+              v-if="canManage && row.status === 'success' && row.model_id"
               size="small"
               type="primary"
               plain
@@ -222,6 +223,10 @@ import {
   startMLTraining,
   uploadMLDataset,
 } from '../api/ml'
+import { usePermissions } from '../composables/usePermissions'
+
+const { can } = usePermissions()
+const canManage = can('ml.manage')
 
 const datasets = ref([])
 const runs = ref([])
@@ -236,6 +241,7 @@ const starting = ref(false)
 const form = reactive({ datasetKey: 'store_sales', validationDays: 28, horizon: 14 })
 let pollTimer = null
 let polling = false
+let pollFailures = 0
 
 const trainableDatasets = computed(() => datasets.value.filter((item) => {
   return item.data_origin !== 'user_upload' || item.status === 'valid'
@@ -331,11 +337,16 @@ function startPolling() {
     polling = true
     try {
       await Promise.all([loadRuns(), loadExports(), loadLogs()])
+      pollFailures = 0
       const busy = runs.value.some((item) => item.status === 'pending' || item.status === 'running')
         || exports.value.some((item) => item.status === 'pending' || item.status === 'running')
       if (!busy) stopPolling()
     } catch {
-      // 请求拦截器负责展示错误；保留轮询，下一轮继续同步后台状态。
+      pollFailures += 1
+      if (pollFailures >= 5) {
+        stopPolling()
+        ElMessage.warning('训练状态连续获取失败，已停止自动刷新；请稍后手动刷新。')
+      }
     } finally {
       polling = false
     }
@@ -345,6 +356,7 @@ function startPolling() {
 function stopPolling() {
   if (pollTimer) window.clearInterval(pollTimer)
   pollTimer = null
+  pollFailures = 0
 }
 
 function statusType(status) {

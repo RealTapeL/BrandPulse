@@ -26,6 +26,15 @@ def client(monkeypatch):
     job_ids = [meta.get("job_id") for meta in created if meta.get("job_id")]
     if job_ids:
         with PostgresClient().engine.begin() as conn:
+            conn.execute(text("""
+                DELETE FROM data_snapshots
+                WHERE collection_run_id IN (
+                    SELECT collection_run_id FROM collection_runs WHERE crawl_job_id = ANY(:job_ids)
+                )
+            """), {"job_ids": job_ids})
+            conn.execute(text(
+                "DELETE FROM collection_runs WHERE crawl_job_id = ANY(:job_ids)"
+            ), {"job_ids": job_ids})
             conn.execute(text("DELETE FROM crawl_jobs WHERE job_id = ANY(:job_ids)"), {"job_ids": job_ids})
 
 

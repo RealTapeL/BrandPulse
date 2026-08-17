@@ -3,7 +3,9 @@
 
 提供 start_scheduler() / shutdown_scheduler()，由独立 runner 进程调用；FastAPI 不再持有调度器。
 """
-from typing import Optional
+from typing import Any, Dict, Optional
+
+from sqlalchemy import text
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -17,60 +19,106 @@ logger = get_logger(__name__)
 _scheduler: Optional[BackgroundScheduler] = None
 
 
-def _fetch_metric_value(metric: str, brand_id: Optional[str]) -> Optional[float]:
-    """
-    从真实指标/原始经营数据表取最新值。
-    """
-    indicator_sql = """
-        SELECT value FROM indicators
-        WHERE indicator = :metric
-          AND (:brand_id IS NULL OR brand_id = :brand_id)
-        ORDER BY date DESC LIMIT 1
-    """
-    raw_sql = """
-        SELECT SUM(review_count)::numeric AS value
-        FROM dp_shop_metrics
-        WHERE crawl_date = (SELECT MAX(crawl_date) FROM dp_shop_metrics)
-          AND (:brand_id IS NULL OR brand_id = :brand_id)
-    """
-    freshness_sql = """
-        SELECT EXTRACT(EPOCH FROM (
-            CURRENT_TIMESTAMP - MAX(crawl_date)::timestamp
-        )) / 3600.0 AS value
-        FROM dp_shop_metrics
-        WHERE (:brand_id IS NULL OR brand_id = :brand_id)
-    """
-    operation_sql = {
-        "rent_to_sales_ratio": """
-            SELECT AVG(rent_to_sales_ratio)::numeric FROM store_operations
-            WHERE record_date = (SELECT MAX(record_date) FROM store_operations)
-              AND (:brand_id IS NULL OR brand_id = :brand_id)
-        """,
-        "sales_per_sqm": """
-            SELECT AVG(sales_per_sqm)::numeric FROM store_operations
-            WHERE record_date = (SELECT MAX(record_date) FROM store_operations)
-              AND (:brand_id IS NULL OR brand_id = :brand_id)
-        """,
-    }
-    if metric == "review_count":
-        sql = raw_sql
-    elif metric == "data_freshness_hours":
-        sql = freshness_sql
-    elif metric in operation_sql:
-        sql = operation_sql[metric]
-    else:
-        sql = indicator_sql
-    params = {"metric": metric, "brand_id": brand_id}
+def _fetch_metric_evidence(metric: str, scope_id: str) -> Optional[Dict[str, Any]]:
+    """读取同一可信范围的最新快照事实，并返回可以追溯的指标证据。
 
+    不回退到旧 ``brand_id`` 聚合、热度或 SOV 表。找不到 ready/published 快照或
+    合格的快照指标时返回 ``None``，由状态机记录“暂无可用指标值”而不是猜测补值。
+    """
+    if metric not in {
+        "data_freshness_hours",
+        "dp_review_count_stock",
+        "source_coverage_ratio",
+        "entity_mapping_coverage",
+    }:
+        return None
+
+    freshness_sql = """
+        SELECT snapshot.snapshot_id, snapshot.observed_at, snapshot.quality_grade,
+               snapshot.freshness_status, snapshot.source_coverage,
+               EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - snapshot.observed_at)) / 3600.0 AS value
+        FROM data_snapshots AS snapshot
+        WHERE snapshot.scope_id = :scope_id
+          AND snapshot.status IN ('ready', 'published')
+          AND snapshot.observed_at IS NOT NULL
+        ORDER BY snapshot.observed_at DESC, snapshot.created_at DESC
+        LIMIT 1
+    """
+    metric_sql = """
+        SELECT observation.value, observation.metric_key, observation.metric_version,
+               observation.quality_status, observation.unit, observation.evidence,
+               observation.calculated_at, snapshot.snapshot_id, snapshot.observed_at,
+               snapshot.quality_grade, snapshot.freshness_status, snapshot.source_coverage
+        FROM metric_observations AS observation
+        JOIN data_snapshots AS snapshot ON snapshot.snapshot_id = observation.snapshot_id
+        WHERE observation.scope_id = :scope_id
+          AND observation.metric_key = :metric_key
+          AND observation.entity_type = 'scope'
+          AND observation.entity_key = :scope_id
+          AND observation.quality_status = 'valid'
+          AND observation.value IS NOT NULL
+          AND snapshot.status IN ('ready', 'published')
+        ORDER BY snapshot.observed_at DESC, observation.calculated_at DESC
+        LIMIT 1
+    """
     try:
         client = PostgresClient()
         with client.engine.connect() as conn:
-            from sqlalchemy import text
-            row = conn.execute(text(sql), params).first()
-            return float(row[0]) if row and row[0] is not None else None
-    except Exception as e:
-        logger.error(f"[scheduler] 查询指标 {metric} 失败: {e}")
+            if metric == "data_freshness_hours":
+                row = conn.execute(text(freshness_sql), {"scope_id": scope_id}).mappings().first()
+                if not row or row["value"] is None:
+                    return None
+                return {
+                    "value": float(row["value"]),
+                    "scope_id": scope_id,
+                    "snapshot_id": row["snapshot_id"],
+                    "metric_key": metric,
+                    "metric_quality": "valid",
+                    "evidence": {
+                        "source": "data_snapshots",
+                        "observed_at": str(row["observed_at"]),
+                        "quality_grade": row["quality_grade"],
+                        "freshness_status": row["freshness_status"],
+                        "source_coverage": row["source_coverage"],
+                    },
+                }
+            row = conn.execute(
+                text(metric_sql), {"scope_id": scope_id, "metric_key": metric}
+            ).mappings().first()
+            if not row:
+                return None
+            return {
+                "value": float(row["value"]),
+                "scope_id": scope_id,
+                "snapshot_id": row["snapshot_id"],
+                "metric_key": row["metric_key"],
+                "metric_quality": row["quality_status"],
+                "evidence": {
+                    "source": "metric_observations",
+                    "unit": row["unit"],
+                    "metric_version": row["metric_version"],
+                    "calculated_at": str(row["calculated_at"]),
+                    "observed_at": str(row["observed_at"]),
+                    "quality_grade": row["quality_grade"],
+                    "freshness_status": row["freshness_status"],
+                    "source_coverage": row["source_coverage"],
+                    "metric_evidence": row["evidence"] or {},
+                },
+            }
+    except Exception as exc:
+        logger.error("[scheduler] 查询可信快照指标 %s 失败: %s", metric, exc)
         return None
+
+
+def _fetch_metric_value(
+    metric: str,
+    brand_id: Optional[str] = None,
+    scope_id: Optional[str] = None,
+) -> Optional[float]:
+    """兼容旧内部调用签名；brand_id 不再参与可信告警的指标查询。"""
+    del brand_id
+    evidence = _fetch_metric_evidence(metric, scope_id) if scope_id else None
+    return evidence["value"] if evidence else None
 
 
 def _check_operator(value: float, op: str, threshold: float) -> bool:
@@ -84,7 +132,13 @@ def _check_operator(value: float, op: str, threshold: float) -> bool:
 
 
 def _check_alert(alert: dict) -> bool:
-    value = _fetch_metric_value(alert["metric"], alert.get("brand_id"))
+    # API 响应保留 metric 字段；调度 SQL 额外带 metric_key。两者在可信规则中相同。
+    metric_key = alert.get("metric_key", alert["metric"])
+    evidence = _fetch_metric_evidence(metric_key, alert["scope_id"])
+    value = evidence["value"] if evidence else None
+    if evidence:
+        # record_evaluation 会把该证据与生成的 alert_history 绑定，避免后续快照覆盖原判断依据。
+        alert["metric_evidence"] = evidence
     triggered = False
     if value is not None:
         triggered = _check_operator(value, alert["operator"], float(alert["threshold"]))
@@ -109,13 +163,15 @@ def check_all_alerts() -> int:
     """立即检查所有启用的告警规则，返回触发数。"""
     client = PostgresClient()
     with client.engine.connect() as conn:
-        from sqlalchemy import text
         rows = conn.execute(
             text("""
                 SELECT alert.*,
                        COALESCE(policy.cooldown_minutes, 60) AS cooldown_minutes,
-                       COALESCE(policy.notify_recovery, TRUE) AS notify_recovery
+                       COALESCE(policy.notify_recovery, TRUE) AS notify_recovery,
+                       trusted_rule.scope_id,
+                       trusted_rule.metric_key
                 FROM alerts AS alert
+                JOIN trusted_alert_rules AS trusted_rule ON trusted_rule.alert_id = alert.id
                 LEFT JOIN alert_delivery_policies AS policy
                   ON policy.alert_id = alert.id
                 WHERE alert.enabled = TRUE

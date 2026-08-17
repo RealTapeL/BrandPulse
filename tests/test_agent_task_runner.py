@@ -8,15 +8,24 @@ from brandpulse.storage.agent_task_repository import AgentTaskRepository
 
 def test_run_agent_task_persists_success_and_logs(monkeypatch):
     repository = AgentTaskRepository()
-    task = repository.create(f"Worker 测试任务 {uuid4().hex}", {})
-    monkeypatch.setattr(task_runner, "ask", lambda _question: ("来自 Worker 的真实执行结果", []))
+    task = repository.create(
+        f"Worker 测试任务 {uuid4().hex}", {},
+        actor_id="test-operator", actor_username="test_operator", actor_role="operator",
+        allowed_tools=["query_db"],
+    )
+    monkeypatch.setattr(
+        task_runner,
+        "ask",
+        lambda _question, allowed_tools=None: ("来自 Worker 的真实执行结果", []),
+    )
 
     try:
         task_runner.run_agent_task(task["id"])
 
         result = repository.get(task["id"])
         assert result["status"] == "success"
-        assert result["output"] == "来自 Worker 的真实执行结果"
+        assert result["output"].startswith("来自 Worker 的真实执行结果")
+        assert "未指定监测范围" in result["output"]
         assert result["attempt_count"] == 1
         assert [item["message"] for item in result["logs"]] == [
             "任务开始，初始化 BrandPulse Agent",
@@ -28,7 +37,11 @@ def test_run_agent_task_persists_success_and_logs(monkeypatch):
 
 def test_recover_stale_task_when_rq_job_is_missing(monkeypatch):
     repository = AgentTaskRepository()
-    task = repository.create(f"RQ 对账测试任务 {uuid4().hex}", {})
+    task = repository.create(
+        f"RQ 对账测试任务 {uuid4().hex}", {},
+        actor_id="test-operator", actor_username="test_operator", actor_role="operator",
+        allowed_tools=["query_db"],
+    )
     repository.set_rq_job(task["id"], f"missing-{uuid4().hex}")
     monkeypatch.setattr(
         repository_module,

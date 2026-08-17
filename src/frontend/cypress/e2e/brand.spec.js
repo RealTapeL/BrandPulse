@@ -3,11 +3,20 @@
  * 前置：FastAPI 与数据库已启动；npm run dev 通过 Vite proxy 访问后端。
  */
 describe('品牌浏览路径', () => {
+  const username = Cypress.env('username')
+  const password = Cypress.env('password')
+
+  before(function () {
+    if (!username || !password) {
+      this.skip()
+    }
+  })
+
   it('登录 -> 品牌列表 -> 搜索 -> 进入详情', () => {
     // 1. 登录
     cy.visit('/#/login')
-    cy.get('input[aria-label="用户名"]').type('admin')
-    cy.get('input[aria-label="密码"]').type('123456')
+    cy.get('input[aria-label="用户名"]').type(username)
+    cy.get('input[aria-label="密码"]').type(password, { log: false })
     cy.get('button[aria-label="登录"]').click()
     cy.hash().should('eq', '#/')
 

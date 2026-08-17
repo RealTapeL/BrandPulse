@@ -41,10 +41,15 @@ def process_due_crawl_schedules() -> int:
 
 
 def process_due_report_schedules() -> int:
-    """延迟导入报告服务，避免采集/报告模块循环依赖。"""
+    """处理到期报告，并消费已审核报告的持久化分发重试队列。"""
     from brandpulse.reporting.scheduler import process_due_report_schedules as process_reports
+    from brandpulse.reporting.delivery import process_due_report_deliveries
 
-    return process_reports(datetime.now())
+    submitted = process_reports(datetime.now())
+    delivery_summary = process_due_report_deliveries()
+    if any(delivery_summary.values()):
+        logger.info("[monitoring] 报告分发队列已处理: %s", delivery_summary)
+    return submitted
 
 
 def start_monitoring_scheduler(interval_seconds: int = 60) -> BackgroundScheduler:

@@ -1,4 +1,12 @@
-"""从指标和点评原始表计算启用中的自定义公式。"""
+"""在可信 scope 快照上执行自定义公式，并保留完整输入证据。
+
+旧 ``brand_indicators_daily`` / ``custom_formula_values`` 没有城市×商场×品类
+范围和快照版本，不能支撑正式招商判断。本模块只使用 metric_observations 中
+已标记为 valid 的 scope 级指标。
+"""
+
+from __future__ import annotations
+
 from typing import Any, Dict, Optional
 
 from sqlalchemy import text
@@ -7,105 +15,139 @@ from brandpulse.db_clients.postgres_client import PostgresClient
 from brandpulse.indicators.formula_engine import FormulaEvaluationError, evaluate_formula
 from brandpulse.logger.logger import get_logger
 from brandpulse.storage.formula_repository import FormulaRepository
+from brandpulse.storage.trusted_data_repository import TrustedScopeRepository
 
 logger = get_logger(__name__)
 
 
-def _contexts(stat_date: str) -> Dict[str, Dict[str, float]]:
+def _snapshot_context(scope_id: str, snapshot_id: Optional[str] = None) -> Dict[str, Any]:
+    """返回一个 ready/published 快照的可用 scope 指标和每个指标的证据。"""
     client = PostgresClient()
-    contexts: Dict[str, Dict[str, float]] = {}
     with client.engine.connect() as conn:
-        indicator_rows = conn.execute(text("""
-            SELECT brand_id,
-                   AVG(weighted_score) AS weighted_score,
-                   AVG(heat_index) AS heat_index,
-                   AVG(wow_momentum) AS wow_momentum,
-                   AVG(volatility) AS volatility,
-                   AVG(sov) AS sov
-            FROM brand_indicators_daily
-            WHERE stat_date = :stat_date AND entity_type = 'shop' AND brand_id IS NOT NULL
-            GROUP BY brand_id
-        """), {"stat_date": stat_date}).mappings().all()
-        for row in indicator_rows:
-            values = {key: float(row[key]) for key in (
-                "weighted_score", "heat_index", "wow_momentum", "volatility", "sov"
-            ) if row[key] is not None}
-            aliases = {
-                "reputation": "weighted_score",
-                "heat": "heat_index",
-                "momentum": "wow_momentum",
-            }
-            for alias, source in aliases.items():
-                if source in values:
-                    values[alias] = values[source]
-            contexts[str(row["brand_id"])] = values
+        conditions = [
+            "snapshot.scope_id = :scope_id",
+            "snapshot.status IN ('ready', 'published')",
+        ]
+        params: Dict[str, Any] = {"scope_id": scope_id}
+        if snapshot_id:
+            conditions.append("snapshot.snapshot_id = :snapshot_id")
+            params["snapshot_id"] = snapshot_id
+        snapshot = conn.execute(text(f"""
+            SELECT snapshot_id, scope_id, observed_at, quality_grade, freshness_status,
+                   data_mode, source_coverage
+            FROM data_snapshots AS snapshot
+            WHERE {' AND '.join(conditions)}
+            ORDER BY observed_at DESC, created_at DESC
+            LIMIT 1
+        """), params).mappings().first()
+        if not snapshot:
+            if snapshot_id:
+                raise ValueError("指定快照不存在、未属于该范围，或尚未 ready/published")
+            raise ValueError("该范围暂无 ready/published 快照，不能计算公式")
+        metric_rows = conn.execute(text("""
+            SELECT metric_key, value, unit, metric_version, quality_status, evidence,
+                   calculated_at
+            FROM metric_observations
+            WHERE snapshot_id = :snapshot_id
+              AND scope_id = :scope_id
+              AND entity_type = 'scope'
+              AND entity_key = :scope_id
+              AND quality_status = 'valid'
+              AND value IS NOT NULL
+            ORDER BY metric_key, calculated_at DESC
+        """), {"snapshot_id": snapshot["snapshot_id"], "scope_id": scope_id}).mappings().all()
 
-        raw_rows = conn.execute(text("""
-                SELECT brand_id,
-                       SUM(review_count)::numeric AS review_count,
-                       AVG(avg_price)::numeric AS avg_price,
-                       AVG(score)::numeric AS score
-                FROM dp_shop_metrics
-                WHERE crawl_date = :stat_date
-                GROUP BY brand_id
-            """), {"stat_date": stat_date}).mappings().all()
-        for row in raw_rows:
-            values = contexts.setdefault(str(row["brand_id"]), {})
-            for key in ("review_count", "avg_price", "score"):
-                if row[key] is not None:
-                    values[key] = float(row[key])
-    return contexts
+    context: Dict[str, float] = {}
+    evidence: Dict[str, Any] = {}
+    for row in metric_rows:
+        # 同一指标可能有不同 source_name；scope 输出优先取最新一条，定义中保留来源证据。
+        if row["metric_key"] in context:
+            continue
+        context[row["metric_key"]] = float(row["value"])
+        evidence[row["metric_key"]] = {
+            "unit": row["unit"], "metric_version": row["metric_version"],
+            "quality_status": row["quality_status"], "calculated_at": str(row["calculated_at"]),
+            "metric_evidence": row["evidence"] or {},
+        }
+    return {"snapshot": dict(snapshot), "context": context, "metric_evidence": evidence}
 
 
-def compute_custom_formulas(stat_date: Optional[str] = None, formula_id: Optional[str] = None) -> int:
-    """计算并持久化公式值；缺少真实输入时跳过并记录原因。"""
-    client = PostgresClient()
-    if not stat_date:
-        with client.engine.connect() as conn:
-            latest = conn.execute(text("SELECT MAX(stat_date) FROM brand_indicators_daily")).scalar()
-        if not latest:
-            return 0
-        stat_date = str(latest)
-
+def compute_custom_formulas(
+    *,
+    scope_id: str,
+    snapshot_id: Optional[str] = None,
+    formula_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """在一个实际快照上计算启用公式；缺失输入会如实记录为 skipped。"""
+    if not TrustedScopeRepository().get(scope_id):
+        raise ValueError("监测范围不存在")
+    snapshot_context = _snapshot_context(scope_id, snapshot_id)
+    snapshot = snapshot_context["snapshot"]
     repo = FormulaRepository()
     formulas = repo.list_enabled()
     if formula_id:
         formulas = [formula for formula in formulas if formula["id"] == formula_id]
     if not formulas:
-        return 0
+        return {
+            "saved": 0, "skipped": 0, "snapshot_id": snapshot["snapshot_id"],
+            "scope_id": scope_id, "evaluations": [],
+        }
 
-    contexts = _contexts(stat_date)
-    values = []
+    evaluations = []
+    saved = 0
+    skipped = 0
     for formula in formulas:
-        params: Dict[str, Any] = {}
+        params: Dict[str, float] = {}
+        failure_reason = ""
         for item in formula.get("params") or []:
             try:
                 params[item["key"]] = float(item["value"])
             except (KeyError, TypeError, ValueError):
-                logger.error("[公式] %s 参数 %r 不是数字，跳过", formula["name"], item)
-                params = {}
+                failure_reason = f"参数 {item!r} 不是有限数值"
                 break
-        if not params and formula.get("params"):
-            continue
-        for brand_id, context in contexts.items():
+        input_metrics = {**params, **snapshot_context["context"]}
+        status = "completed"
+        value: Optional[float] = None
+        if not failure_reason:
             try:
-                # 真实数据变量优先于同名参数，避免 review_count=0 之类的
-                # 表单默认值覆盖数据库中的真实评价数。
-                value = evaluate_formula(formula["expression"], {**params, **context})
+                value = evaluate_formula(formula["expression"], input_metrics)
             except FormulaEvaluationError as exc:
-                logger.warning("[公式] %s/%s 无法计算: %s", formula["name"], brand_id, exc)
-                continue
-            values.append({
-                "formula_id": formula["id"],
-                "brand_id": brand_id,
-                "stat_date": stat_date,
-                "value": value,
-                "detail": {
-                    "expression": formula["expression"],
-                    "input_fields": sorted(context.keys()),
-                    "source_stat_date": stat_date,
+                status = "skipped"
+                failure_reason = str(exc)
+        else:
+            status = "skipped"
+
+        row = repo.upsert_snapshot_evaluation({
+            "formula_id": formula["id"], "scope_id": scope_id,
+            "snapshot_id": snapshot["snapshot_id"], "status": status, "value": value,
+            "input_metrics": input_metrics,
+            "formula_definition": {
+                "name": formula["name"], "description": formula.get("description") or "",
+                "expression": formula["expression"], "params": formula.get("params") or [],
+            },
+            "evidence": {
+                "snapshot": {
+                    "observed_at": str(snapshot["observed_at"]),
+                    "quality_grade": snapshot["quality_grade"],
+                    "freshness_status": snapshot["freshness_status"],
+                    "data_mode": snapshot["data_mode"],
+                    "source_coverage": snapshot["source_coverage"],
                 },
-            })
-    saved = repo.upsert_values(values)
-    logger.info("[公式] %s 计算并写入 %s 条真实结果", stat_date, saved)
-    return saved
+                "metric_evidence": snapshot_context["metric_evidence"],
+            },
+            "failure_reason": failure_reason,
+        })
+        evaluations.append(row)
+        if status == "completed":
+            saved += 1
+        else:
+            skipped += 1
+
+    logger.info(
+        "[公式] scope=%s snapshot=%s 完成=%s 跳过=%s",
+        scope_id, snapshot["snapshot_id"], saved, skipped,
+    )
+    return {
+        "saved": saved, "skipped": skipped, "snapshot_id": snapshot["snapshot_id"],
+        "scope_id": scope_id, "evaluations": evaluations,
+    }

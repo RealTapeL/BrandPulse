@@ -1,4 +1,6 @@
 from brandpulse.collectors import worker
+from brandpulse.db_clients.postgres_client import PostgresClient
+from sqlalchemy import text
 
 
 def test_mall_crawl_keeps_source_level_results(monkeypatch):
@@ -25,14 +27,27 @@ def test_mall_crawl_keeps_source_level_results(monkeypatch):
     monkeypatch.setattr("brandpulse.data_governance.service.DataGovernanceService", FakeGovernance)
     monkeypatch.setattr("brandpulse.indicators.pipeline.run", lambda: {"口碑": 1})
 
-    result = worker.main.run_mall_crawl(
-        mall="苏州中心",
-        category="咖啡",
-        city="苏州",
-        brand_id="MALL_906d5b65",
-    )
+    result = None
+    try:
+        result = worker.main.run_mall_crawl(
+            mall="苏州中心",
+            category="咖啡",
+            city="苏州",
+            brand_id="MALL_906d5b65",
+        )
 
-    assert calls == ["dianping_webbridge", "xiaohongshu_webbridge"]
-    assert result["raw"] == 1
-    assert result["source_results"]["dianping_webbridge"]["status"] == "success"
-    assert result["source_results"]["xiaohongshu_webbridge"]["status"] == "empty"
+        assert calls == ["dianping_webbridge", "xiaohongshu_webbridge"]
+        assert result["raw"] == 1
+        assert result["source_results"]["dianping_webbridge"]["status"] == "success"
+        assert result["source_results"]["xiaohongshu_webbridge"]["status"] == "empty_validated"
+        # 假 connector 只伪造返回值而没有写入 raw_observations；快照必须拒绝发布。
+        assert result["snapshot"]["status"] == "failed"
+    finally:
+        if result and result.get("collection_run_id"):
+            with PostgresClient().engine.begin() as conn:
+                conn.execute(text(
+                    "DELETE FROM data_snapshots WHERE collection_run_id = :collection_run_id"
+                ), {"collection_run_id": result["collection_run_id"]})
+                conn.execute(text(
+                    "DELETE FROM collection_runs WHERE collection_run_id = :collection_run_id"
+                ), {"collection_run_id": result["collection_run_id"]})

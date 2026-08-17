@@ -86,11 +86,10 @@ class OperationsRepository:
             where.append(
                 """EXISTS (
                     SELECT 1
-                    FROM monitoring_scopes AS scope
-                    WHERE scope.scope_id = :scope_id
-                      AND scope.brand_id = operation.brand_id
-                      AND scope.city = store.city
-                      AND scope.mall_name = store.mall_name
+                    FROM scope_store_mappings AS scope_store
+                    WHERE scope_store.scope_id = :scope_id
+                      AND scope_store.store_id = operation.store_id
+                      AND scope_store.mapping_status = 'confirmed'
                 )"""
             )
             params["scope_id"] = scope_id
@@ -136,46 +135,37 @@ class OperationsRepository:
 
     def mapping_readiness(self, scope: Dict[str, Any]) -> Dict[str, Any]:
         """返回项目与主数据、经营数据的真实映射准备状态。"""
-        params = {
-            "brand_id": scope["brand_id"],
-            "city": scope["city"],
-            "mall_name": scope["mall_name"],
-        }
+        params = {"scope_id": scope["scope_id"]}
         with self.client.engine.connect() as conn:
             store_count = conn.execute(text("""
                 SELECT COUNT(*)
-                FROM stores
-                WHERE brand_id = :brand_id
-                  AND city = :city
-                  AND mall_name = :mall_name
+                FROM scope_store_mappings
+                WHERE scope_id = :scope_id AND mapping_status = 'confirmed'
             """), params).scalar_one()
             operation_count = conn.execute(text("""
                 SELECT COUNT(*)
                 FROM store_operations AS operation
-                JOIN stores AS store
-                  ON store.store_id = operation.store_id
-                 AND store.brand_id = operation.brand_id
-                WHERE operation.brand_id = :brand_id
-                  AND store.city = :city
-                  AND store.mall_name = :mall_name
+                JOIN scope_store_mappings AS scope_store
+                  ON scope_store.store_id = operation.store_id
+                 AND scope_store.scope_id = :scope_id
+                 AND scope_store.mapping_status = 'confirmed'
             """), params).scalar_one()
             latest_date = conn.execute(text("""
                 SELECT MAX(operation.record_date)
                 FROM store_operations AS operation
-                JOIN stores AS store
-                  ON store.store_id = operation.store_id
-                 AND store.brand_id = operation.brand_id
-                WHERE operation.brand_id = :brand_id
-                  AND store.city = :city
-                  AND store.mall_name = :mall_name
+                JOIN scope_store_mappings AS scope_store
+                  ON scope_store.store_id = operation.store_id
+                 AND scope_store.scope_id = :scope_id
+                 AND scope_store.mapping_status = 'confirmed'
             """), params).scalar_one()
         return {
             "scope_id": scope["scope_id"],
-            "brand_id": scope["brand_id"],
+            "brand_id": None,
             "city": scope["city"],
             "mall_name": scope["mall_name"],
             "mapped_store_count": int(store_count or 0),
             "operation_record_count": int(operation_count or 0),
             "latest_record_date": str(latest_date) if latest_date else None,
             "ready_for_sales_metric": bool(store_count and operation_count),
+            "mapping_rule": "仅统计 scope_store_mappings 中人工确认的真实门店；不会使用旧数据集键推断经营归属。",
         }

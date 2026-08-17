@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header">
       <h2>指标公式管理</h2>
-      <p class="desc">查看内置指标口径，管理自定义计算公式</p>
+      <p class="desc">查看快照指标口径，并在选定的可信范围与数据快照上执行可追溯的自定义公式。</p>
     </div>
 
     <!-- 内置指标（只读） -->
@@ -28,9 +28,15 @@
     </el-row>
 
     <!-- 自定义公式 -->
+    <el-alert class="formula-note" type="info" :closable="false" show-icon title="自定义公式只读取所选范围的 valid 快照指标，并保存输入、公式定义和快照证据；结果仅作分析试验，不会自动写入机会判断、报告或招商结论。" />
     <div class="custom-head">
       <h3 class="section-title" style="margin: 0">自定义公式</h3>
-      <el-button type="primary" :icon="'Plus'" @click="openCreate">新建公式</el-button>
+      <div class="custom-actions">
+        <el-select v-model="runScopeId" class="run-scope-select" placeholder="选择计算范围">
+          <el-option v-for="scope in scopes" :key="scope.scope_id" :label="scopeLabel(scope)" :value="scope.scope_id" />
+        </el-select>
+        <el-button v-if="canManage" type="primary" :icon="'Plus'" @click="openCreate">新建公式</el-button>
+      </div>
     </div>
     <el-card shadow="never" v-loading="loading">
       <div class="table-scroll">
@@ -66,6 +72,7 @@
             <el-switch
               :model-value="row.enabled"
               :loading="row._toggling"
+              :disabled="!canManage"
               @change="(val) => toggleEnabled(row, val)"
             />
           </template>
@@ -73,9 +80,9 @@
         <el-table-column label="备注" min-width="140" show-overflow-tooltip>
           <template #default="{ row }">{{ row.remark || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="210" fixed="right">
+        <el-table-column v-if="canManage" label="操作" width="210" fixed="right">
           <template #default="{ row }">
-            <el-button link type="success" :loading="row._running" @click="runNow(row)">立即计算</el-button>
+            <el-button link type="success" :loading="row._running" :disabled="!runScopeId" @click="runNow(row)">按范围计算</el-button>
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="remove(row)">删除</el-button>
           </template>
@@ -94,7 +101,7 @@
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
         <el-form-item label="公式名称" prop="name">
-          <el-input v-model="form.name" placeholder="例如：热度指数（自定义权重）" maxlength="50" show-word-limit />
+          <el-input v-model="form.name" placeholder="例如：点评单店平均评价数" maxlength="50" show-word-limit />
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" placeholder="公式的业务含义与用途" maxlength="200" />
@@ -104,7 +111,7 @@
             v-model="form.expression"
             type="textarea"
             :rows="3"
-            placeholder="例如：100 * ln(1 + review_count)；变量来自真实指标和点评数据"
+            placeholder="例如：dp_review_count_stock / max(dp_store_count_observed, 1)"
           />
         </el-form-item>
         <el-form-item label="参数定义">
@@ -146,32 +153,43 @@ import {
   runFormula,
   validateExpression,
 } from '../api/formulas'
+import { fetchMonitoringScopes } from '../api/monitoring'
+import { usePermissions } from '../composables/usePermissions'
 
-// ---- 内置指标（口径与后端 src/backend/brandpulse/indicators/ 保持一致，只读展示） ----
+const { can } = usePermissions()
+const canManage = can('formula.manage')
+
+// ---- 内置指标：与 metric_definitions / snapshot_metrics 保持一致，只读展示。 ----
 const builtinMetrics = [
   {
-    name: '口碑分',
+    name: '点评累计评价数（公开存量）',
+    formula: 'Σ review_count（当前 scope 快照内通过校验的点评门店）',
+    params: '范围固定为 城市 × 商场 × 品类；只统计当前快照 accepted 的点评观测。',
+    meaning: '反映公开评价存量，不代表近期热度、销售额或市场份额。',
+  },
+  {
+    name: '点评评价份额',
+    formula: '门店 review_count ÷ 同一 scope 的 Σ review_count',
+    params: '仅比较当前快照内同一范围的点评门店；分子、分母和来源 URL 写入指标证据。',
+    meaning: '用于观察同范围内公开评价分布，不等同真实市场份额或销售占比。',
+  },
+  {
+    name: '贝叶斯加权口碑',
     formula: 'WR = (v/(v+m))·R + (m/(v+m))·C',
-    params: 'R = 门店评分；v = 门店评价数；C = 当日全城加权平均评分；m = 当日全城门店评价数中位数（可信度阈值）',
-    meaning: '贝叶斯加权（IMDB 同款算法）。评价数越少，评分越被拉回全城均值，避免「5 条评价的 5.0 分」虚高（0~5 分）',
+    params: 'R = 门店评分；v = 评价数；C/m 优先取同商场同品类比较池，样本不足时按证据记录的降级策略处理。',
+    meaning: '仅在比较池满足最小样本时输出；未满足时标记 insufficient_sample，不强行给分。',
   },
   {
-    name: '热度指数',
-    formula: 'heat = 100·ln(1+v) / ln(1+50000)',
-    params: 'v = 点评评价数；50000 = 固定参考基准 REVIEW_REF（5 万评价视为满分热度）',
-    meaning: '对数压缩长尾，固定基准归一保证指数跨天、跨商场可比（0~100）',
+    name: '来源与实体映射覆盖率',
+    formula: '成功来源数 ÷ 预期来源数；已确认映射观测数 ÷ 可用原始观测数',
+    params: 'empty_validated / failed 不计为来源成功；未确认映射不进入品牌结论。',
+    meaning: '先判断数据是否足以使用，再讨论机会或风险；低覆盖率会产生数据质量事项而非业务结论。',
   },
   {
-    name: 'SOV 声量份额',
-    formula: 'SOV = 门店评价数 ÷ 同商场同品类当日总评价数',
-    params: '评价数取点评 dp_shop_metrics 当日采集值；分母为同商场（苏州中心）咖啡品类全部门店评价数之和',
-    meaning: '衡量门店在同商场同品类中的声量占比（0~1）。真实消费后的发声量，比裸评分更接近市场份额体感',
-  },
-  {
-    name: '趋势（周环比动量）',
-    formula: 'wow = (本期热度 − 上期热度) / 上期热度',
-    params: '热度取热度指标产出的固定基准热度指数；波动率窗口 4 期（近 N 期热度标准差 ÷ 均值）',
-    meaning: '数据积累不足 2 期时动量为 NULL，属正常状态。高动量 + 低波动 = 正在起势且非网红泡沫的品牌',
+    name: '点评评价趋势',
+    formula: '当前累计评价数 − 前一可比快照累计评价数',
+    params: '仅当来源完整、时间有序且累计数未下降时输出增量与增长率。',
+    meaning: '不满足可比条件时不输出趋势结论，避免把采集缺失或累计回落伪装成业务变化。',
   },
 ]
 
@@ -182,6 +200,8 @@ const saving = ref(false)
 const dialogVisible = ref(false)
 const editingId = ref(null)
 const formRef = ref(null)
+const scopes = ref([])
+const runScopeId = ref('')
 
 const emptyForm = () => ({
   name: '',
@@ -214,6 +234,16 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function scopeLabel(scope) {
+  return `${scope.city || '-'} · ${scope.mall_name || '-'} · ${scope.category || '-'}`
+}
+
+async function loadScopes() {
+  const result = await fetchMonitoringScopes()
+  scopes.value = result.items || []
+  if (!runScopeId.value && scopes.value.length) runScopeId.value = scopes.value[0].scope_id
 }
 
 function resetForm(data) {
@@ -287,10 +317,15 @@ async function toggleEnabled(row, val) {
 }
 
 async function runNow(row) {
+  if (!runScopeId.value) {
+    ElMessage.warning('请先选择可信监测范围')
+    return
+  }
   row._running = true
   try {
-    const result = await runFormula(row.id)
-    ElMessage.success(`已按最新真实指标计算 ${result.saved} 条结果`)
+    const result = await runFormula(row.id, { scopeId: runScopeId.value })
+    const suffix = result.skipped ? `，${result.skipped} 条因输入不足跳过` : ''
+    ElMessage.success(`已按快照 ${result.snapshot_id} 完成 ${result.saved} 条计算${suffix}`)
   } catch (e) {
     ElMessage.error(`计算失败：${e.response?.data?.detail || e.message || e}`)
   } finally {
@@ -317,7 +352,7 @@ async function remove(row) {
   }
 }
 
-onMounted(load)
+onMounted(async () => { await Promise.all([load(), loadScopes()]) })
 </script>
 
 <style scoped>
@@ -354,6 +389,13 @@ onMounted(load)
   justify-content: space-between;
   margin: 24px 0 12px;
 }
+.custom-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.run-scope-select { width: min(300px, 48vw); }
+.formula-note { margin: 24px 0 12px; }
 
 .expr-code {
   font-family: Consolas, Menlo, monospace;
@@ -387,6 +429,11 @@ onMounted(load)
     align-items: flex-start;
     gap: 12px;
     flex-wrap: wrap;
+  }
+
+  .custom-actions,
+  .run-scope-select {
+    width: 100%;
   }
 
   .param-row {

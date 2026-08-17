@@ -8,6 +8,7 @@ from sqlalchemy import text
 
 from brandpulse.config.config import Config
 from brandpulse.db_clients.postgres_client import PostgresClient
+from brandpulse.storage.auth_repository import AuthRepository
 
 router = APIRouter(prefix="/api/v1/system", tags=["system"])
 protected_router = APIRouter(prefix="/api/v1/system", tags=["system"])
@@ -60,8 +61,8 @@ def configuration_status():
 
     add(
         "auth_mode", "登录模式",
-        "pass" if Config.AUTH_MODE == "password" else "fail",
-        "已启用固定账号密码模式" if Config.AUTH_MODE == "password" else "当前为 local，本地模式接受任意非空账号密码",
+        "pass" if Config.AUTH_MODE == "rbac" else "warning",
+        "已启用数据库用户、角色与刷新会话" if Config.AUTH_MODE == "rbac" else "当前为 local 开发模式，不应用生产级账号权限",
     )
     secret_ok = len(Config.AUTH_SECRET) >= 32
     add(
@@ -69,11 +70,15 @@ def configuration_status():
         "pass" if secret_ok else "fail",
         "已配置长度不少于 32 的持久密钥" if secret_ok else "AUTH_SECRET 缺失或长度不足，服务重启会使登录令牌失效",
     )
-    password_ok = bool(Config.AUTH_USERNAME and Config.AUTH_PASSWORD)
+    try:
+        active_admin_count = AuthRepository().active_admin_count() if Config.AUTH_MODE == "rbac" else 0
+    except Exception:
+        active_admin_count = 0
+    account_ok = Config.AUTH_MODE == "rbac" and active_admin_count >= 1
     add(
-        "auth_account", "固定登录账号",
-        "pass" if password_ok else "fail",
-        "固定账号已配置" if password_ok else "AUTH_USERNAME / AUTH_PASSWORD 尚未完整配置",
+        "auth_account", "有效管理员账号",
+        "pass" if account_ok else "fail",
+        f"已配置 {active_admin_count} 个有效管理员账号" if account_ok else "尚未创建有效管理员账号",
     )
     add(
         "audit", "操作审计",

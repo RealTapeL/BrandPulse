@@ -11,7 +11,10 @@ def test_local_login_returns_session_token():
     assert response.status_code == 200
     data = response.json()
     assert data["token"]
-    assert data["user"] == {"id": "operator", "username": "operator", "role": "operator"}
+    assert data["user"]["id"] == "operator"
+    assert data["user"]["username"] == "operator"
+    assert data["user"]["role"] == "operator"
+    assert "business.read" in data["user"]["permissions"]
 
 
 def test_business_api_rejects_anonymous_request():

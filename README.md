@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/RealTapeL/BrandPulse/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/RealTapeL/BrandPulse/actions/workflows/ci.yml)
 
-面向商业地产招商运营场景的品牌情报系统。按「商场 + 品类」采集大众点评、小红书的公开数据，用确定性指标模型计算口碑、热度、声量份额，通过 Web 平台展示，并提供对话式数据问答。
+面向商业地产招商运营场景的可信品牌情报系统。系统按「城市 × 商场/项目 × 品类」登记监测范围，将公开来源记录、来源运行、数据质量、快照、指标与人工映射串成可追溯链路，用于候选品牌筛选和招商线索核验；不把公开评价或内容直接解释为销售、利润或确定招商结论。
 
 ## 项目结构
 
@@ -37,7 +37,7 @@ BrandPulse/
 │   │       │   ├── schemas.py      #   pydantic 采集 schema
 │   │       │   └── pipelines.py    #   解析/标准化/校验 pipeline
 │   │       ├── storage/            # 仓储层：PG 表 + JSON 文件缓存双写
-│   │       ├── indicators/         # 指标层：口碑 / 热度 / SOV / 趋势 + aggregate job
+│   │       ├── indicators/         # 指标层：快照指标、比较池、趋势可比性与公式试验
 │   │       ├── api/                # FastAPI：认证、看板、品牌、任务、数据表、公式等
 │   │       ├── agent/              # Pydantic AI 工具循环 + Tool registry
 │   │       ├── alerts/             # 告警规则与调度器
@@ -45,7 +45,7 @@ BrandPulse/
 │   ├── frontend/                   # 前端（Vue3 + Element Plus + ECharts + Pinia）
 │   └── ml/                         # 情感/NER 与时间序列预测（transformers + scikit-learn）
 ├── models/                         # 训练后模型保存目录
-└── tests/                          # pytest（当前 104 项）
+└── tests/                          # pytest（当前 122 项）
 ```
 
 ## 快速开始
@@ -65,6 +65,10 @@ cp env.dev.example .env   # 编辑填入 LLM_*（对话助手）、REDIS_URL 等
 
 # 初始化数据库，读取环境变量或 .env 中的 PostgreSQL 配置
 bash scripts/apply_migrations.sh
+
+# 启用数据库用户、三角色权限和安全刷新会话。
+# 本机 HTTP 调试才使用 --local-http；正式环境必须通过 HTTPS 运行，不要添加此参数。
+.venv/bin/python scripts/configure_production_auth.py --local-http
 
 # 前端（本机 npm 位于 ~/.local/node/bin）
 fish_add_path ~/.local/node/bin
@@ -109,19 +113,22 @@ cd src/frontend && npm run dev
 
 | 接口 | 说明 |
 |------|------|
-| `POST /api/v1/auth/login` | 本地会话登录（`AUTH_MODE` 可选 `local` / `password`） |
+| `POST /api/v1/auth/login` | 用户名密码登录，返回短期 Access Token 并设置 HttpOnly 刷新 Cookie |
+| `POST /api/v1/auth/refresh` / `POST .../logout` | 轮换刷新会话 / 注销当前会话 |
+| `POST /api/v1/auth/change-password` | 修改自己的密码并注销所有历史会话 |
+| `GET|POST|PUT /api/v1/users` | 管理员管理账号、角色、状态和一次性临时密码 |
 | `GET  /api/v1/dashboard` | 看板聚合数据（`/api/dashboard` 保留为兼容别名） |
 | `GET  /api/v1/brands` | 品牌目录筛选与分页 |
 | `GET  /api/v1/brands/filters` | 品类、城市筛选项 |
-| `GET  /api/v1/brands/{id}` | 品牌详情、采集记录与真实指标时序 |
-| `POST /api/v1/brands/{id}/crawl` | 从品牌详情发起采集 |
+| `GET  /api/v1/brands/{id}` | 品牌主数据、采集记录与可信数据边界说明 |
+| `POST /api/v1/brands/{id}/crawl` | 按已登记 `scope_id` 发起候选采集；不自动确认品牌映射 |
 | `POST /api/v1/crawl_jobs` | 创建采集任务并投递 `brandpulse-crawl` RQ 队列（body: brand_id, mall, category, cities?） |
 | `GET  /api/v1/crawl_jobs` / `GET .../{id}` | 查询持久化采集任务历史与状态 |
 | `GET  /api/v1/indicators` | 指标时序（query: brand_id, indicator, start, end） |
 | `GET /api/v1/dashboard/scopes` / `GET /api/v1/dashboard?scope_id=` | 真实项目/品类范围与范围内看板快照 |
-| `GET  /api/v1/tables/{name}` | 白名单数据表的服务端筛选、排序、分页 |
+| `GET  /api/v1/tables/{name}` | 白名单数据表的服务端筛选、排序、分页；`raw_observations`、`metric_observations` 必须传 `scope_id` |
 | `GET|POST|PUT|DELETE /api/v1/formulas` | 自定义指标公式配置 |
-| `POST /api/v1/formulas/{id}/run` / `GET .../values` | 按真实指标上下文计算并读取公式结果 |
+| `POST /api/v1/formulas/{id}/run` / `GET .../values?scope_id=` | 按可信范围的 ready/published 快照计算并读取带证据的公式试验结果 |
 | `POST /api/v1/operations/preview` / `POST .../import` | 校验并导入“内部经营数据”Excel |
 | `GET /api/v1/data-governance/summary` / `POST .../scan` | 数据质量汇总与扫描 |
 | `GET /api/v1/data-governance/issues` | 查看、确认和关闭数据质量问题 |
@@ -134,7 +141,7 @@ cd src/frontend && npm run dev
 | `POST /api/v1/alerts/check-now` | 立即执行告警检查 |
 | `GET /api/v1/alerts/deliveries/list` | 查看逐目标通知、失败原因和重试状态 |
 | `GET|POST|PUT|DELETE /api/v1/monitoring/crawl-schedules` | 自动采集计划配置、启停与持久化状态 |
-| `GET|POST|PUT|DELETE /api/v1/alerts` / `GET .../alerts/history` | 告警规则、通知配置与检查历史 |
+| `GET|POST|PUT|DELETE /api/v1/alerts` / `GET .../alerts/history` | 范围绑定告警、快照证据、通知配置与检查历史 |
 | `GET|POST /api/v1/reports` / `GET .../download` | 真实指标快照报告生成、查询和下载 |
 | `GET|POST|PUT|DELETE /api/v1/reports/schedules` | 日报/周报定时计划配置 |
 | `POST /ml/sentiment` | 情感分类推理 |
@@ -152,9 +159,23 @@ cd src/frontend && npm run dev
 | `GET /metrics` | Prometheus 进程与 HTTP 请求指标 |
 | `GET /api/v1/audit/events` | 按操作者、动作、结果和请求 ID 查询操作审计 |
 
-除登录接口外的业务 API 都需要 `Authorization: Bearer <token>`。变更请求、登录和文件下载会写入
-`audit_events`，只记录操作者、动作、结果、耗时与请求 ID，不保存正文、密码或 Token。未部署 ML 模型时
-推理接口返回 503，不会返回伪造预测。生产部署请配置 `AUTH_MODE=password`、`AUTH_SECRET`、SMTP 或告警 webhook。
+除登录与刷新接口外的业务 API 都需要 `Authorization: Bearer <token>`。变更请求、登录、认证/授权失败和文件下载会写入
+`audit_events`，只记录操作者、动作、结果、耗时与请求 ID，不保存正文、密码、刷新令牌或 Access Token。未部署 ML 模型时
+推理接口返回 503，不会返回伪造预测。
+
+## 生产登录与权限
+
+生产环境使用 `AUTH_MODE=rbac`，密码以 Argon2id 哈希保存，短期 Access Token 仅存在浏览器内存，刷新令牌只通过
+`HttpOnly + Secure + SameSite=Strict` Cookie 保存。初始化命令会生成至少 64 字符的 `AUTH_SECRET`，并在没有管理员时创建
+一个必须改密的初始管理员；初始密码只落到本机 `.secrets/brandpulse_initial_admin_password.txt`（权限 0600），不会打印或提交到仓库。
+
+| 角色 | 可做的事 |
+|---|---|
+| 管理员 | 拥有运营人员所有能力，并管理账号/角色、审计记录和生产配置检查。 |
+| 运营人员 | 查看所有业务数据；执行采集、指标/数据治理、经营数据导入、模型训练与导出、监控告警、报告和后台 Agent。 |
+| 只读人员 | 查看业务数据、历史记录、已完成报告/预测，并使用仅含查询工具的对话 Agent；不能写入、采集、训练或创建后台任务。 |
+
+正式部署必须设置 `APP_ENV=production`、`AUTH_MODE=rbac`、`AUTH_COOKIE_SECURE=true`，并经 HTTPS 对外提供服务；启动时会拒绝不安全配置。
 
 ## 机器学习预测
 
@@ -246,32 +267,32 @@ bash scripts/verify_postgres_backup.sh backups/postgres/brandpulse_YYYYmmdd_HHMM
 用户级每日 timer 可执行 `bash scripts/install_backup_timer.sh` 安装，默认约 02:30 运行且不需要 root；仍应
 定期使用独立临时数据库执行完整恢复演练。
 
-## 指标计算
+## 可信快照指标
 
 ```bash
 .venv/bin/python src/backend/main.py indicators [--date 2026-07-29]
 ```
 
-指标全部由确定性代码计算，不经过大模型，可复现可审计。口径（`src/backend/brandpulse/indicators/`，公式参数为文件头常量，可用历史数据校准）：
+正式页面读取 `metric_observations`：每一条结果都绑定 `scope_id`、`snapshot_id`、指标版本、比较池、质量状态和来源证据。它们不经过大模型，能够复现和审计。
 
-- **口碑分**：贝叶斯加权 `WR=(v/(v+m))·R+(m/(v+m))·C`。v=评价数，R=门店评分，C=全城加权均分，m=评价数中位数。评价少的店分数被拉向全城均值，避免小样本门店分数虚高
-- **热度指数**：固定基准对数归一 `100·ln(1+v)/ln(1+50000)`。对数压缩长尾，固定基准保证跨天、跨商场可比
-- **SOV 声量份额**：门店评价数 ÷ 同商场同品类总评价数，衡量商场内的相对竞争力
-- **趋势**：周环比动量 + 近 4 期波动率（变异系数）。数据不足 2 期时不产出，属正常状态
+- **点评公开存量**：累计评价数、观测门店数；明确标为公开存量，不称为近期热度或经营表现。
+- **贝叶斯加权口碑**：`WR=(v/(v+m))·R+(m/(v+m))·C`，优先使用同商场同品类比较池；样本不足时如实标记而不强行给分。
+- **点评评价份额**：仅在同一范围、同一快照内计算，记录分子、分母及来源。
+- **覆盖率与趋势**：来源覆盖率、实体映射覆盖率；评价增量只在相邻快照来源完整、时间有序且累计数可比时输出。
 
-结果写入 `brand_indicators_daily`；管道结束后自动同步 `indicators` 时序兼容表和启用中的自定义公式结果。
+`src/backend/main.py indicators` 仍用于旧兼容日表维护，不能作为正式招商页面、范围告警、报告或公式试验的数据源。自定义公式必须由用户在页面选择范围和 ready/published 快照后显式执行。
 
 ## Web 平台
 
 访问 `http://<本机IP>:8000/`，包含：
 
 - **登录页**：真实 `/api/v1/auth/login` 接口；单团队本地部署默认接受非空凭据，也可用环境变量切换为固定账号密码
-- **数据看板**：KPI 卡片、指标趋势图、双平台明细表
-- **品牌列表 / 详情**：搜索、分页、热度趋势、最近采集、发起采集
+- **数据看板**：范围内公开观测、快照质量、竞争线索与待处理事项；不显示伪造热度或经营判断
+- **品牌列表 / 详情**：搜索、分页、已确认映射的范围内公开观测、最近采集和候选采集
 - **Agent 控制台**：输入指令 → PostgreSQL 持久化 → RQ `brandpulse-agent` 队列 → Worker 执行 → 轮询状态 → 展示日志与输出；页面刷新后可恢复历史任务
-- **数据表查看**：点评门店 / 小红书笔记 / 指标日表 / 门店经营数据的分页、排序、筛选
+- **数据表查看**：范围绑定的原始观测、快照指标和门店经营数据的分页、排序、筛选
 - **内部经营数据**：在“门店经营数据”表页上传 Excel；系统先校验品牌与门店主数据，通过后才写库
-- **指标公式管理**：内置指标口径、自定义安全公式、按最新真实数据立即计算
+- **指标公式管理**：快照指标口径、自定义安全公式、按所选范围和快照计算并保存证据
 - **操作审计**：查看变更、登录和下载记录，并显示当前生产配置缺口
 
 技术栈：FastAPI + Vue3 / Element Plus / ECharts + Pinia + axios（hash 路由）。
@@ -282,12 +303,12 @@ bash scripts/verify_postgres_backup.sh backups/postgres/brandpulse_YYYYmmdd_HHMM
 
 | 工具 | 说明 |
 |------|------|
-| `list_tables` | 返回业务表结构，供模型写 SQL 前参考 |
-| `query_db` / `run_sql` | 只读 SQL（仅 SELECT/WITH，拦截多语句与写操作，限 100 行） |
-| `query_brand` | 按 brand_id 查询品牌基础信息 |
-| `start_crawl` | 把采集任务入队 RQ，返回 job_id |
-| `run_indicators` | 调用指标管道，刷新当日指标 |
-| `crawl` | 驱动浏览器采集指定商场 × 品类数据（约 40 秒） |
+| `list_monitoring_scopes` | 返回可选的可信监测范围 |
+| `get_scope_snapshot_evidence` | 返回范围的快照、来源覆盖和指标证据 |
+| `get_brand_evidence` | 只读取已确认映射的品牌公开观测 |
+| `list_opportunity_evidence` / `list_data_quality_evidence` | 返回机会线索或数据质量信号的触发证据 |
+| `list_business_case_evidence` | 返回开放事项、负责人和处置状态 |
+| `query_db` / `list_tables` | 仅管理员高级调试模式可用的只读 SQL 能力 |
 | `external_research` | 可选 Agent-Reach：读取/搜索公开网页，不写入 BrandPulse 指标表 |
 
 ```bash
@@ -312,9 +333,10 @@ agent-reach doctor --json
 ## 数据模型
 
 - **维度表**：`malls`（商场，采集时自动登记）、`brands`、`category_dict`
-- **原始表**：`stores`（高德）、`dp_shop_metrics`（点评门店指标）、`xhs_notes`（小红书笔记）
-- **聚合表**：`brand_heat_daily`（品牌 × 城市 × 商场 × 日期 × 平台热度）
-- **指标表**：`brand_indicators_daily`（口碑 / 热度 / SOV / 趋势，按日按门店）
+- **可信范围与运行**：`trusted_monitoring_scopes`、`collection_runs`、`source_runs`
+- **可信原始与快照**：`raw_observations`、`data_snapshots`、`snapshot_source_results`
+- **指标与判断证据**：`metric_observations`、`opportunity_signals`、`trusted_alert_evaluations`、`snapshot_formula_evaluations`
+- **兼容历史表**：`dp_shop_metrics`、`xhs_notes`、`brand_heat_daily`、`brand_indicators_daily` 保留历史读，不作为正式判断来源
 - **经营表**：`store_operations`（销售、订单、客流、成本、坪效、租售比、合同到期）
 
 ## 测试
@@ -325,7 +347,7 @@ PYTHONPATH=.:src/backend:src .venv/bin/python -m pytest tests/ -q
 
 # 前端测试（在 src/frontend 目录）
 cd src/frontend
-npm run test:unit   # 10 项
+npm run test:unit   # 当前 13 项
 npm run cypress     # e2e 1 项
 ```
 
@@ -335,7 +357,7 @@ npm run cypress     # e2e 1 项
 
 - 在全新的 PostgreSQL 16 数据库中连续应用两次全部初始化 SQL 和迁移，验证顺序和幂等性
 - 启动 Redis 7，运行后端测试，并检查 FastAPI 存活与就绪接口
-- 运行前端 10 项单元测试和 Vite 生产构建
+- 运行前端单元测试和 Vite 生产构建
 - 使用 Gitleaks 扫描 Git 历史，阻止 API Key、邮箱授权码等密钥进入仓库
 
 本地可使用与 CI 相同的核心命令：

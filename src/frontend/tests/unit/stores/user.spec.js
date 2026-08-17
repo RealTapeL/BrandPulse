@@ -1,5 +1,5 @@
 /**
- * user store 单元测试：mock axios 后端，验证登录成功写入 token/user、失败不残留状态。
+ * user store 单元测试：验证短期令牌只保留在内存、失败不残留状态。
  */
 import MockAdapter from 'axios-mock-adapter'
 import { setActivePinia, createPinia } from 'pinia'
@@ -13,7 +13,6 @@ describe('stores/user', () => {
   let mock
 
   beforeEach(() => {
-    localStorage.clear()
     setActivePinia(createPinia())
     mock = new MockAdapter(api)
   })
@@ -22,7 +21,7 @@ describe('stores/user', () => {
     mock.restore()
   })
 
-  it('登录成功：保存 token 与 user 到 state 和 localStorage', async () => {
+  it('登录成功：保存 token 与 user 到内存，不写入浏览器持久化存储', async () => {
     mock.onPost('/v1/auth/login').reply(200, {
       token: 'mock-jwt-token-for-demo',
       user: { id: 1, username: 'admin', role: 'admin' },
@@ -34,7 +33,7 @@ describe('stores/user', () => {
     expect(store.isLoggedIn).toBe(true)
     expect(store.token).toBe('mock-jwt-token-for-demo')
     expect(store.user.username).toBe('admin')
-    expect(localStorage.getItem('token')).toBe('mock-jwt-token-for-demo')
+    expect(localStorage.getItem('token')).toBeNull()
     // axios 请求头注入 token
     expect(mock.history.post[0].headers.Authorization).toBeUndefined() // 登录前无 token
   })
@@ -62,7 +61,7 @@ describe('stores/user', () => {
     expect(localStorage.getItem('token')).toBeNull()
   })
 
-  it('logout：清空 state 与 localStorage', async () => {
+  it('logout：立即清空内存状态，并请求服务端注销', async () => {
     mock.onPost('/v1/auth/login').reply(200, {
       token: 't-123',
       user: { id: 1, username: 'admin', role: 'admin' },
@@ -70,10 +69,13 @@ describe('stores/user', () => {
 
     const store = useUserStore()
     await store.login('admin', '123456')
-    store.logout()
+    mock.onPost('/v1/auth/logout').reply(204)
+    await store.logout()
 
     expect(store.isLoggedIn).toBe(false)
     expect(localStorage.getItem('token')).toBeNull()
     expect(localStorage.getItem('user')).toBeNull()
+    expect(mock.history.post.at(-1).url).toBe('/v1/auth/logout')
+    expect(mock.history.post.at(-1).headers.Authorization).toBe('Bearer t-123')
   })
 })
