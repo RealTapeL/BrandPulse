@@ -5,6 +5,7 @@
         <DataFreshnessBadge :value="data?.crawl_date" source="大众点评" />
         <DataFreshnessBadge :value="xhsLatestDate" source="小红书" />
         <el-button :loading="loading" @click="reload"><el-icon><Refresh /></el-icon>刷新数据</el-button>
+        <el-button @click="router.push('/analysis')"><el-icon><TrendCharts /></el-icon>进入分析中心</el-button>
         <el-button type="primary" :disabled="!scopeStore.currentId" @click="router.push('/automation?tab=collection')"><el-icon><Timer /></el-icon>发起采集</el-button>
       </template>
     </PageHeader>
@@ -83,6 +84,7 @@ import DataFreshnessBadge from '../components/DataFreshnessBadge.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { buildMomentumOption, buildReviewShareOption } from '../components/dashboard/chartOptions'
 import { fetchDashboard } from '../api/dashboard'
+import { fetchAnalysis } from '../api/analysis'
 import { fetchAlerts } from '../api/alerts'
 import { fetchCrawlSchedules } from '../api/monitoring'
 import { fetchOpportunities } from '../api/opportunities'
@@ -93,6 +95,7 @@ import { average, formatNumber, formatPercent } from '../utils/insights'
 const router = useRouter()
 const scopeStore = useScopeStore()
 const data = ref(null)
+const analysisData = ref(null)
 const schedules = ref([])
 const alerts = ref([])
 const opportunitySignals = ref([])
@@ -105,13 +108,13 @@ const xhsLatestDate = computed(() => (data.value?.xhs_notes || []).reduce((lates
 const opportunities = computed(() => opportunitySignals.value.map(toOpportunityItem))
 const focusItems = computed(() => opportunities.value.slice(0, 5))
 const averageScore = computed(() => { const value = average(data.value?.indicators || [], 'weighted_score'); return value === null ? '-' : formatNumber(value, 2) })
-const metricByKey = computed(() => Object.fromEntries((data.value?.metric_summary || []).map((item) => [item.metric_key, item])))
+const metricByKey = computed(() => Object.fromEntries((analysisData.value?.metrics || data.value?.metric_summary || []).map((item) => [item.metric_key, item])))
 const metricValue = (key) => metricByKey.value[key]?.value
 const observedStoreCount = computed(() => formatNumber(metricValue('dp_store_count_observed') ?? data.value?.dp_shops?.length))
 const reviewStock = computed(() => formatNumber(metricValue('dp_review_count_stock')))
 const sourceCoverage = computed(() => formatPercent(metricValue('source_coverage_ratio')))
 const sourceCoverageNote = computed(() => {
-  const results = data.value?.source_results || []
+  const results = analysisData.value?.snapshot?.source_results || data.value?.source_results || []
   const successful = results.filter((item) => item.status === 'success').map((item) => item.source_name)
   return successful.length ? `已成功：${successful.join('、')}` : '暂无成功来源'
 })
@@ -147,10 +150,12 @@ async function reload() {
   try {
     await scopeStore.load()
     if (!scopeStore.currentId) { data.value = null; return }
-    const [dashboard, crawlSchedules, alertRules, signalResult, caseResult] = await Promise.all([
-      fetchDashboard(scopeStore.currentId), fetchCrawlSchedules().catch(() => ({ items: [] })), fetchAlerts().catch(() => []), fetchOpportunities({ scopeId: scopeStore.currentId }).catch(() => ({ items: [] })), fetchCases().catch(() => ({ items: [] })),
+    const [dashboard, unifiedAnalysis, crawlSchedules, alertRules, signalResult, caseResult] = await Promise.all([
+      fetchDashboard(scopeStore.currentId),
+      fetchAnalysis({ scope_id: scopeStore.currentId, view: 'overview', limit: 30 }).catch(() => null),
+      fetchCrawlSchedules().catch(() => ({ items: [] })), fetchAlerts().catch(() => []), fetchOpportunities({ scopeId: scopeStore.currentId }).catch(() => ({ items: [] })), fetchCases().catch(() => ({ items: [] })),
     ])
-    data.value = dashboard; schedules.value = crawlSchedules.items || []; alerts.value = Array.isArray(alertRules) ? alertRules : []; opportunitySignals.value = signalResult.items || []; cases.value = caseResult.items || []
+    data.value = dashboard; analysisData.value = unifiedAnalysis; schedules.value = crawlSchedules.items || []; alerts.value = Array.isArray(alertRules) ? alertRules : []; opportunitySignals.value = signalResult.items || []; cases.value = caseResult.items || []
   } catch (err) { error.value = String(err?.response?.data?.detail || err?.message || err) } finally { loading.value = false }
 }
 watch(() => scopeStore.currentId, (next, previous) => { if (next && next !== previous && !loading.value) reload() })

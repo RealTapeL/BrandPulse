@@ -10,11 +10,21 @@ from typing import Any, Optional
 from uuid import uuid4
 
 import pandas as pd
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 
+from brandpulse.api.auth import require_auth
 from brandpulse.config.config import Config
+from brandpulse.ml_forecasting.admission import (
+    EXTERNAL_REVIEW_TARGET,
+    ForecastReadinessService,
+)
+from brandpulse.ml_forecasting.benchmark import (
+    download_public_dataset,
+    public_dataset_summary,
+)
 from brandpulse.ml_forecasting.queue import (
     MLExportEnqueueError,
     MLTrainingEnqueueError,
@@ -27,6 +37,7 @@ from brandpulse.storage.ml_forecasting_repository import (
     MLOperationLogRepository,
     MLTrainingRepository,
 )
+from brandpulse.storage.model_registry_repository import ModelRegistryRepository
 
 router = APIRouter(prefix="/api/v1/ml", tags=["machine-learning"])
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
@@ -36,6 +47,9 @@ class TrainingRequest(BaseModel):
     dataset_key: str = Field(default="store_sales", min_length=1, max_length=128)
     validation_days: int = Field(default=28, ge=7, le=180)
     horizon: int = Field(default=14, ge=1, le=90)
+    scope_id: Optional[str] = Field(default=None, max_length=64)
+    target_metric: str = Field(default=EXTERNAL_REVIEW_TARGET, max_length=128)
+    entity_type: str = Field(default="scope", pattern="^(scope|brand|store)$")
 
 
 class ExportRequest(BaseModel):
@@ -100,6 +114,65 @@ def list_datasets() -> list[dict[str, Any]]:
     public_items = [status_loader(key) for key in specs]
     uploads = [_uploaded_dataset_response(item) for item in MLDatasetRepository().list()]
     return public_items + uploads
+
+
+@router.post("/datasets/{dataset_key}/download")
+def download_dataset(dataset_key: str):
+    """下载并校验登记过的公开数据集；不接收任意 URL。"""
+    specs, _ = _dataset_module()
+    if dataset_key not in specs:
+        raise HTTPException(status_code=404, detail="公开数据集不存在")
+    logs = MLOperationLogRepository()
+    logs.append(
+        operation_type="data_download",
+        status="running",
+        message="开始下载公开数据集并校验来源",
+        details={"dataset_key": dataset_key, "source_url": specs[dataset_key].source_url},
+    )
+    try:
+        result = download_public_dataset(dataset_key)
+    except Exception as exc:
+        logs.append(
+            operation_type="data_download",
+            status="failed",
+            level="error",
+            message="公开数据集下载或校验失败",
+            details={"dataset_key": dataset_key, "error": str(exc)},
+        )
+        raise HTTPException(status_code=502, detail=f"公开数据集下载或校验失败: {exc}") from exc
+    logs.append(
+        operation_type="data_download",
+        status="success",
+        message="公开数据集下载并校验通过",
+        details={
+            "dataset_key": dataset_key,
+            "sha256": result.get("sha256"),
+            "validation": result.get("validation") or {},
+            "production_eligible": False,
+        },
+    )
+    return result
+
+
+@router.get("/datasets/{dataset_key}/summary")
+def get_dataset_summary(
+    dataset_key: str,
+    daily_limit: int = Query(default=30, ge=1, le=90),
+    ranking_limit: int = Query(default=10, ge=1, le=50),
+):
+    """查看已下载公开数据集的真实摘要与来源边界。"""
+    try:
+        return public_dataset_summary(
+            dataset_key,
+            daily_limit=daily_limit,
+            ranking_limit=ranking_limit,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"公开数据摘要读取失败: {exc}") from exc
 
 
 @router.post("/datasets/upload")
@@ -190,18 +263,49 @@ def upload_dataset(file: UploadFile = File(...)):
 @router.post("/forecasting/train")
 def start_training(payload: TrainingRequest):
     specs, _ = _dataset_module()
+    external_review = payload.dataset_key == "trusted_dianping_reviews"
+    readiness = None
+    if external_review:
+        if not payload.scope_id:
+            raise HTTPException(status_code=422, detail="点评增量预测必须指定 scope_id")
+        try:
+            readiness = ForecastReadinessService().check(
+                scope_id=payload.scope_id,
+                target_metric=payload.target_metric,
+                entity_type=payload.entity_type,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        if readiness["status"] != "ready":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "forecast_not_ready",
+                    "message": "真实快照尚未满足预测训练准入条件，系统不会创建训练任务。",
+                    "readiness": readiness,
+                },
+            )
     upload = None
-    if payload.dataset_key not in specs:
+    if payload.dataset_key not in specs and not external_review:
         upload = MLDatasetRepository().get(payload.dataset_key)
         if not upload or upload["status"] != "valid":
             raise HTTPException(status_code=404, detail="数据集不存在或尚未校验通过")
-    data_origin = upload["data_origin"] if upload else specs[payload.dataset_key].data_origin
+    data_origin = "trusted_snapshot" if external_review else (upload["data_origin"] if upload else specs[payload.dataset_key].data_origin)
     production_eligible = bool(upload["production_eligible"]) if upload else False
+    task = "dianping_review_increment_forecast" if external_review else "store_sales_forecast"
     repository = MLTrainingRepository()
     log_repository = MLOperationLogRepository()
     run = repository.create(
         payload.dataset_key,
-        {"validation_days": payload.validation_days, "horizon": payload.horizon},
+        {
+            "validation_days": payload.validation_days,
+            "horizon": payload.horizon,
+            "scope_id": payload.scope_id,
+            "target_metric": payload.target_metric,
+            "entity_type": payload.entity_type,
+            "readiness": readiness,
+        },
+        task=task,
         data_origin=data_origin,
         production_eligible=production_eligible,
         dataset_upload_id=upload["upload_id"] if upload else None,
@@ -240,6 +344,87 @@ def start_training(payload: TrainingRequest):
     run["rq_job_id"] = rq_job_id
     run["status"] = "pending"
     return run
+
+
+@router.get("/forecasting/readiness")
+def forecast_readiness(
+    scope_id: str = Query(..., min_length=1, max_length=64),
+    target_metric: str = Query(default=EXTERNAL_REVIEW_TARGET, min_length=1, max_length=128),
+    entity_type: str = Query(default="scope", pattern="^(scope|brand|store)$"),
+):
+    try:
+        return ForecastReadinessService().check(
+            scope_id=scope_id,
+            target_metric=target_metric,
+            entity_type=entity_type,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/models")
+def list_registered_models(
+    scope_id: Optional[str] = Query(default=None, max_length=64),
+    status: Optional[str] = Query(default=None, max_length=32),
+    limit: int = Query(default=100, ge=1, le=200),
+):
+    return {"items": ModelRegistryRepository().list(scope_id=scope_id, status=status, limit=limit)}
+
+
+@router.get("/models/{model_version_id}")
+def get_registered_model(model_version_id: str):
+    model = ModelRegistryRepository().get(model_version_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="模型版本不存在")
+    return model
+
+
+@router.get("/models/{model_version_id}/monitoring")
+def monitor_registered_model(model_version_id: str):
+    try:
+        return ModelRegistryRepository().monitoring(model_version_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/models/{model_version_id}/publish")
+def publish_registered_model(model_version_id: str, auth: dict = Depends(require_auth)):
+    # 认证和 ML 权限由 app 的受保护路由及路径权限白名单执行；actor 仅用于审计台账。
+    actor_id = str((auth or {}).get("sub") or (auth or {}).get("username") or "unknown")
+    try:
+        return ModelRegistryRepository().publish(model_version_id, actor_id=actor_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/models/{model_version_id}/retire")
+def retire_registered_model(model_version_id: str, auth: dict = Depends(require_auth)):
+    actor_id = str((auth or {}).get("sub") or (auth or {}).get("username") or "unknown")
+    try:
+        return ModelRegistryRepository().retire(model_version_id, actor_id=actor_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/forecasting/predictions")
+def list_forecast_predictions(
+    scope_id: str = Query(..., min_length=1, max_length=64),
+    target_metric: str = Query(default=EXTERNAL_REVIEW_TARGET, min_length=1, max_length=128),
+    limit: int = Query(default=100, ge=1, le=500),
+):
+    with ModelRegistryRepository().client.engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT * FROM forecast_results
+                WHERE scope_id = :scope_id AND target_metric = :target_metric
+                ORDER BY forecast_date ASC
+                LIMIT :limit
+                """
+            ),
+            {"scope_id": scope_id, "target_metric": target_metric, "limit": limit},
+        ).mappings().all()
+    return {"items": [dict(row) for row in rows]}
 
 
 @router.get("/forecasting/runs")
@@ -335,7 +520,7 @@ def download_export(export_id: str):
 
 @router.get("/logs")
 def list_ml_logs(
-    operation_type: Optional[str] = Query(default=None, pattern="^(data_upload|training|forecast_export)$"),
+    operation_type: Optional[str] = Query(default=None, pattern="^(data_download|data_upload|training|forecast_export)$"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
 ):

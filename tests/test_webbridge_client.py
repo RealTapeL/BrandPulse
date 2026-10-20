@@ -45,3 +45,39 @@ def test_remote_webbridge_keeps_proxy_configuration(monkeypatch):
         webbridge_client.WebBridgeClient("wss://bridge.example.test/ws").execute("snapshot", {})
 
     assert "http_no_proxy" not in captured
+
+
+def test_tool_error_is_not_returned_as_empty_data(monkeypatch):
+    class FakeSocket:
+        def send(self, message):
+            import json
+
+            captured["request_id"] = json.loads(message)["requestId"]
+
+        def recv(self):
+            import json
+
+            request_id = captured["request_id"]
+            return json.dumps({
+                "type": "tool_result",
+                "requestId": request_id,
+                "payload": {"error": "扩展未就绪"},
+            })
+
+        def close(self):
+            pass
+
+    captured = {}
+
+    def fake_tcp_connection(*_args, **_kwargs):
+        return object()
+
+    def fake_connection(_url, **kwargs):
+        captured["socket"] = kwargs["socket"]
+        return FakeSocket()
+
+    monkeypatch.setattr(webbridge_client.socket, "create_connection", fake_tcp_connection)
+    monkeypatch.setattr(webbridge_client.websocket, "create_connection", fake_connection)
+
+    with pytest.raises(webbridge_client.WebBridgeToolError, match="扩展未就绪"):
+        webbridge_client.WebBridgeClient(timeout=1).execute("evaluate", {"code": "1"})

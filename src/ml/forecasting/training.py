@@ -124,7 +124,19 @@ def train_store_sales(
     validation_model.fit(x_train, y_train)
     validation_pred = validation_model.predict(x_validation)
     metrics = _metrics(y_validation, validation_pred)
-    _progress(progress_callback, "running", "时间回测完成", metrics)
+    previous_period_metrics = _metrics(y_validation, validation_frame["lag_1"].to_numpy(dtype="float64"))
+    recent_mean_metrics = _metrics(y_validation, validation_frame["rolling_mean_7"].to_numpy(dtype="float64"))
+    baseline_name, baseline_metrics = min(
+        (("previous_period", previous_period_metrics), ("recent_7_period_mean", recent_mean_metrics)),
+        key=lambda item: item[1]["wape"],
+    )
+    beats_baseline = metrics["wape"] <= baseline_metrics["wape"]
+    _progress(progress_callback, "running", "时间回测完成", {
+        "metrics": metrics,
+        "baseline_name": baseline_name,
+        "baseline_metrics": baseline_metrics,
+        "beats_baseline": beats_baseline,
+    })
 
     model = _new_model()
     x_all, y_all = feature_matrix(supervised)
@@ -172,6 +184,13 @@ def train_store_sales(
             "train_rows": int(len(train_frame)),
             "validation_rows": int(len(validation_frame)),
             "metrics": metrics,
+            "baseline_name": baseline_name,
+            "baseline_metrics": baseline_metrics,
+            "alternative_baselines": {
+                "previous_period": previous_period_metrics,
+                "recent_7_period_mean": recent_mean_metrics,
+            },
+            "beats_baseline": beats_baseline,
         },
         "training": {
             "rows_loaded": int(len(frame)),

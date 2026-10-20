@@ -5,6 +5,18 @@ export async function fetchMLDatasets() {
   return data
 }
 
+export async function downloadMLDataset(datasetKey) {
+  const { data } = await api.post(`/v1/ml/datasets/${encodeURIComponent(datasetKey)}/download`)
+  return data
+}
+
+export async function fetchMLDatasetSummary(datasetKey, { dailyLimit = 30, rankingLimit = 10 } = {}) {
+  const { data } = await api.get(`/v1/ml/datasets/${encodeURIComponent(datasetKey)}/summary`, {
+    params: { daily_limit: dailyLimit, ranking_limit: rankingLimit },
+  })
+  return data
+}
+
 export async function uploadMLDataset(file) {
   const formData = new FormData()
   formData.append('file', file)
@@ -20,6 +32,45 @@ export async function startMLTraining(payload = {}) {
     dataset_key: payload.datasetKey || 'store_sales',
     validation_days: payload.validationDays || 28,
     horizon: payload.horizon || 14,
+    scope_id: payload.scopeId || undefined,
+    target_metric: payload.targetMetric || 'dp_review_count_delta',
+    entity_type: payload.entityType || 'scope',
+  })
+  return data
+}
+
+export async function fetchForecastReadiness({ scopeId, targetMetric = 'dp_review_count_delta', entityType = 'scope' } = {}) {
+  const { data } = await api.get('/v1/ml/forecasting/readiness', {
+    params: { scope_id: scopeId, target_metric: targetMetric, entity_type: entityType },
+  })
+  return data
+}
+
+export async function fetchRegisteredModels({ scopeId = '', status = '', limit = 100 } = {}) {
+  const { data } = await api.get('/v1/ml/models', {
+    params: { scope_id: scopeId || undefined, status: status || undefined, limit },
+  })
+  return data
+}
+
+export async function publishRegisteredModel(modelVersionId) {
+  const { data } = await api.post(`/v1/ml/models/${modelVersionId}/publish`)
+  return data
+}
+
+export async function retireRegisteredModel(modelVersionId) {
+  const { data } = await api.post(`/v1/ml/models/${modelVersionId}/retire`)
+  return data
+}
+
+export async function fetchModelMonitoring(modelVersionId) {
+  const { data } = await api.get('/v1/ml/models/' + modelVersionId + '/monitoring')
+  return data
+}
+
+export async function fetchForecastPredictions({ scopeId, targetMetric = 'dp_review_count_delta', limit = 100 } = {}) {
+  const { data } = await api.get('/v1/ml/forecasting/predictions', {
+    params: { scope_id: scopeId, target_metric: targetMetric, limit },
   })
   return data
 }

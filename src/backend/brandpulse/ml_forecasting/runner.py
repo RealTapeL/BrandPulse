@@ -15,6 +15,7 @@ from brandpulse.storage.ml_forecasting_repository import (
     MLExportRepository,
     MLOperationLogRepository,
 )
+from brandpulse.storage.model_registry_repository import ModelRegistryRepository
 
 logger = get_logger(__name__)
 
@@ -71,26 +72,58 @@ def run_training_run(run_id: str) -> dict:
                 details=details or {},
             )
 
-        metadata = train_store_sales(
-            dataset_key=run["dataset_key"],
-            validation_days=int(parameters.get("validation_days", 28)),
-            horizon=int(parameters.get("horizon", 14)),
-            ensure_public_data=data_path is None,
-            data_path=data_path,
-            data_manifest=data_manifest,
-            data_origin=run["data_origin"],
-            production_eligible=run["production_eligible"],
-            model_id=model_id,
-            output_dir=output_dir,
-            progress_callback=progress,
+        if run["task"] == "dianping_review_increment_forecast":
+            from brandpulse.ml_forecasting.admission import ForecastReadinessService
+            from ml.forecasting.external_reviews import train_review_increment
+
+            scope_id = str(parameters.get("scope_id") or "")
+            if not scope_id:
+                raise ValueError("点评增量预测缺少 scope_id")
+            admission = ForecastReadinessService()
+            with admission.client.engine.connect() as conn:
+                series_rows = admission._load_series(
+                    conn,
+                    scope_id,
+                    str(parameters.get("target_metric") or "dp_review_count_delta"),
+                )
+            if len(series_rows) < 12:
+                raise ValueError("训练执行前再次检查发现可比较周期不足，任务已拒绝")
+            series = pd.DataFrame(series_rows)
+            metadata = train_review_increment(
+                series=series,
+                validation_periods=min(3, max(2, len(series) // 4)),
+                horizon=int(parameters.get("horizon", 7)),
+                scope_id=scope_id,
+                model_id=model_id,
+                output_dir=output_dir,
+                progress_callback=progress,
+            )
+        else:
+            metadata = train_store_sales(
+                dataset_key=run["dataset_key"],
+                validation_days=int(parameters.get("validation_days", 28)),
+                horizon=int(parameters.get("horizon", 14)),
+                ensure_public_data=data_path is None,
+                data_path=data_path,
+                data_manifest=data_manifest,
+                data_origin=run["data_origin"],
+                production_eligible=run["production_eligible"],
+                model_id=model_id,
+                output_dir=output_dir,
+                progress_callback=progress,
+        )
+        model_registry_row = ModelRegistryRepository().register_training(run=run, metadata=metadata)
+        forecast_rows = ModelRegistryRepository().record_forecasts(
+            model_version_id=model_registry_row["model_version_id"],
+            metadata=metadata,
         )
         repository.finish_success(
             run_id,
             artifact_path=str(Path(metadata["artifacts"]["model"]).parent),
             model_id=metadata["model_id"],
             metrics=metadata["validation"]["metrics"],
-            train_rows=metadata["validation"]["train_rows"],
-            validation_rows=metadata["validation"]["validation_rows"],
+            train_rows=int(metadata["validation"].get("train_rows", metadata["training"].get("supervised_periods", 0))),
+            validation_rows=int(metadata["validation"].get("validation_rows", metadata["validation"].get("validation_periods", 0))),
         )
         log_repository.append(
             operation_type="training",
@@ -100,9 +133,17 @@ def run_training_run(run_id: str) -> dict:
             details={
                 "model_id": metadata["model_id"],
                 "metrics": metadata["validation"]["metrics"],
+                "model_version_id": model_registry_row.get("model_version_id"),
+                "forecast_rows": forecast_rows,
             },
         )
-        return {"run_id": run_id, "status": "success", "model_id": metadata["model_id"]}
+        return {
+            "run_id": run_id,
+            "status": "success",
+            "model_id": metadata["model_id"],
+            "model_version_id": model_registry_row.get("model_version_id"),
+            "forecast_rows": forecast_rows,
+        }
     except Exception as exc:
         logger.exception("[ml] 训练失败: run_id=%s", run_id)
         repository.finish_failure(run_id, str(exc))

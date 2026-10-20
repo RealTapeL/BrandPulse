@@ -106,8 +106,7 @@ def extract_search(
     try:
         client.execute("navigate", {"url": target_url})
     except Exception as e:
-        logger.error(f"[webbridge] 打开页面失败: {e}")
-        return []
+        raise RuntimeError(f"小红书 WebBridge 打开搜索页失败：{e}") from e
 
     # 2. 等待页面渲染
     time.sleep(wait_seconds)
@@ -117,11 +116,12 @@ def extract_search(
     try:
         result = client.execute("evaluate", {"code": js_code})
     except Exception as e:
-        logger.error(f"[webbridge] 提取卡片失败: {e}")
-        return []
+        raise RuntimeError(f"小红书搜索结果解析失败：{e}") from e
 
     items = result.get("value", []) or []
     logger.info(f"[webbridge] 提取到 {len(items)} 条笔记")
+    if not items:
+        raise RuntimeError("小红书页面未提取到笔记卡片；可能未登录、触发平台验证、结果尚未加载或页面结构已变化，不能判定为有效空结果")
 
     results: List[Dict[str, Any]] = []
     for item in items:

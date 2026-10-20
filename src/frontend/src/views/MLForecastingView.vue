@@ -72,6 +72,47 @@
             {{ row.validation?.min_date || '-' }} 至 {{ row.validation?.max_date || '-' }}
           </template>
         </el-table-column>
+        <el-table-column label="操作" width="150" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              v-if="row.data_origin === 'public_benchmark'"
+              size="small"
+              :loading="downloadingKey === row.key"
+              @click="downloadDataset(row)"
+            >
+              {{ row.downloaded ? '重新校验' : '下载并校验' }}
+            </el-button>
+            <span v-else class="muted">通过上传校验</span>
+          </template>
+        </el-table-column>
+        </el-table>
+      </div>
+    </el-card>
+
+    <el-card v-if="benchmarkSummary" shadow="never" class="section">
+      <template #header>
+        <div class="section-title">
+          <span>公开销售基准摘要</span>
+          <span class="muted">真实数据预览，不进入内部经营表</span>
+        </div>
+      </template>
+      <el-alert
+        :title="benchmarkSummary.boundary"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="summary-boundary"
+      />
+      <div class="summary-grid">
+        <div class="summary-item"><span>记录数</span><strong>{{ benchmarkSummary.summary.rows.toLocaleString() }}</strong></div>
+        <div class="summary-item"><span>门店数</span><strong>{{ benchmarkSummary.summary.stores }}</strong></div>
+        <div class="summary-item"><span>商品数</span><strong>{{ benchmarkSummary.summary.items }}</strong></div>
+        <div class="summary-item"><span>日周期数</span><strong>{{ benchmarkSummary.summary.daily_periods }}</strong></div>
+      </div>
+      <div class="table-scroll">
+        <el-table :data="benchmarkSummary.summary.daily_series" border stripe>
+          <el-table-column prop="date" label="日期" width="140" />
+          <el-table-column prop="sales" label="销量" width="140" />
         </el-table>
       </div>
     </el-card>
@@ -214,7 +255,9 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
+  downloadMLDataset,
   downloadMLExport,
+  fetchMLDatasetSummary,
   fetchMLDatasets,
   fetchMLExports,
   fetchMLLogs,
@@ -238,6 +281,8 @@ const loadingExports = ref(false)
 const loadingLogs = ref(false)
 const uploading = ref(false)
 const starting = ref(false)
+const downloadingKey = ref('')
+const benchmarkSummary = ref(null)
 const form = reactive({ datasetKey: 'store_sales', validationDays: 28, horizon: 14 })
 let pollTimer = null
 let polling = false
@@ -254,8 +299,30 @@ async function loadDatasets() {
     if (datasets.value.length && !trainableDatasets.value.some((item) => item.key === form.datasetKey)) {
       form.datasetKey = trainableDatasets.value[0]?.key || datasets.value[0].key
     }
+    const benchmark = datasets.value.find((item) => item.key === 'store_sales' && item.downloaded)
+    if (!benchmark) {
+      benchmarkSummary.value = null
+    } else {
+      try {
+        benchmarkSummary.value = await fetchMLDatasetSummary('store_sales')
+      } catch {
+        benchmarkSummary.value = null
+      }
+    }
   } finally {
     loadingDatasets.value = false
+  }
+}
+
+async function downloadDataset(row) {
+  downloadingKey.value = row.key
+  try {
+    await downloadMLDataset(row.key)
+    benchmarkSummary.value = await fetchMLDatasetSummary(row.key)
+    ElMessage.success('公开数据集下载并校验通过，已生成真实摘要')
+    await Promise.all([loadDatasets(), loadLogs()])
+  } finally {
+    downloadingKey.value = ''
   }
 }
 
@@ -380,7 +447,7 @@ function datasetStatusLabel(status) {
 }
 
 function operationTypeLabel(type) {
-  return { data_upload: '数据输入', training: '模型训练', forecast_export: '预测导出' }[type] || type
+  return { data_download: '公开数据下载', data_upload: '数据输入', training: '模型训练', forecast_export: '预测导出' }[type] || type
 }
 
 function formatMetric(value) {
@@ -411,6 +478,30 @@ onBeforeUnmount(stopPolling)
 .section {
   margin-bottom: 16px;
 }
+.summary-boundary {
+  margin-bottom: 16px;
+}
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.summary-item {
+  padding: 14px;
+  border: 1px solid var(--bp-card-border);
+  border-radius: 8px;
+  background: #fafcff;
+}
+.summary-item span {
+  display: block;
+  color: var(--bp-text-muted);
+  font-size: 12px;
+  margin-bottom: 7px;
+}
+.summary-item strong {
+  color: var(--bp-text);
+}
 .section-title {
   display: flex;
   align-items: center;
@@ -437,6 +528,9 @@ onBeforeUnmount(stopPolling)
 @media (max-width: 767px) {
   .dataset-select {
     width: 100%;
+  }
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

@@ -30,6 +30,7 @@ class MLTrainingRepository:
         dataset_key: str,
         parameters: Dict[str, Any],
         *,
+        task: str = "store_sales_forecast",
         data_origin: str = "public_benchmark",
         production_eligible: bool = False,
         dataset_upload_id: Optional[str] = None,
@@ -43,13 +44,14 @@ class MLTrainingRepository:
                         (run_id, task, dataset_key, dataset_upload_id, parameters,
                          data_origin, production_eligible)
                     VALUES
-                        (:run_id, 'store_sales_forecast', :dataset_key, :dataset_upload_id,
+                        (:run_id, :task, :dataset_key, :dataset_upload_id,
                          CAST(:parameters AS jsonb), :data_origin, :production_eligible)
                     RETURNING *
                     """
                 ),
                 {
                     "run_id": run_id,
+                    "task": task,
                     "dataset_key": dataset_key,
                     "dataset_upload_id": dataset_upload_id,
                     "parameters": json.dumps(parameters, ensure_ascii=False),

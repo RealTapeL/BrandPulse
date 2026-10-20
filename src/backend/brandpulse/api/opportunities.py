@@ -56,12 +56,22 @@ def generate_opportunities(snapshot_id: str) -> Dict[str, Any]:
 def update_opportunity(
     signal_id: str,
     payload: OpportunityLifecycleUpdate,
-    _auth: Dict[str, Any] = Depends(require_auth),
+    auth: Dict[str, Any] = Depends(require_auth),
 ) -> Dict[str, Any]:
     try:
-        row = OpportunityService().update_lifecycle(signal_id=signal_id, **payload.model_dump())
+        row = OpportunityService().update_lifecycle(
+            signal_id=signal_id,
+            actor_id=str(auth.get("sub") or auth.get("username") or "unknown"),
+            actor_role=str(auth.get("role") or ""),
+            **payload.model_dump(),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not row:
         raise HTTPException(status_code=404, detail="机会信号不存在")
     return row
+
+
+@router.get("/{signal_id}/events")
+def opportunity_events(signal_id: str) -> Dict[str, Any]:
+    return {"items": OpportunityService().events(signal_id)}

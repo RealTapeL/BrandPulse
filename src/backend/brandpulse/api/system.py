@@ -106,6 +106,18 @@ def configuration_status():
         backup_message = "尚未发现 PostgreSQL 备份"
     add("backup", "数据库备份", "pass" if backup_ok else "fail", backup_message)
 
+    storage_backend = Config.OBJECT_STORAGE_BACKEND
+    if storage_backend == "local":
+        storage_status = "warning"
+        storage_message = f"当前使用本地对象目录 {Config.OBJECT_STORAGE_LOCAL_DIR}，生产建议切换到 S3/MinIO 并配置异地备份"
+    elif storage_backend == "s3" and Config.OBJECT_STORAGE_BUCKET:
+        storage_status = "pass"
+        storage_message = f"S3 兼容对象存储已配置，bucket={Config.OBJECT_STORAGE_BUCKET}"
+    else:
+        storage_status = "fail"
+        storage_message = "对象存储后端配置不完整；模型工件和异地备份不能宣称已启用"
+    add("object_storage", "对象存储", storage_status, storage_message)
+
     local_cors = any("localhost" in item or "127.0.0.1" in item for item in Config.CORS_ORIGINS)
     add(
         "cors", "浏览器来源限制",

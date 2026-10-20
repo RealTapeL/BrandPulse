@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     host: '0.0.0.0',
+    allowedHosts: ['frp-bar.com'],
     proxy: {
       '/api': `http://127.0.0.1:${process.env.BRANDPULSE_BACKEND_PORT || '8000'}`,
     },

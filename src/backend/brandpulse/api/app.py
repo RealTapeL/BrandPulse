@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from brandpulse.api.agent import router as agent_router
 from brandpulse.api.audit import router as audit_router
 from brandpulse.api.alerts import router as alerts_router
+from brandpulse.api.analysis import router as analysis_router
 from brandpulse.api.auth import router as auth_router
 from brandpulse.api.auth import require_auth
 from brandpulse.api.users import router as users_router
@@ -66,6 +67,7 @@ app.include_router(chat_router, **protected)
 app.include_router(tables_router, **protected)
 app.include_router(formulas_router, **protected)
 app.include_router(alerts_router, **protected)
+app.include_router(analysis_router, **protected)
 app.include_router(crawl_jobs_router, **protected)
 app.include_router(data_governance_router, **protected)
 app.include_router(indicators_router, **protected)

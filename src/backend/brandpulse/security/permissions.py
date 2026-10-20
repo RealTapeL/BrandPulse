@@ -99,6 +99,8 @@ def permission_for_request(method: str, path: str) -> str | None:
         return CRAWL_EXECUTE if method == "POST" else BUSINESS_READ
     if path.startswith("/api/v1/indicators") or path.startswith("/api/v1/tables"):
         return BUSINESS_READ
+    if path.startswith("/api/v1/analysis"):
+        return BUSINESS_READ
     if path.startswith("/api/v1/metrics"):
         return BUSINESS_READ if method == "GET" else MONITORING_MANAGE
     if path.startswith("/api/v1/chat"):

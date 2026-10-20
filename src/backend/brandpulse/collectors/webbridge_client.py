@@ -20,6 +20,10 @@ import websocket
 DEFAULT_WS_URL = "ws://127.0.0.1:10086/ws"
 
 
+class WebBridgeToolError(RuntimeError):
+    """WebBridge 已返回工具级错误；这不是一个合法的空采集结果。"""
+
+
 class WebBridgeClient:
     """通过 WebSocket 调用 Kimi WebBridge MCP 服务"""
 
@@ -85,7 +89,10 @@ class WebBridgeClient:
                     payload = msg.get("payload", {})
                     # 某些版本的 payload 会再包一层 data
                     if isinstance(payload, dict) and "data" in payload and len(payload) <= 2:
-                        return payload["data"]
+                        payload = payload["data"]
+                    if msg.get("isError") or (isinstance(payload, dict) and payload.get("error")):
+                        detail = payload.get("error") if isinstance(payload, dict) else payload
+                        raise WebBridgeToolError(str(detail or "WebBridge 工具执行失败"))
                     return payload
         finally:
             try:

@@ -10,6 +10,7 @@ import hashlib
 import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 from sqlalchemy import text
 
@@ -50,11 +51,13 @@ class OpportunityService:
                 INSERT INTO opportunity_signals (
                     signal_id, snapshot_id, scope_id, brand_id, store_id, entity_type, entity_key,
                     entity_name, signal_type, signal_class, trigger_rule, metric_evidence,
-                    source_evidence, quality_grade, confidence, recommended_action
+                    source_evidence, quality_grade, confidence, recommended_action,
+                    rule_version, information_gaps, evidence_status
                 ) VALUES (
                     :signal_id, :snapshot_id, :scope_id, :brand_id, :store_id, :entity_type, :entity_key,
                     :entity_name, :signal_type, :signal_class, :trigger_rule, CAST(:metric_evidence AS jsonb),
-                    CAST(:source_evidence AS jsonb), :quality_grade, :confidence, :recommended_action
+                    CAST(:source_evidence AS jsonb), :quality_grade, :confidence, :recommended_action,
+                    :rule_version, CAST(:information_gaps AS jsonb), :evidence_status
                 )
                 ON CONFLICT (snapshot_id, signal_type, entity_type, entity_key) DO UPDATE SET
                     entity_name = EXCLUDED.entity_name,
@@ -64,6 +67,9 @@ class OpportunityService:
                     quality_grade = EXCLUDED.quality_grade,
                     confidence = EXCLUDED.confidence,
                     recommended_action = EXCLUDED.recommended_action,
+                    rule_version = EXCLUDED.rule_version,
+                    information_gaps = EXCLUDED.information_gaps,
+                    evidence_status = EXCLUDED.evidence_status,
                     updated_at = CURRENT_TIMESTAMP
                 """
             ),
@@ -71,6 +77,9 @@ class OpportunityService:
                 **signal,
                 "metric_evidence": _json(signal["metric_evidence"]),
                 "source_evidence": _json(signal["source_evidence"]),
+                "rule_version": signal.get("rule_version", "opportunity-v2"),
+                "information_gaps": _json(signal.get("information_gaps", [])),
+                "evidence_status": signal.get("evidence_status", "available"),
             },
         )
 
@@ -91,7 +100,7 @@ class OpportunityService:
                     FROM metric_observations
                     WHERE snapshot_id = :snapshot_id
                       AND entity_type = 'scope'
-                      AND metric_key IN ('entity_mapping_coverage', 'source_coverage_ratio')
+                      AND metric_key IN ('entity_mapping_coverage', 'source_coverage_ratio', 'dp_review_count_delta')
                     """
                 ),
                 {"snapshot_id": snapshot_id},
@@ -138,6 +147,106 @@ class OpportunityService:
                     "confidence": None,
                     "recommended_action": "检查采集来源登录态、解析失败或空结果校验；来源恢复后使用新快照重新评估。",
                 })
+
+            # 评价增量只有在当前/上一快照同口径且来源覆盖达标时才允许生成增长/下降线索。
+            delta = quality_by_key.get("dp_review_count_delta")
+            if delta and (delta.get("value") is None or delta.get("quality_status") != "valid"):
+                evidence = delta.get("evidence") or {}
+                signals.append({
+                    "signal_id": self._signal_id(snapshot_id, "trend_requires_validation", "scope", scope_id),
+                    "snapshot_id": snapshot_id,
+                    "scope_id": scope_id,
+                    "brand_id": None,
+                    "store_id": None,
+                    "entity_type": "scope",
+                    "entity_key": scope_id,
+                    "entity_name": f"{snapshot['city']}·{snapshot['mall_name']}·{snapshot['category']}",
+                    "signal_type": "trend_requires_validation",
+                    "signal_class": "data_quality",
+                    "trigger_rule": "点评新增评价趋势缺少同口径、可比较的前序快照，不输出增长或下降结论。",
+                    "metric_evidence": {"metric_key": "dp_review_count_delta", "value": delta.get("value"), "quality_status": delta.get("quality_status"), "evidence": evidence},
+                    "source_evidence": {"snapshot_id": snapshot_id, "source_coverage": source_coverage},
+                    "quality_grade": snapshot["quality_grade"],
+                    "confidence": None,
+                    "recommended_action": "继续保持同一范围和来源采集；待形成连续可比较周期后再生成趋势线索。",
+                    "evidence_status": "insufficient",
+                    "information_gaps": ["连续可比较快照"],
+                })
+            elif delta and delta.get("value") is not None and float(delta["value"]) < 0:
+                signals.append({
+                    "signal_id": self._signal_id(snapshot_id, "source_anomaly", "scope", scope_id),
+                    "snapshot_id": snapshot_id,
+                    "scope_id": scope_id,
+                    "brand_id": None,
+                    "store_id": None,
+                    "entity_type": "scope",
+                    "entity_key": scope_id,
+                    "entity_name": f"{snapshot['city']}·{snapshot['mall_name']}·{snapshot['category']}",
+                    "signal_type": "source_anomaly",
+                    "signal_class": "risk",
+                    "trigger_rule": "累计点评数计算出的新增评价数为负，疑似来源回退、门店集合变化或解析异常。",
+                    "metric_evidence": {"metric_key": "dp_review_count_delta", "value": float(delta["value"]), "evidence": delta.get("evidence") or {}},
+                    "source_evidence": {"snapshot_id": snapshot_id, "source_coverage": source_coverage},
+                    "quality_grade": snapshot["quality_grade"],
+                    "confidence": None,
+                    "recommended_action": "核对原始门店集合、累计评价数和来源解析结果；异常确认前不进入预测训练集。",
+                    "evidence_status": "invalid",
+                    "information_gaps": ["累计评价数回退原因"],
+                })
+            elif delta and delta.get("value") is not None and source and float(source["value"] or 0) >= 0.8:
+                previous = conn.execute(
+                    text(
+                        """
+                        SELECT metric.value, snapshot.snapshot_id, snapshot.data_mode,
+                               coverage.value AS source_coverage
+                        FROM data_snapshots AS snapshot
+                        JOIN metric_observations AS metric
+                          ON metric.snapshot_id = snapshot.snapshot_id
+                         AND metric.entity_type = 'scope'
+                         AND metric.metric_key = 'dp_review_count_delta'
+                        LEFT JOIN metric_observations AS coverage
+                          ON coverage.snapshot_id = snapshot.snapshot_id
+                         AND coverage.entity_type = 'scope'
+                         AND coverage.metric_key = 'source_coverage_ratio'
+                        WHERE snapshot.scope_id = :scope_id
+                          AND snapshot.status IN ('ready', 'published')
+                          AND snapshot.observed_at < :observed_at
+                          AND metric.quality_status = 'valid'
+                          AND metric.value IS NOT NULL
+                        ORDER BY snapshot.observed_at DESC
+                        LIMIT 1
+                        """
+                    ),
+                    {"scope_id": scope_id, "observed_at": snapshot.get("observed_at")},
+                ).mappings().first()
+                if previous and previous["source_coverage"] is not None and float(previous["source_coverage"]) >= 0.8:
+                    current_value = float(delta["value"])
+                    previous_value = float(previous["value"])
+                    if current_value > max(previous_value * 1.2, previous_value + 1):
+                        signal_type, signal_class, action = "recent_growth", "opportunity", "将该范围列入招商关注清单，并结合品牌映射和项目客群人工复核增长是否具有业务意义。"
+                    elif current_value < previous_value * 0.8:
+                        signal_type, signal_class, action = "continuous_decline", "risk", "核对来源和门店集合后，再由运营负责人确认是否需要关注口碑或内容下降。"
+                    else:
+                        signal_type = signal_class = action = ""
+                    if signal_type:
+                        signals.append({
+                            "signal_id": self._signal_id(snapshot_id, signal_type, "scope", scope_id),
+                            "snapshot_id": snapshot_id,
+                            "scope_id": scope_id,
+                            "brand_id": None,
+                            "store_id": None,
+                            "entity_type": "scope",
+                            "entity_key": scope_id,
+                            "entity_name": f"{snapshot['city']}·{snapshot['mall_name']}·{snapshot['category']}",
+                            "signal_type": signal_type,
+                            "signal_class": signal_class,
+                            "trigger_rule": "同一监测范围、同一来源口径下，当前点评新增评价数相较上一可比快照变化超过 20%。",
+                            "metric_evidence": {"metric_key": "dp_review_count_delta", "current_value": current_value, "previous_value": previous_value, "previous_snapshot_id": previous["snapshot_id"], "change_ratio": (current_value - previous_value) / previous_value if previous_value else None},
+                            "source_evidence": {"snapshot_id": snapshot_id, "previous_snapshot_id": previous["snapshot_id"], "source_coverage": source_coverage},
+                            "quality_grade": snapshot["quality_grade"],
+                            "confidence": 0.65,
+                            "recommended_action": action,
+                        })
 
             # 仅统计已经人工确认到真实品牌的观测。每个份额的分母仍为同一 scope 的点评累计评价总量。
             brand_rows = conn.execute(
@@ -257,6 +366,8 @@ class OpportunityService:
         owner_id: Optional[str],
         human_comment: str,
         human_confirmed: Optional[bool],
+        actor_id: Optional[str] = None,
+        actor_role: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         allowed = {
             "discovered", "master_confirmed", "profile_incomplete", "under_review", "qualified",
@@ -265,6 +376,26 @@ class OpportunityService:
         if lifecycle_status not in allowed:
             raise ValueError("机会生命周期状态不合法")
         with self.client.engine.begin() as conn:
+            previous_status = conn.execute(
+                text("SELECT lifecycle_status FROM opportunity_signals WHERE signal_id = :signal_id"),
+                {"signal_id": signal_id},
+            ).scalar_one_or_none()
+            transitions = {
+                "discovered": {"discovered", "master_confirmed", "profile_incomplete", "under_review", "rejected", "archived"},
+                "master_confirmed": {"master_confirmed", "profile_incomplete", "under_review", "qualified", "rejected", "archived"},
+                "profile_incomplete": {"profile_incomplete", "under_review", "master_confirmed", "rejected", "archived"},
+                "under_review": {"under_review", "qualified", "profile_incomplete", "rejected", "archived"},
+                "qualified": {"qualified", "outreach", "rejected", "archived"},
+                "outreach": {"outreach", "negotiation", "qualified", "rejected", "archived"},
+                "negotiation": {"negotiation", "introduced", "outreach", "rejected", "archived"},
+                "introduced": {"introduced", "archived"},
+                "rejected": {"rejected", "under_review", "archived"},
+                "archived": {"archived", "under_review"},
+            }
+            if previous_status is None:
+                return None
+            if lifecycle_status not in transitions.get(previous_status, set()):
+                raise ValueError(f"机会不能从 {previous_status} 直接转为 {lifecycle_status}")
             row = conn.execute(
                 text(
                     """
@@ -273,6 +404,8 @@ class OpportunityService:
                         owner_id = :owner_id,
                         human_comment = :human_comment,
                         human_confirmed = COALESCE(:human_confirmed, human_confirmed),
+                        reviewed_at = CASE WHEN :human_confirmed IS TRUE THEN CURRENT_TIMESTAMP ELSE reviewed_at END,
+                        reviewed_by = CASE WHEN :human_confirmed IS TRUE THEN :actor_id ELSE reviewed_by END,
                         resolved_at = CASE WHEN :lifecycle_status IN ('introduced', 'rejected', 'archived')
                                            THEN CURRENT_TIMESTAMP ELSE NULL END,
                         updated_at = CURRENT_TIMESTAMP
@@ -286,6 +419,47 @@ class OpportunityService:
                     "owner_id": owner_id or None,
                     "human_comment": human_comment,
                     "human_confirmed": human_confirmed,
+                    "actor_id": actor_id or "",
                 },
             ).mappings().first()
+            if row and actor_id:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO opportunity_signal_events (
+                            event_id, signal_id, from_status, to_status, actor_id, actor_role,
+                            comment, metadata
+                        )
+                        VALUES (
+                            :event_id, :signal_id,
+                            :from_status,
+                            :to_status, :actor_id, :actor_role, :comment, CAST(:metadata AS jsonb)
+                        )
+                        """
+                    ),
+                    {
+                        "event_id": f"opp_event_{uuid4().hex}",
+                        "signal_id": signal_id,
+                        "from_status": previous_status or "",
+                        "to_status": lifecycle_status,
+                        "actor_id": actor_id,
+                        "actor_role": actor_role or "",
+                        "comment": human_comment,
+                        "metadata": _json({"human_confirmed": human_confirmed}),
+                    },
+                )
         return _serialize(row) if row else None
+
+    def events(self, signal_id: str) -> List[Dict[str, Any]]:
+        with self.client.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT * FROM opportunity_signal_events
+                    WHERE signal_id = :signal_id
+                    ORDER BY created_at DESC
+                    """
+                ),
+                {"signal_id": signal_id},
+            ).mappings().all()
+        return [_serialize(row) for row in rows]

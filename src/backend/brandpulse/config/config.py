@@ -74,6 +74,20 @@ class Config:
     )
     BACKUP_RETENTION_DAYS = int(os.getenv("BRANDPULSE_BACKUP_RETENTION_DAYS", "14"))
 
+    # 模型工件/备份对象存储。local 可直接落盘；s3 兼容 MinIO、阿里云 OSS 的 S3 接口。
+    OBJECT_STORAGE_BACKEND = os.getenv("OBJECT_STORAGE_BACKEND", "local").lower()
+    OBJECT_STORAGE_LOCAL_DIR = (
+        PROJECT_ROOT / os.getenv("OBJECT_STORAGE_LOCAL_DIR", "data/object-storage")
+        if not Path(os.getenv("OBJECT_STORAGE_LOCAL_DIR", "data/object-storage")).is_absolute()
+        else Path(os.getenv("OBJECT_STORAGE_LOCAL_DIR", "data/object-storage"))
+    )
+    OBJECT_STORAGE_BUCKET = os.getenv("OBJECT_STORAGE_BUCKET", "")
+    OBJECT_STORAGE_ENDPOINT = os.getenv("OBJECT_STORAGE_ENDPOINT", "")
+    OBJECT_STORAGE_REGION = os.getenv("OBJECT_STORAGE_REGION", "cn-hangzhou")
+    OBJECT_STORAGE_PREFIX = os.getenv("OBJECT_STORAGE_PREFIX", "brandpulse/")
+    OBJECT_STORAGE_ACCESS_KEY = os.getenv("OBJECT_STORAGE_ACCESS_KEY", "")
+    OBJECT_STORAGE_SECRET_KEY = os.getenv("OBJECT_STORAGE_SECRET_KEY", "")
+
     # 高德 API
     AMAP_KEY = os.getenv("AMAP_KEY", "")
 

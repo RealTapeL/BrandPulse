@@ -45,7 +45,7 @@ def run(stat_date: Optional[str] = None) -> Dict[str, int]:
             stats[name] = 0
 
     # 看板 /api/v1/indicators 使用兼容时序表；指标计算完成后立即同步，
-    # 不再依赖人工单独执行 run_aggregate.sh。
+    # 无需人工单独触发聚合任务。
     try:
         from brandpulse.indicators.jobs.aggregate import aggregate
 

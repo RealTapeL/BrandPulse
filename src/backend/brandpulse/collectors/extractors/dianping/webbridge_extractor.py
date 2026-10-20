@@ -186,28 +186,24 @@ def extract_search(
     try:
         client.execute("navigate", {"url": search_url})
     except Exception as e:
-        logger.error(f"[dianping-webbridge] 打开页面失败: {e}")
-        return []
+        raise RuntimeError(f"大众点评 WebBridge 打开搜索页失败：{e}") from e
 
     time.sleep(wait_seconds)
 
     # 检测验证码页，等待用户在可见浏览器里手动过验证
     if not _wait_captcha_pass(client, captcha_wait):
-        logger.error(f"[dianping-webbridge] 验证码未在 {captcha_wait}s 内通过，本次跳过")
-        return []
+        raise RuntimeError(f"大众点评触发验证码，等待 {captcha_wait}s 后仍未通过")
 
     max_shops = params.get("max_shops", 10)
     try:
         result = client.execute("evaluate", {"code": _build_shop_list_js(max_shops)})
     except Exception as e:
-        logger.error(f"[dianping-webbridge] 提取门店文本失败: {e}")
-        return []
+        raise RuntimeError(f"大众点评搜索结果解析失败：{e}") from e
 
     value = result.get("value") if isinstance(result, dict) else None
     items = value if isinstance(value, list) else []
     if not items:
-        logger.warning("[dianping-webbridge] 未找到搜索结果门店卡片（可能触发验证或未登录）")
-        return []
+        raise RuntimeError("大众点评页面未找到门店卡片；可能未登录、触发平台验证或页面结构已变化，不能判定为有效空结果")
 
     records = []
     seen_shops = set()

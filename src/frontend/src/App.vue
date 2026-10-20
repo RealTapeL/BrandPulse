@@ -105,10 +105,18 @@ const isBarePage = computed(() => ['/login', '/change-password'].includes(route.
 
 const navGroups = [
   { path: '/', title: '工作台', icon: 'Odometer' },
+  { id: 'analysis', title: '分析中心', icon: 'TrendCharts', items: [
+    { path: '/analysis', title: '分析总览', icon: 'DataAnalysis' },
+    { path: '/analysis/brands', title: '品牌对比', icon: 'Shop' },
+    { path: '/analysis/trends', title: '趋势与证据', icon: 'TrendCharts' },
+  ] },
   { id: 'insights', title: '品牌洞察', icon: 'Compass', items: [
     { path: '/brands', title: '品牌库', icon: 'Shop' },
     { path: '/opportunities', title: '机会雷达', icon: 'Radar' },
     { path: '/watchlist', title: '关注清单', icon: 'Star' },
+  ] },
+  { id: 'prediction', title: '预测中心', icon: 'TrendCharts', items: [
+    { path: '/predictions', title: '预测总览', icon: 'DataAnalysis' },
   ] },
   { id: 'data', title: '数据中心', icon: 'DataAnalysis', items: [
     { path: '/data?tab=overview', title: '数据概览', icon: 'PieChart' },

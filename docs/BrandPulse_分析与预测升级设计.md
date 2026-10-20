@@ -171,3 +171,87 @@ Phase 0 只确定产品结构，不在本阶段伪造预测结果。
 - 已明确正式范围由 `scope_id` 表达，当前试点范围同时包含城市、项目和品类。
 - 已确认点评、小红书和指标是否来自同一次快照必须通过 `snapshot_id → collection_run_id → source_run_id` 判断；最近快照为点评成功、小红书已验证空结果。
 - 已发现快照创建时机、状态历史、来源结果即时关联和数据库范围一致性约束四个 Phase 1 底座问题，并给出不破坏历史数据的迁移方式。
+
+## 11. Phase 2～4 实际落地结果
+
+### 11.1 Phase 2：统一指标字典
+
+已新增 `migrations/030_metric_dictionary_phase2.sql` 和 `031_metric_dictionary_corrections.sql`。迁移只扩展/修正指标定义，不重写历史 `metric_observations`，新增元数据包括：
+
+- `formula`：可读的计算公式或计算规则；
+- `comparison_scope`：指标允许比较的范围、来源和快照边界；
+- `minimum_sample_size`：最小样本门槛；
+- `quality_requirements`：来源、样本、可比性等质量要求；
+- `allow_alert` / `allow_prediction`：是否允许进入告警或预测流程。
+
+字典已经覆盖存量、增量、质量、竞争和趋势五组指标。当前没有真实小红书、POS、客流、租金或面积数据的指标，只会在 API 中返回 `available=false` 和质量说明，不会写入 0 或生成模拟值。
+
+已有自定义公式通过 `formula:<formula_id>` 纳入分析指标目录。只有 `snapshot_formula_evaluations.status=completed` 的快照绑定结果才会变成可用值；没有快照计算结果时只展示公式定义，不把旧 `custom_formula_values` 的 brand/date 兼容结果混入新分析。当前自定义公式的正式结果是范围级指标，不能被页面伪装成品牌级观测。
+
+### 11.2 Phase 3：统一分析 API
+
+后端新增 `brandpulse.analysis.AnalysisService` 和 `/api/v1/analysis` 查询入口：
+
+```text
+GET /api/v1/analysis?scope_id=<scope>&view=overview
+GET /api/v1/analysis?scope_id=<scope>&view=comparison&brand_ids=LK001,KD001
+GET /api/v1/analysis?scope_id=<scope>&view=trend&metric_key=dp_review_count_stock
+GET /api/v1/analysis?scope_id=<scope>&view=evidence&source_name=dianping_webbridge
+GET /api/v1/analysis/metrics
+```
+
+统一响应始终带有 `scope`、`snapshot`、`filters`、`metrics`、`series`、`ranking`、`comparison`、`evidence`、`quality` 和 `warnings`。品牌查询只接受 `entity_mapping_status=confirmed` 的原始观测；`MALL_*` 兼容数据集键不会被当作品牌。来源失败、跳过或 `empty_validated` 都会保留来源状态，不能按 0 参加综合指标。
+
+变化解释只使用“指标事实变化”和“系统推断边界”表述，未取得因果证据时不输出“导致”或“造成”。原始证据会绑定 `snapshot_id`、`collection_run_id`、来源和观测记录。
+
+### 11.3 Phase 4：分析中心 MVP
+
+前端新增三个真实数据页面：
+
+1. `/analysis` 分析总览：范围、快照、质量、来源覆盖、核心指标、品牌排名、累计评价趋势和原始证据入口；
+2. `/analysis/brands` 品牌对比：选择 2～5 个主数据品牌，展示已确认映射的真实对比结果；
+3. `/analysis/trends` 趋势与证据：切换指标、查看快照序列、相邻变化和原始观测。
+
+三个页面共用顶部监测范围，筛选状态写入 URL，并实现加载、空数据、错误、来源缺失和低质量状态。没有已确认品牌映射时，品牌排名和对比显示空状态；没有两个可比快照时，趋势显示不可比较，不绘制占位数据。
+
+### 11.4 当前试点真实数据边界
+
+截至本次实施，测试库的苏州 × 苏州中心 × 咖啡范围有 5 个就绪快照，但只有 3 个快照具备可比较的点评新增评价指标；最新快照为点评单源、质量 B，来源覆盖率为 0.5；小红书为 `empty_validated`，原始观测尚无 confirmed 品牌/门店映射。因此范围级点评存量和快照序列可以展示，品牌排名、品牌对比和小红书内容指标必须保持不可用。这是数据事实，不是页面缺陷。
+
+## 12. Phase 5～8 实际落地结果
+
+### 12.1 机会雷达
+
+机会生成服务现在只从 ready/published 快照读取事实，并增加了以下可解释规则：
+
+- `trend_requires_validation`：缺少同口径前序快照时提示“需验证”；
+- `source_anomaly`：累计评价数回退或新增评价数为负时标记来源异常；
+- `recent_growth` / `continuous_decline`：只有当前与前一快照范围、来源覆盖和数据模式一致且覆盖率达到 80% 才生成；
+- 原有的高口碑低评价份额、映射不完整、来源覆盖不完整继续保留。
+
+每条信号携带规则版本、指标证据、来源证据、snapshot_id、质量等级、置信度、信息缺口和推荐动作。生命周期变更写入 `opportunity_signal_events`，并校验状态流转，不允许任意跳过人工复核阶段。
+
+### 12.2 预测准入
+
+新增点评新增评价数预测目标 `dp_review_count_delta`。准入规则为至少 12 个可比较周期、来源覆盖率不低于 80%、采集间隔不超过 7 天、数据模式不切换、目标值不为负；品牌/门店预测还要求稳定实体映射。检查结果写入 `forecast_readiness_checks`，训练前和后台任务执行前各检查一次。
+
+当前真实库检查结果：3 个可比较周期、最低来源覆盖率 50%，所以接口返回 `not_ready`，训练请求返回 409 并说明缺少 9 个周期和覆盖率不足，不创建任务。
+
+### 12.3 外部点评预测 MVP
+
+数据满足准入后，RQ Worker 会读取数据库快照序列，按时间切分最后 3 个周期进行回测，训练一个基础线性模型，并与上一周期值、最近 3 周期均值两个朴素基线比较。输出包括实际值、预测值、MAE、RMSE、WAPE、残差区间、输入快照和模型工件。模型不优于基线时不会进入可发布状态，也不会被标记为内部经营模型。
+
+### 12.4 模型注册和预测中心
+
+新增 `model_registry`、`model_routes` 和 `forecast_results`。训练成功自动登记模型版本；发布时停用同一目标的旧路由但保留旧版本，停用接口可以回收当前路由，满足基础回滚要求。前端新增 /predictions 预测中心，展示准入周期、覆盖率、阻断原因、快照序列、模型指标和发布状态。
+
+### 12.5 对象存储与备份
+
+备份脚本继续先执行 custom-format 归档校验和 SHA-256，再根据 `_OBJECT_STORAGE_BACKEND` 选择本地目录或 S3/MinIO 兼容对象存储。对象存储上传失败会使备份命令失败，不会报告“已备份”但实际未上传。系统配置自检会区分本地存储警告、S3 配置通过和配置缺失。
+
+## 13. 尚未满足的生产条件
+
+- POS、客流、租金、面积、合同和门店主数据仍未授权提供，内部经营预测、坪效、租售比和租户健康度不能执行；
+- 小红书当前是已校验空结果，不能参与跨来源综合指标；
+- 真实品牌/门店映射仍为 0，品牌级排名、品牌级机会和品牌/门店级预测保持空状态；
+- 外部点评预测仍需继续运行采集并达到准入门槛，系统不以降低门槛的方式“完成”预测。

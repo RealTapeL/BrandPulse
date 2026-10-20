@@ -126,6 +126,7 @@ cd src/frontend && npm run dev
 | `GET  /api/v1/crawl_jobs` / `GET .../{id}` | 查询持久化采集任务历史与状态 |
 | `GET  /api/v1/indicators` | 指标时序（query: brand_id, indicator, start, end） |
 | `GET /api/v1/dashboard/scopes` / `GET /api/v1/dashboard?scope_id=` | 真实项目/品类范围与范围内看板快照 |
+| `GET /api/v1/analysis` / `GET /api/v1/analysis/metrics` | 统一分析总览、品牌对比、趋势/证据查询与指标字典；必须传 `scope_id` |
 | `GET  /api/v1/tables/{name}` | 白名单数据表的服务端筛选、排序、分页；`raw_observations`、`metric_observations` 必须传 `scope_id` |
 | `GET|POST|PUT|DELETE /api/v1/formulas` | 自定义指标公式配置 |
 | `POST /api/v1/formulas/{id}/run` / `GET .../values?scope_id=` | 按可信范围的 ready/published 快照计算并读取带证据的公式试验结果 |
@@ -243,6 +244,20 @@ PYTHONPATH=src/backend:src .venv/bin/python scripts/test_alert_destination.py --
 当前数据库没有内部 POS 记录时，这两个接口会明确返回未就绪或空 `series`；收到授权的 POS 导出文件
 后，先在 Web 页面预览校验，再确认导入，最后才进行销售趋势和内部预测训练。
 
+### 公开销售基准验证
+
+在没有授权内部 POS 数据时，可以使用已登记的公开 `store_sales` 数据集验证销售时序和模型回测链路。它来自 Kaggle Store Item Demand Forecasting Challenge 的公开镜像，下载前会校验字段、日期、空值、非负销量和重复键；数据层级固定为 `public_benchmark`，不会写入 `store_operations`，也不能作为内部经营预测依据：
+
+```bash
+PYTHONPATH=src/backend:src .venv/bin/python -m ml.forecasting.cli download --dataset store_sales
+PYTHONPATH=src/backend:src .venv/bin/python -m ml.forecasting.cli train \
+  --dataset store_sales --validation-days 28 --horizon 14
+```
+
+Web 端机器学习页面也提供“下载并校验”和真实摘要入口，对应 `POST /api/v1/ml/datasets/{dataset_key}/download` 与
+`GET /api/v1/ml/datasets/{dataset_key}/summary`。详细边界、来源和本次回测结果见
+`docs/Phase9_公开基准验证与内部经营数据准入.md`。
+
 ## 运维检查与数据库备份
 
 负载均衡或容器探针使用：
@@ -265,6 +280,7 @@ bash scripts/verify_postgres_backup.sh backups/postgres/brandpulse_YYYYmmdd_HHMM
 
 备份默认写入 `backups/postgres/`（Git 忽略），生成 SHA-256 校验和，并在落盘前通过 `pg_restore --list`
 检查归档。默认保留 14 天；可用 `BRANDPULSE_BACKUP_DIR` 和 `BRANDPULSE_BACKUP_RETENTION_DAYS` 调整。
+如需异地保存，可设置 OBJECT_STORAGE_BACKEND=s3、bucket、endpoint 和访问凭据；备份脚本会在本地校验成功后上传到 S3/MinIO 兼容对象存储，上传失败会使备份任务失败。
 用户级每日 timer 可执行 `bash scripts/install_backup_timer.sh` 安装，默认约 02:30 运行且不需要 root；仍应
 定期使用独立临时数据库执行完整恢复演练。
 
@@ -294,6 +310,7 @@ bash scripts/verify_postgres_backup.sh backups/postgres/brandpulse_YYYYmmdd_HHMM
 - **数据表查看**：范围绑定的原始观测、快照指标和门店经营数据的分页、排序、筛选
 - **内部经营数据**：在“门店经营数据”表页上传 Excel；系统先校验品牌与门店主数据，通过后才写库
 - **指标公式管理**：快照指标口径、自定义安全公式、按所选范围和快照计算并保存证据
+- **分析中心 MVP**：统一指标字典、快照级分析 API、分析总览、品牌对比、趋势与原始证据；未确认映射或来源缺失时显示不可用，不补造数据
 - **操作审计**：查看变更、登录和下载记录，并显示当前生产配置缺口
 
 技术栈：FastAPI + Vue3 / Element Plus / ECharts + Pinia + axios（hash 路由）。
@@ -337,6 +354,7 @@ agent-reach doctor --json
 - **可信范围与运行**：`trusted_monitoring_scopes`、`collection_runs`、`source_runs`
 - **可信原始与快照**：`raw_observations`、`data_snapshots`、`snapshot_source_results`
 - **指标与判断证据**：`metric_observations`、`opportunity_signals`、`trusted_alert_evaluations`、`snapshot_formula_evaluations`
+- **统一指标字典**：`metric_definitions`（公式、比较范围、样本门槛、质量要求、告警/预测准入）
 - **兼容历史表**：`dp_shop_metrics`、`xhs_notes`、`brand_heat_daily`、`brand_indicators_daily` 保留历史读，不作为正式判断来源
 - **经营表**：`store_operations`（销售、订单、客流、成本、坪效、租售比、合同到期）
 
@@ -380,9 +398,10 @@ cd src/frontend && npm run test:unit && npm run build
 
 ## 后续计划
 
-- 获得授权后接入 POS 与门店主数据，形成真实销售趋势、坪效和内部预测
-- 增加角色/项目权限、对象存储以及模型审批发布与回滚
-- 将数据库备份接入异机/对象存储，并建立定期完整恢复演练
+- 继续积累苏州中心咖啡的连续可比快照：当前只有 3 个点评增量可比较周期，来源覆盖率约 50%，预测中心会保持未就绪
+- 完成真实品牌/门店映射后再开放品牌级排名、品牌级机会和品牌/门店级预测
+- 获得授权后接入 POS 与门店主数据，形成真实销售趋势、坪效和内部经营预测；没有授权数据时不展示经营预测
+- 生产部署将 OBJECT_STORAGE_BACKEND 切换为 s3，并定期执行异地备份和完整恢复演练
 
 ## 注意事项
 

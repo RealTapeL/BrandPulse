@@ -26,6 +26,24 @@ const routes = [
     alias: '/dashboard',
   },
   {
+    path: '/analysis',
+    name: 'analysis-overview',
+    component: () => import('../views/AnalysisOverviewView.vue'),
+    meta: { title: '分析总览', group: '分析中心', navActive: '/analysis' },
+  },
+  {
+    path: '/analysis/brands',
+    name: 'analysis-brands',
+    component: () => import('../views/AnalysisBrandComparisonView.vue'),
+    meta: { title: '品牌对比', group: '分析中心', navActive: '/analysis' },
+  },
+  {
+    path: '/analysis/trends',
+    name: 'analysis-trends',
+    component: () => import('../views/AnalysisTrendEvidenceView.vue'),
+    meta: { title: '趋势与证据', group: '分析中心', navActive: '/analysis' },
+  },
+  {
     path: '/assistant',
     name: 'assistant',
     component: () => import('../views/ChatView.vue'),
@@ -51,6 +69,12 @@ const routes = [
     name: 'ml-forecasting',
     component: () => import('../views/MLForecastingView.vue'),
     meta: { title: '实验室 · 机器学习预测', group: '系统设置' },
+  },
+  {
+    path: '/predictions',
+    name: 'predictions',
+    component: () => import('../views/PredictionCenterView.vue'),
+    meta: { title: '预测总览', group: '预测中心', navActive: '/predictions' },
   },
   {
     path: '/automation',

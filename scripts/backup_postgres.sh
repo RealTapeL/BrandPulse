@@ -64,3 +64,8 @@ find "$backup_dir" -maxdepth 1 -type f -name 'brandpulse_*.dump.sha256' \
 
 size="$(du -h "$final_path" | awk '{print $1}')"
 log "备份完成并通过 pg_restore 结构校验：$final_path（$size）"
+
+object_storage_backend="$(config_value OBJECT_STORAGE_BACKEND)"
+if [[ "$object_storage_backend" == "s3" ]]; then
+    "$venv_python" scripts/upload_backup.py "$final_path"
+fi
